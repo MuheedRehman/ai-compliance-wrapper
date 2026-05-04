@@ -37,11 +37,28 @@ class ApiKey(Base):
     revoked_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class AiSystem(Base):
+    __tablename__ = "ai_systems"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    
+    deployment_status = Column(String, nullable=False, server_default="draft", default="draft")
+    registration_status = Column(String, nullable=False, server_default="draft", default="draft")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class AiFeature(Base):
     __tablename__ = "ai_features"
 
     id = Column(String, primary_key=True, index=True)
     tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
     feature_id = Column(String, nullable=False, index=True)
 
     name = Column(String, nullable=False)
@@ -106,10 +123,12 @@ class EvidenceLog(Base):
 
     event_id = Column(String, primary_key=True, index=True)
     tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
     feature_pk = Column(String, ForeignKey("ai_features.id"), nullable=True, index=True)
     feature_id = Column(String, nullable=True, index=True)
     feature_version_id = Column(String, ForeignKey("feature_versions.feature_version_id"), nullable=True, index=True)
     policy_bundle_version = Column(String, nullable=True, index=True)
+    evidence_domain = Column(String, nullable=True, index=True)
 
     request_id = Column(String, nullable=False, index=True)
     trace_id = Column(String, nullable=False, index=True)
@@ -153,6 +172,7 @@ class ReviewTask(Base):
 
     review_task_id = Column(String, primary_key=True, index=True)
     tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
     feature_pk = Column(String, ForeignKey("ai_features.id"), nullable=True, index=True)
     feature_id = Column(String, nullable=True, index=True)
     feature_version_id = Column(String, ForeignKey("feature_versions.feature_version_id"), nullable=True, index=True)
@@ -172,3 +192,61 @@ class ReviewTask(Base):
         # Backup constraint only. Code-level dedupe is the primary guarantee because NULL semantics differ by DB.
         Index("ix_review_dedupe_lookup", "tenant_id", "feature_id", "feature_version_id", "review_type", "trigger_reason", "status"),
     )
+
+
+class FRIARecord(Base):
+    __tablename__ = "fria_records"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
+    
+    status = Column(String, nullable=False, default="draft")
+    assessment_json = Column(JSON, nullable=False, default=dict)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class OversightAssignment(Base):
+    __tablename__ = "oversight_assignments"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
+    
+    reviewer_email = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class IncidentRecord(Base):
+    __tablename__ = "incident_records"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
+    
+    severity = Column(String, nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String, nullable=False, default="open")
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class EvidenceBundle(Base):
+    __tablename__ = "evidence_bundles"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
+    
+    bundle_hash = Column(String, nullable=False)
+    bundle_url = Column(String, nullable=True)  # Link to Cloud Storage
+    status = Column(String, nullable=False, default="pending")
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)

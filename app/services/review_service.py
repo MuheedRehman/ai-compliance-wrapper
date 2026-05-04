@@ -15,6 +15,7 @@ def get_or_create_open_review_task(
     findings: dict | None = None,
     feature_pk: str | None = None,
     feature_version_id: str | None = None,
+    ai_system_id: str | None = None,
 ) -> ReviewTask:
     # Code-level dedupe is primary because nullable unique constraints behave differently across DBs.
     task = (
@@ -38,6 +39,8 @@ def get_or_create_open_review_task(
             **(task.findings_json or {}),
             "latest": findings or {},
         }
+        if task.ai_system_id is None and ai_system_id is not None:
+            task.ai_system_id = ai_system_id
         db.flush()
         return task
 
@@ -50,6 +53,7 @@ def get_or_create_open_review_task(
                 feature_id=feature_id,
                 feature_pk=feature_pk,
                 feature_version_id=feature_version_id,
+                ai_system_id=ai_system_id,
                 review_type=review_type,
                 trigger_reason=trigger_reason,
                 severity=severity,
@@ -82,6 +86,8 @@ def get_or_create_open_review_task(
             **(task.findings_json or {}),
             "latest": findings or {},
         }
+        if task.ai_system_id is None and ai_system_id is not None:
+            task.ai_system_id = ai_system_id
         db.flush()
 
     return task

@@ -1,5 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import AiFeature, FeatureVersion
@@ -15,7 +16,6 @@ def create_feature(payload: FeatureCreate, x_api_key: str | None = Header(defaul
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     existing = db.query(AiFeature).filter(AiFeature.tenant_id == auth["tenant_id"], AiFeature.feature_id == payload.feature_id).first()
     if existing:
-        db.rollback()
         raise HTTPException(status_code=409, detail="Feature already exists for this tenant")
 
     feature = AiFeature(
@@ -39,25 +39,23 @@ def create_feature(payload: FeatureCreate, x_api_key: str | None = Header(defaul
     db.add(feature)
     db.commit()
     db.refresh(feature)
-    return feature
+    return jsonable_encoder(feature)
 
 
 @router.get("/v1/features")
 def list_features(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:read")
     features = db.query(AiFeature).filter(AiFeature.tenant_id == auth["tenant_id"]).order_by(AiFeature.created_at.desc()).all()
-    db.commit()
-    return {"tenant_id": auth["tenant_id"], "features": features}
+    return {"tenant_id": auth["tenant_id"], "features": jsonable_encoder(features)}
 
 
 @router.get("/v1/features/{feature_id}")
 def get_feature(feature_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:read")
     feature = db.query(AiFeature).filter(AiFeature.tenant_id == auth["tenant_id"], AiFeature.feature_id == feature_id).first()
-    db.commit()
     if not feature:
         raise HTTPException(status_code=404, detail="Feature not found")
-    return feature
+    return jsonable_encoder(feature)
 
 
 @router.patch("/v1/features/{feature_id}")
@@ -65,13 +63,12 @@ def update_feature(feature_id: str, payload: FeatureUpdate, x_api_key: str | Non
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     feature = db.query(AiFeature).filter(AiFeature.tenant_id == auth["tenant_id"], AiFeature.feature_id == feature_id).first()
     if not feature:
-        db.rollback()
         raise HTTPException(status_code=404, detail="Feature not found")
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(feature, key, value)
     db.commit()
     db.refresh(feature)
-    return feature
+    return jsonable_encoder(feature)
 
 
 @router.get("/v1/features/{feature_id}/versions")
@@ -79,11 +76,9 @@ def list_feature_versions(feature_id: str, x_api_key: str | None = Header(defaul
     auth = authenticate_api_key(db, x_api_key, required_scope="features:read")
     feature = db.query(AiFeature).filter(AiFeature.tenant_id == auth["tenant_id"], AiFeature.feature_id == feature_id).first()
     if not feature:
-        db.rollback()
         raise HTTPException(status_code=404, detail="Feature not found")
     versions = db.query(FeatureVersion).filter(FeatureVersion.tenant_id == auth["tenant_id"], FeatureVersion.feature_pk == feature.id).order_by(FeatureVersion.version.desc()).all()
-    db.commit()
-    return {"feature_id": feature_id, "versions": versions}
+    return {"feature_id": feature_id, "versions": jsonable_encoder(versions)}
 
 
 @router.post("/v1/features/{feature_id}/versions/{feature_version_id}/approve")
@@ -92,7 +87,7 @@ def approve_version(feature_id: str, feature_version_id: str, payload: VersionDe
     version = approve_feature_version(db, auth["tenant_id"], feature_id, feature_version_id)
     db.commit()
     db.refresh(version)
-    return version
+    return jsonable_encoder(version)
 
 
 @router.post("/v1/features/{feature_id}/versions/{feature_version_id}/reject")
@@ -101,4 +96,4 @@ def reject_version(feature_id: str, feature_version_id: str, payload: VersionDec
     version = reject_feature_version(db, auth["tenant_id"], feature_id, feature_version_id)
     db.commit()
     db.refresh(version)
-    return version
+    return jsonable_encoder(version)

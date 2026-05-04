@@ -21,6 +21,8 @@ def write_evidence_log(db: Session, event_data: dict) -> EvidenceLog:
     evidence = EvidenceLog(
         event_id=base_event["event_id"],
         tenant_id=event_data["tenant_id"],
+        ai_system_id=event_data.get("ai_system_id"),
+        evidence_domain=event_data.get("evidence_domain"),
         feature_pk=event_data.get("feature_pk"),
         feature_id=event_data.get("feature_id"),
         feature_version_id=event_data.get("feature_version_id"),
