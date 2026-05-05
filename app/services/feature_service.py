@@ -2,13 +2,76 @@ from datetime import datetime, timezone
 import uuid
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from app.models import AiFeature, FeatureVersion
+from app.models import AiFeature, FeatureVersion, AiSystem
 from app.services.hashing import hash_object
 from app.services.review_service import get_or_create_open_review_task
+from app.schemas import FeatureCreate, FeatureUpdate
 
 
 def get_feature(db: Session, tenant_id: str, feature_id: str) -> AiFeature | None:
     return db.query(AiFeature).filter(AiFeature.tenant_id == tenant_id, AiFeature.feature_id == feature_id).first()
+
+
+def create_feature(db: Session, tenant_id: str, payload: FeatureCreate) -> AiFeature:
+    existing = get_feature(db, tenant_id, payload.feature_id)
+    if existing:
+        raise HTTPException(status_code=409, detail="Feature already exists for this tenant")
+
+    feature = AiFeature(
+        id=str(uuid.uuid4()),
+        tenant_id=tenant_id,
+        feature_id=payload.feature_id,
+        name=payload.name,
+        slug=payload.feature_id,
+        description=payload.description,
+        owner_email=payload.owner_email,
+        team=payload.team,
+        use_case=payload.use_case,
+        decision_impact=payload.decision_impact,
+        affected_user_groups=payload.affected_user_groups,
+        risk_level_current=payload.risk_level_current,
+        compliance_status=payload.compliance_status,
+        fria_likely_required=payload.fria_likely_required,
+        approved_providers=payload.approved_providers,
+        approved_models=payload.approved_models,
+        ai_system_id=payload.ai_system_id,
+    )
+    validate_ai_system_linkage(db, tenant_id, feature.ai_system_id)
+    db.add(feature)
+    db.commit()
+    db.refresh(feature)
+    return feature
+
+
+def update_feature(db: Session, tenant_id: str, feature_id: str, payload: FeatureUpdate) -> AiFeature:
+    feature = get_feature(db, tenant_id, feature_id)
+    if not feature:
+        raise HTTPException(status_code=404, detail="Feature not found")
+
+    update_data = payload.model_dump(exclude_unset=True)
+    
+    if "ai_system_id" in update_data and update_data["ai_system_id"] is not None:
+        validate_ai_system_linkage(db, tenant_id, update_data["ai_system_id"])
+
+    for key, value in update_data.items():
+        setattr(feature, key, value)
+        
+    db.commit()
+    db.refresh(feature)
+    return feature
+
+
+def validate_ai_system_linkage(db: Session, tenant_id: str, ai_system_id: str | None):
+    if ai_system_id is None:
+        return
+    
+    system = db.query(AiSystem).filter(AiSystem.id == ai_system_id, AiSystem.tenant_id == tenant_id).first()
+    if not system:
+        # Check if it exists but belongs to another tenant to give a better error
+        other_tenant_system = db.query(AiSystem).filter(AiSystem.id == ai_system_id).first()
+        if other_tenant_system:
+            raise HTTPException(status_code=403, detail="AI System belongs to another tenant")
+        raise HTTPException(status_code=404, detail="AI System not found")
 
 
 def compute_feature_fingerprint(feature_id: str, provider: str, model: str, prompt_hash: str, policy_bundle_version: str) -> str:
