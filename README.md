@@ -90,3 +90,12 @@ For SQLite local tests, the main request transaction is rolled back before the i
 ## Sprint 6B
 
 Adds Alembic migrations, PostgreSQL test support, Docker test DB, release gate scripts, and GitHub Actions CI.
+
+## Phase 0A: Cloud Foundation
+
+This phase prepares the AI Compliance Backend for Google Cloud Platform staging and production deployment.
+
+- `Dockerfile` and `cloudbuild.yaml` for containerization and CI/CD.
+- GCP Secret Manager integration for robust configuration handling.
+- Documentation for Cloud Run and Cloud SQL deployment in the `infra/` folder.
+
