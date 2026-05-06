@@ -99,3 +99,13 @@ This phase prepares the AI Compliance Backend for Google Cloud Platform staging 
 - GCP Secret Manager integration for robust configuration handling.
 - Documentation for Cloud Run and Cloud SQL deployment in the `infra/` folder.
 
+## Firecrawl Foundation (Phase 0A Additive Extension)
+
+Added Firecrawl wrapper to enable asynchronous and single-page scraping without heavy internal dependencies. This foundation must abide by these strict infrastructure constraints to keep costs near zero during the build phase:
+- **Low-Cost GCP Usage**: Maintain low-cost architecture during the pre-revenue build phase.
+- **No Always-On Workers**: Avoid background worker infrastructure; run processes synchronously where possible.
+- **No Queueing System**: Do not use Pub/Sub or Celery unless clearly required in later phases.
+- **Same-Region Deployment**: Keep all components in the same GCP region to eliminate cross-region network egress costs.
+- **Max Instance Caps & Budgets**: Set `max-instances` tight caps (e.g., 2) on Cloud Run, use GCP budgets, and apply resource labels.
+- **Helper Layer**: Firecrawl is purely a helper layer for data acquisition. The database (app.db or Cloud SQL Postgres) remains the ultimate compliance source of truth, not Firecrawl's outputs.
+

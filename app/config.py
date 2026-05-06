@@ -21,6 +21,24 @@ CANDIDATE_VERSION_POLICY = get_secret("CANDIDATE_VERSION_POLICY", "allow_with_wa
 EVIDENCE_CHAIN_MODE = get_secret("EVIDENCE_CHAIN_MODE", "best_effort_tenant_chain")
 EVIDENCE_HMAC_SECRET = get_secret("EVIDENCE_HMAC_SECRET")
 
+FIRECRAWL_API_KEY = get_secret("FIRECRAWL_API_KEY")
+FIRECRAWL_API_URL = get_secret("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1")
+FIRECRAWL_ALLOWED_DOMAINS = get_secret("FIRECRAWL_ALLOWED_DOMAINS", "")
+
+try:
+    FIRECRAWL_TIMEOUT = int(get_secret("FIRECRAWL_TIMEOUT", "30"))
+    if FIRECRAWL_TIMEOUT <= 0:
+        raise ValueError
+except ValueError:
+    raise RuntimeError("FIRECRAWL_TIMEOUT must be a positive integer.")
+
+try:
+    FIRECRAWL_MAX_PAGES = int(get_secret("FIRECRAWL_MAX_PAGES", "50"))
+    if FIRECRAWL_MAX_PAGES <= 0:
+        raise ValueError
+except ValueError:
+    raise RuntimeError("FIRECRAWL_MAX_PAGES must be a positive integer.")
+
 VALID_FEATURE_ENFORCEMENT_MODES = {"warn", "quarantine", "block"}
 VALID_CANDIDATE_VERSION_POLICIES = {"allow_with_warning", "quarantine", "block"}
 
