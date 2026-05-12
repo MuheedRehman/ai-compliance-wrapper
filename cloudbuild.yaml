@@ -34,7 +34,7 @@ steps:
     args:
       - build
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
       - .
     waitFor:
       - run-backend-tests
@@ -43,7 +43,7 @@ steps:
     id: push-backend
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
     waitFor:
       - build-backend
 
@@ -56,7 +56,7 @@ steps:
       - deploy
       - ${_MIGRATION_JOB}
       - --image
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
       - --region
       - ${_REGION}
       - --service-account
@@ -86,7 +86,7 @@ steps:
       - deploy
       - ${_BACKEND_SERVICE}
       - --image
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
       - --region
       - ${_REGION}
       - --platform
@@ -128,7 +128,7 @@ steps:
         BACKEND_URL="$(cat /workspace/backend_url.txt)"
         docker build \
           --build-arg NEXT_PUBLIC_API_URL="$$BACKEND_URL" \
-          -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$COMMIT_SHA" \
+          -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID" \
           apps/dashboard
     waitFor:
       - capture-backend-url
@@ -137,7 +137,7 @@ steps:
     id: push-frontend
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$COMMIT_SHA
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID
     waitFor:
       - build-frontend
 
@@ -150,7 +150,7 @@ steps:
         set -euo pipefail
         BACKEND_URL="$(cat /workspace/backend_url.txt)"
         gcloud run deploy "$_FRONTEND_SERVICE" \
-          --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$COMMIT_SHA" \
+          --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID" \
           --region "$_REGION" \
           --platform managed \
           --allow-unauthenticated \
@@ -180,8 +180,8 @@ steps:
       - deploy-frontend
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$COMMIT_SHA
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID
 
 options:
   logging: CLOUD_LOGGING_ONLY
