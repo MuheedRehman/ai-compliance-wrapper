@@ -54,9 +54,26 @@ export const api = {
   // AI Systems
   listSystems: () => fetchApi<any[]>('/v1/ai-systems'),
   getSystem: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}`),
+  createSystem: (body: { name: string; description?: string }) =>
+    fetchApi<any>('/v1/ai-systems', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 
   // Features
   listFeatures: () => fetchApi<{ tenant_id: string; features: any[] }>('/v1/features'),
+  createFeature: (body: {
+    feature_id: string;
+    name: string;
+    description?: string;
+    owner_email?: string;
+    ai_system_id?: string;
+    approved_models?: string[];
+  }) =>
+    fetchApi<any>('/v1/features', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   getFeature: (featureId: string) => fetchApi<any>(`/v1/features/${featureId}`),
   getFeatureVersions: (featureId: string) =>
     fetchApi<{ feature_id: string; versions: any[] }>(`/v1/features/${featureId}/versions`),

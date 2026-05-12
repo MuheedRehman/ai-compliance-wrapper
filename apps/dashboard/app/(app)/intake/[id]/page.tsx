@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, use } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
@@ -18,8 +18,8 @@ import {
   History
 } from 'lucide-react';
 
-export default function IntakeDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function IntakeDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [intake, setIntake] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -26,6 +26,9 @@ export default function SystemsPage() {
   const [systems, setSystems] = useState<AiSystem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({ name: '', description: '' });
 
   const load = () => {
     setLoading(true);
@@ -38,6 +41,25 @@ export default function SystemsPage() {
 
   useEffect(() => { load(); }, []);
 
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.createSystem({
+        name: formData.name.trim(),
+        description: formData.description.trim() || undefined,
+      });
+      setFormData({ name: '', description: '' });
+      setShowCreate(false);
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to register system');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   const breadcrumbs = [{ label: 'AI Systems' }];
 
   const deployedCount = systems.filter(s => s.deployment_status.toLowerCase() === 'deployed').length;
@@ -49,9 +71,12 @@ export default function SystemsPage() {
       subtitle="Comprehensive inventory of AI systems within your governance scope."
       breadcrumbs={breadcrumbs}
       actions={
-        <button className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95">
+        <button
+          onClick={() => setShowCreate((current) => !current)}
+          className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+        >
           <Plus className="h-4 w-4" />
-          REGISTER SYSTEM
+          {showCreate ? 'CANCEL' : 'REGISTER SYSTEM'}
         </button>
       }
     >
@@ -60,13 +85,60 @@ export default function SystemsPage() {
       ) : error ? (
         <ErrorState message={error} onRetry={load} />
       ) : systems.length === 0 ? (
-        <EmptyState 
-          title="No AI systems identified" 
-          message="Begin by registering your first AI system to initiate the compliance workflow."
-          icon={Cpu}
-        />
+        <div className="space-y-6">
+          {showCreate && (
+            <Card title="Register AI System">
+              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                <input
+                  required
+                  value={formData.name}
+                  onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                  placeholder="System name"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  value={formData.description}
+                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                  placeholder="Short description"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <button disabled={submitting} className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {submitting ? 'Creating...' : 'Create System'}
+                </button>
+              </form>
+            </Card>
+          )}
+          <EmptyState
+            title="No AI systems identified"
+            message="Begin by registering your first AI system to initiate the compliance workflow."
+            icon={Cpu}
+          />
+        </div>
       ) : (
         <div className="space-y-6">
+          {showCreate && (
+            <Card title="Register AI System">
+              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+                <input
+                  required
+                  value={formData.name}
+                  onChange={(event) => setFormData({ ...formData, name: event.target.value })}
+                  placeholder="System name"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  value={formData.description}
+                  onChange={(event) => setFormData({ ...formData, description: event.target.value })}
+                  placeholder="Short description"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <button disabled={submitting} className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
+                  {submitting ? 'Creating...' : 'Create System'}
+                </button>
+              </form>
+            </Card>
+          )}
+
           {/* Summary KPIs */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Card title="Total Systems" variant="stat">
