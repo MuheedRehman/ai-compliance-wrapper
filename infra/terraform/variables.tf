@@ -59,7 +59,7 @@ variable "deploy_cloud_run" {
 }
 
 variable "allow_unauthenticated" {
-  description = "Allow unauthenticated access to Cloud Run. True is a temporary staging/testing tradeoff."
+  description = "Allow unauthenticated access to Cloud Run. Keep false unless a public staging URL is explicitly approved."
   type        = bool
-  default     = true
+  default     = false
 }
