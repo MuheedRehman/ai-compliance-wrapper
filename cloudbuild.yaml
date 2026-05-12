@@ -4,6 +4,7 @@ substitutions:
   _BACKEND_SERVICE: ai-compliance-backend
   _FRONTEND_SERVICE: ai-compliance-dashboard
   _MIGRATION_JOB: ai-compliance-migrate
+  _SEED_JOB: ai-compliance-seed
   _CLOUD_SQL_INSTANCE: ''
   _CLOUD_RUN_SERVICE_ACCOUNT: ''
 
@@ -79,6 +80,37 @@ steps:
       - push-backend
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    id: seed-staging-data
+    entrypoint: gcloud
+    args:
+      - run
+      - jobs
+      - deploy
+      - ${_SEED_JOB}
+      - --image
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-backend:$BUILD_ID
+      - --region
+      - ${_REGION}
+      - --service-account
+      - ${_CLOUD_RUN_SERVICE_ACCOUNT}
+      - --set-cloudsql-instances
+      - ${_CLOUD_SQL_INSTANCE}
+      - --set-env-vars
+      - APP_ENV=staging
+      - --set-secrets
+      - DATABASE_URL=DATABASE_URL:latest,EVIDENCE_HMAC_SECRET=EVIDENCE_HMAC_SECRET:latest,DASHBOARD_API_KEY=DASHBOARD_API_KEY:latest
+      - --command
+      - python
+      - --args
+      - scripts/seed_dashboard_key.py
+      - --max-retries
+      - '0'
+      - --execute-now
+      - --wait
+    waitFor:
+      - run-migrations
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: deploy-backend
     entrypoint: gcloud
     args:
@@ -103,7 +135,7 @@ steps:
       - --max-instances
       - '2'
     waitFor:
-      - run-migrations
+      - seed-staging-data
 
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk
     id: capture-backend-url

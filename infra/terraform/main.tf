@@ -34,6 +34,7 @@ resource "google_artifact_registry_repository" "backend_repo" {
 # 3. Secret Manager (Containers only)
 locals {
   secrets = [
+    "DASHBOARD_API_KEY",
     "OPENAI_API_KEY",
     "EVIDENCE_HMAC_SECRET",
     "FIRECRAWL_API_KEY",

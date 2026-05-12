@@ -11,10 +11,11 @@ from app.models import AiFeature, AiSystem, Entitlement, Tenant, ApiKey
 from app.services.hashing import hash_api_key
 from app.services.compliance_control_service import ComplianceControlService
 
-TENANT_ID = "tenant-dashboard-dev"
-TENANT_NAME = "Dashboard Dev Tenant"
-RAW_API_KEY = "test_api_key"
-KEY_ID = "key-dashboard-dev"
+APP_ENV = os.getenv("APP_ENV", "development")
+TENANT_ID = os.getenv("DASHBOARD_TENANT_ID", "tenant-dashboard-dev")
+TENANT_NAME = os.getenv("DASHBOARD_TENANT_NAME", "Dashboard Dev Tenant")
+RAW_API_KEY = os.getenv("DASHBOARD_API_KEY")
+KEY_ID = os.getenv("DASHBOARD_KEY_ID", f"key-dashboard-{APP_ENV}")
 DEMO_SYSTEM_ID = "sys-dashboard-demo"
 DEMO_FEATURE_ID = "dashboard_demo_assistant"
 
@@ -26,6 +27,12 @@ ENTITLEMENTS = [
 ]
 
 def seed():
+    raw_api_key = RAW_API_KEY
+    if not raw_api_key and APP_ENV == "development":
+        raw_api_key = "test_api_key"
+    if not raw_api_key:
+        raise RuntimeError("DASHBOARD_API_KEY must be set outside development.")
+
     db = SessionLocal()
     try:
         # Upsert tenant
@@ -38,7 +45,7 @@ def seed():
             print(f"Tenant already exists: {TENANT_ID}")
 
         # Upsert API key
-        key_hash = hash_api_key(RAW_API_KEY)
+        key_hash = hash_api_key(raw_api_key)
         existing = db.query(ApiKey).filter(ApiKey.key_id == KEY_ID).first()
         if not existing:
             api_key = ApiKey(
@@ -51,7 +58,10 @@ def seed():
                 revoked=False,
             )
             db.add(api_key)
-            print(f"Created API key: {RAW_API_KEY}  (hash: {key_hash[:16]}...)")
+            if APP_ENV == "development":
+                print(f"Created API key: {raw_api_key}  (hash: {key_hash[:16]}...)")
+            else:
+                print(f"Created API key: {KEY_ID}  (hash: {key_hash[:16]}...)")
         else:
             print(f"API key already exists: {KEY_ID}")
 
@@ -114,7 +124,10 @@ def seed():
         db.commit()
         ComplianceControlService.seed_baseline(db, TENANT_ID)
         ComplianceControlService.seed_baseline(db, TENANT_ID, DEMO_SYSTEM_ID)
-        print("Done. Dashboard can now authenticate with x-api-key: test_api_key")
+        if APP_ENV == "development":
+            print("Done. Dashboard can now authenticate with x-api-key: test_api_key")
+        else:
+            print("Done. Dashboard API key is stored in Secret Manager.")
     finally:
         db.close()
 
