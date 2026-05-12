@@ -1,5 +1,5 @@
 from openai import OpenAI
-from app.config import OPENAI_API_KEY, DEFAULT_MODEL
+from app.config import AI_PROVIDER_MODE, OPENAI_API_KEY, DEFAULT_MODEL
 
 _client = None
 
@@ -18,6 +18,28 @@ def call_ai_provider(provider: str, messages: list[dict], model: str | None, max
         raise ValueError(f"Unsupported provider: {provider}")
 
     selected_model = model or DEFAULT_MODEL
+    if AI_PROVIDER_MODE == "demo":
+        prompt = "\n".join(message.get("content", "") for message in messages if message.get("role") == "user")
+        output_text = (
+            "Demo provider response: this request passed through the governance pipeline. "
+            "For high-risk AI systems under the EU AI Act, maintain risk management, data governance, "
+            "technical documentation, logging, human oversight, accuracy/cybersecurity controls, "
+            "post-market monitoring, and incident reporting evidence. "
+            f"Request summary: {prompt[:240]}"
+        )
+        return {
+            "provider": "demo",
+            "model": f"{selected_model}-demo",
+            "output_text": output_text[: max(1, max_tokens) * 8],
+            "usage": {
+                "prompt_tokens": len(prompt.split()),
+                "completion_tokens": len(output_text.split()),
+                "total_tokens": len(prompt.split()) + len(output_text.split()),
+            },
+            "finish_reason": "stop",
+            "provider_response_id": "demo-response",
+        }
+
     client = get_openai_client()
     response = client.chat.completions.create(model=selected_model, messages=messages, max_tokens=max_tokens, timeout=30)
     output_text = response.choices[0].message.content or ""

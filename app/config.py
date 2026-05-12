@@ -13,6 +13,7 @@ def get_secret(secret_name: str, default: str | None = None) -> str | None:
 
 
 OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
+AI_PROVIDER_MODE = get_secret("AI_PROVIDER_MODE", "live").lower()
 DEFAULT_MODEL = get_secret("DEFAULT_MODEL", "gpt-4.1-nano")
 DATABASE_URL = get_secret("DATABASE_URL", "sqlite:///./app/data/app.db")
 APP_ENV = get_secret("APP_ENV", "development")
@@ -46,12 +47,16 @@ except ValueError:
 
 VALID_FEATURE_ENFORCEMENT_MODES = {"warn", "quarantine", "block"}
 VALID_CANDIDATE_VERSION_POLICIES = {"allow_with_warning", "quarantine", "block"}
+VALID_AI_PROVIDER_MODES = {"live", "demo"}
 
 if FEATURE_ID_ENFORCEMENT not in VALID_FEATURE_ENFORCEMENT_MODES:
     raise RuntimeError(f"Invalid FEATURE_ID_ENFORCEMENT={FEATURE_ID_ENFORCEMENT}")
 
 if CANDIDATE_VERSION_POLICY not in VALID_CANDIDATE_VERSION_POLICIES:
     raise RuntimeError(f"Invalid CANDIDATE_VERSION_POLICY={CANDIDATE_VERSION_POLICY}")
+
+if AI_PROVIDER_MODE not in VALID_AI_PROVIDER_MODES:
+    raise RuntimeError(f"Invalid AI_PROVIDER_MODE={AI_PROVIDER_MODE}")
 
 if not EVIDENCE_HMAC_SECRET:
     raise RuntimeError("EVIDENCE_HMAC_SECRET is missing. Add it to .env.")
