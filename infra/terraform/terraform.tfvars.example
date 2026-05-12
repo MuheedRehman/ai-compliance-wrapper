@@ -1,0 +1,5 @@
+# project_id = "eu-ai-act-platform-staging"
+# region = "europe-west3"
+# container_image = "europe-west3-docker.pkg.dev/eu-ai-act-platform-staging/backend-repo/ai-compliance-backend:latest"
+# max_instances = 2
+# deploy_cloud_run = false

@@ -11,3 +11,23 @@ htmlcov/
 .DS_Store
 *.log
 test_out.txt
+
+# Frontend / Next.js
+apps/dashboard/node_modules/
+apps/dashboard/.next/
+apps/dashboard/out/
+apps/dashboard/*.log
+apps/dashboard/tsconfig.tsbuildinfo
+apps/dashboard/.env.local
+
+# Terraform local state
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+
+# Build bundles
+*.zip
+*.tar
+*.tar.gz

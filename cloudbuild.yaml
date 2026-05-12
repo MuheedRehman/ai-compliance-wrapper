@@ -1,0 +1,67 @@
+steps:
+  # 0. Validate required substitutions
+  - name: 'ubuntu'
+    id: 'validate-inputs'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if [[ -z "$_CLOUD_SQL_INSTANCE" ]]; then
+          echo "ERROR: _CLOUD_SQL_INSTANCE substitution is required for deployment."
+          echo "Run with: gcloud builds submit --substitutions=_CLOUD_SQL_INSTANCE=project:region:instance ."
+          exit 1
+        fi
+
+  # 1. Run unit tests
+  - name: 'python:3.11-slim'
+    id: 'run-tests'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        pip install -r backend/requirements.txt
+        pip install pytest httpx pytest-asyncio psycopg2-binary
+        cd backend && pytest tests/
+
+  # 2. Build backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'build-backend'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/ai-compliance-backend:$COMMIT_SHA', './backend']
+    waitFor: ['run-tests']
+
+  # 3. Push backend image
+  - name: 'gcr.io/cloud-builders/docker'
+    id: 'push-backend'
+    args: ['push', 'gcr.io/$PROJECT_ID/ai-compliance-backend:$COMMIT_SHA']
+    waitFor: ['build-backend']
+
+  # 4. Deploy to Cloud Run (Backend)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    id: 'deploy-backend'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'ai-compliance-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/ai-compliance-backend:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'APP_ENV=staging'
+      - '--set-secrets'
+      - 'DATABASE_URL=DATABASE_URL:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,EVIDENCE_HMAC_SECRET=EVIDENCE_HMAC_SECRET:latest'
+      - '--add-cloudsql-instances'
+      - '$_CLOUD_SQL_INSTANCE'
+      - '--max-instances'
+      - '10'
+    waitFor: ['push-backend']
+
+images:
+  - 'gcr.io/$PROJECT_ID/ai-compliance-backend:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
