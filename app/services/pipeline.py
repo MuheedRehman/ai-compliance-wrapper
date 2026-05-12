@@ -12,6 +12,7 @@ from app.services.hashing import hash_object, sha256_text
 from app.services.redaction import redact_metadata, redact_text
 from app.services.review_service import get_or_create_open_review_task
 from app.services.risk_engine import assess_risk
+from app.services.billing_service import record_usage
 
 
 @dataclass(kw_only=True)
@@ -310,5 +311,7 @@ def _run_chat_pipeline_inner(db: Session, request, auth_context: dict) -> dict:
         metadata_warnings=metadata_warnings, ai_system_id=ai_system_id
     )
     event = write_event(db, payload)
+
+    record_usage(db, tenant_id, "governed_call", 1)
 
     return {"request_id": request_id, "trace_id": trace_id, "status": "completed", "output": output_text, "compliance": {"risk_level": final_level, "risk_score": final_score, "decision": decision, "triggered_rule_ids": final_risk["triggered_rule_ids"], "rule_results": rule_results}, "evidence": {"event_id": event.event_id, "event_hash": event.event_hash, "hmac_signature": event.hmac_signature, "feature_version_id": feature_version_id, "policy_bundle_version": policy_bundle_version, "metadata_warnings": metadata_warnings}}

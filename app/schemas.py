@@ -81,3 +81,221 @@ class AiSystemResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class SubscriptionStatusResponse(BaseModel):
+    tenant_id: str
+    plan_id: str
+    status: str
+    current_period_end: Optional[datetime] = None
+
+
+class CheckoutSessionRequest(BaseModel):
+    plan_id: str
+
+
+class CheckoutSessionResponse(BaseModel):
+    checkout_url: str
+
+
+class PortalSessionResponse(BaseModel):
+    portal_url: str
+
+
+class EntitlementResponse(BaseModel):
+    feature_key: str
+    is_enabled: bool
+    limit_value: Optional[int] = None
+
+
+class IntakeCreate(BaseModel):
+    title: str
+    answers: Dict[str, Any]
+
+
+
+class IntakeResponse(BaseModel):
+    id: str
+    tenant_id: str
+    title: str
+    answers_json: Dict[str, Any]
+    actor_role: str
+    system_classification: str
+    obligation_path: str
+    obligation_graph_json: List[Dict[str, Any]] = Field(default_factory=list)
+    legal_basis_json: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_requirements_json: List[Dict[str, Any]] = Field(default_factory=list)
+    rationale: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Phase 4: Obligation Workflows ---
+
+# FRIA
+class FRIACreate(BaseModel):
+    ai_system_id: str
+    assessment_json: Dict[str, Any] = Field(default_factory=dict)
+    dpia_link_json: Dict[str, Any] = Field(default_factory=dict)
+    signoff_json: Dict[str, Any] = Field(default_factory=dict)
+    status: str = "draft"
+
+class FRIAUpdate(BaseModel):
+    assessment_json: Optional[Dict[str, Any]] = None
+    dpia_link_json: Optional[Dict[str, Any]] = None
+    signoff_json: Optional[Dict[str, Any]] = None
+    status: Optional[str] = None
+
+class FRIAResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: str
+    status: str
+    assessment_json: Dict[str, Any]
+    legal_basis_json: List[Dict[str, Any]] = Field(default_factory=list)
+    dpia_link_json: Dict[str, Any] = Field(default_factory=dict)
+    signoff_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Oversight
+class OversightCreate(BaseModel):
+    ai_system_id: str
+    reviewer_email: str
+    role: str
+    competence_json: Dict[str, Any] = Field(default_factory=dict)
+
+class OversightUpdate(BaseModel):
+    reviewer_email: Optional[str] = None
+    role: Optional[str] = None
+    competence_json: Optional[Dict[str, Any]] = None
+
+class OversightResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: str
+    reviewer_email: str
+    role: str
+    competence_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Incidents
+class IncidentCreate(BaseModel):
+    ai_system_id: str
+    severity: str
+    description: str
+    incident_type: Literal["standard", "widespread_infringement", "death"] = "standard"
+    authority_notification_json: Dict[str, Any] = Field(default_factory=dict)
+    status: str = "open"
+
+class IncidentUpdate(BaseModel):
+    severity: Optional[str] = None
+    incident_type: Optional[Literal["standard", "widespread_infringement", "death"]] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    reported_at: Optional[datetime] = None
+    escalation_status: Optional[str] = None
+    authority_notification_json: Optional[Dict[str, Any]] = None
+
+class IncidentResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: str
+    severity: str
+    incident_type: str
+    description: str
+    status: str
+    deadline_at: Optional[datetime] = None
+    reported_at: Optional[datetime] = None
+    escalation_status: str
+    authority_notification_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Phase 4.5: Assessment & Report Engine ---
+
+class ReportCreate(BaseModel):
+    report_type: Literal["assessment_summary", "test_session_summary", "compliance_readiness_summary", "incident_summary"]
+    title: Optional[str] = None
+    ai_system_id: Optional[str] = None
+    feature_id: Optional[str] = None
+    source_refs: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
+
+class ReportResponse(BaseModel):
+    id: str
+    tenant_id: str
+    report_type: str
+    title: str
+    status: str
+    report_json: Dict[str, Any]
+    source_refs_json: List[Dict[str, Any]]
+    artifact_metadata: Dict[str, Any]
+    legal_basis_json: List[Dict[str, Any]] = Field(default_factory=list)
+    generation_manifest_json: Dict[str, Any] = Field(default_factory=dict)
+    ai_system_id: Optional[str] = None
+    feature_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- Compliance Control Register ---
+
+class ComplianceControlCreate(BaseModel):
+    control_key: str
+    article: str
+    title: str
+    ai_system_id: Optional[str] = None
+    owner_email: Optional[str] = None
+    status: str = "not_started"
+    due_at: Optional[datetime] = None
+    evidence_domain: str
+    details_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ComplianceControlUpdate(BaseModel):
+    owner_email: Optional[str] = None
+    status: Optional[str] = None
+    due_at: Optional[datetime] = None
+    details_json: Optional[Dict[str, Any]] = None
+
+
+class ComplianceControlResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: Optional[str] = None
+    control_key: str
+    article: str
+    title: str
+    owner_email: Optional[str] = None
+    status: str
+    due_at: Optional[datetime] = None
+    evidence_domain: str
+    details_json: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReadinessScorecardResponse(BaseModel):
+    tenant_id: str
+    ai_system_id: Optional[str] = None
+    total_controls: int
+    completed_controls: int
+    overdue_controls: int
+    readiness_score: int
+    controls_by_status: Dict[str, int]

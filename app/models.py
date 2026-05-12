@@ -77,7 +77,15 @@ class AiFeature(Base):
     approved_providers = Column(JSON, nullable=False, default=list)
     approved_models = Column(JSON, nullable=False, default=list)
 
-    current_feature_version_id = Column(String, ForeignKey("feature_versions.feature_version_id"), nullable=True)
+    current_feature_version_id = Column(
+        String,
+        ForeignKey(
+            "feature_versions.feature_version_id",
+            name="fk_ai_features_current_feature_version_id",
+            use_alter=True,
+        ),
+        nullable=True,
+    )
     current_prompt_hash = Column(String, nullable=True)
     current_fingerprint = Column(String, nullable=True)
     policy_bundle_version = Column(String, nullable=False, default="default_v1")
@@ -203,6 +211,9 @@ class FRIARecord(Base):
     
     status = Column(String, nullable=False, default="draft")
     assessment_json = Column(JSON, nullable=False, default=dict)
+    legal_basis_json = Column(JSON, nullable=False, default=list)
+    dpia_link_json = Column(JSON, nullable=False, default=dict)
+    signoff_json = Column(JSON, nullable=False, default=dict)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -217,6 +228,7 @@ class OversightAssignment(Base):
     
     reviewer_email = Column(String, nullable=False)
     role = Column(String, nullable=False)
+    competence_json = Column(JSON, nullable=False, default=dict)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -230,8 +242,13 @@ class IncidentRecord(Base):
     ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
     
     severity = Column(String, nullable=False)
+    incident_type = Column(String, nullable=False, default="standard")
     description = Column(Text, nullable=False)
     status = Column(String, nullable=False, default="open")
+    deadline_at = Column(DateTime(timezone=True), nullable=True)
+    reported_at = Column(DateTime(timezone=True), nullable=True)
+    escalation_status = Column(String, nullable=False, default="open")
+    authority_notification_json = Column(JSON, nullable=False, default=dict)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
@@ -250,3 +267,109 @@ class EvidenceBundle(Base):
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class TenantSubscription(Base):
+    __tablename__ = "tenant_subscriptions"
+    
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), primary_key=True)
+    stripe_customer_id = Column(String, nullable=True, index=True)
+    stripe_subscription_id = Column(String, nullable=True, index=True)
+    plan_id = Column(String, nullable=False, default="free")
+    status = Column(String, nullable=False, default="active")
+    current_period_end = Column(DateTime(timezone=True), nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Entitlement(Base):
+    __tablename__ = "entitlements"
+    
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    feature_key = Column(String, nullable=False)
+    is_enabled = Column(Boolean, default=False)
+    limit_value = Column(Integer, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class UsageMeter(Base):
+    __tablename__ = "usage_meters"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    event_type = Column(String, nullable=False)
+    count = Column(Integer, nullable=False, default=1)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class IntakeAssessment(Base):
+    __tablename__ = "intake_assessments"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    
+    title = Column(String, nullable=False)
+    answers_json = Column(JSON, nullable=False, default=dict)
+    
+    actor_role = Column(String, nullable=False)
+    system_classification = Column(String, nullable=False)
+    obligation_path = Column(String, nullable=False)
+    obligation_graph_json = Column(JSON, nullable=False, default=list)
+    legal_basis_json = Column(JSON, nullable=False, default=list)
+    evidence_requirements_json = Column(JSON, nullable=False, default=list)
+    rationale = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ReportRecord(Base):
+    __tablename__ = "reports"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    
+    report_type = Column(String, nullable=False)
+    title = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="completed")
+    
+    report_json = Column(JSON, nullable=False, default=dict)
+    source_refs_json = Column(JSON, nullable=False, default=list)
+    artifact_metadata = Column(JSON, nullable=False, default=dict)
+    legal_basis_json = Column(JSON, nullable=False, default=list)
+    generation_manifest_json = Column(JSON, nullable=False, default=dict)
+    
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
+    feature_id = Column(String, nullable=True, index=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class ComplianceControl(Base):
+    __tablename__ = "compliance_controls"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
+
+    control_key = Column(String, nullable=False, index=True)
+    article = Column(String, nullable=False, index=True)
+    title = Column(String, nullable=False)
+    owner_email = Column(String, nullable=True)
+    status = Column(String, nullable=False, default="not_started")
+    due_at = Column(DateTime(timezone=True), nullable=True)
+    evidence_domain = Column(String, nullable=False)
+    details_json = Column(JSON, nullable=False, default=dict)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "ai_system_id", "control_key", name="uq_control_system_key"),
+    )

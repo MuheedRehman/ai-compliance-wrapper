@@ -19,6 +19,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
     # 1. Create ai_systems table
     op.create_table(
         'ai_systems',
@@ -113,31 +115,40 @@ def upgrade() -> None:
     # 6. Add columns to existing tables
     op.add_column('ai_features', sa.Column('ai_system_id', sa.String(), nullable=True))
     op.create_index(op.f('ix_ai_features_ai_system_id'), 'ai_features', ['ai_system_id'], unique=False)
-    op.create_foreign_key('fk_ai_features_ai_system_id', 'ai_features', 'ai_systems', ['ai_system_id'], ['id'])
+    if not is_sqlite:
+        op.create_foreign_key('fk_ai_features_ai_system_id', 'ai_features', 'ai_systems', ['ai_system_id'], ['id'])
 
     op.add_column('evidence_logs', sa.Column('ai_system_id', sa.String(), nullable=True))
     op.add_column('evidence_logs', sa.Column('evidence_domain', sa.String(), nullable=True))
     op.create_index(op.f('ix_evidence_logs_ai_system_id'), 'evidence_logs', ['ai_system_id'], unique=False)
     op.create_index(op.f('ix_evidence_logs_evidence_domain'), 'evidence_logs', ['evidence_domain'], unique=False)
-    op.create_foreign_key('fk_evidence_logs_ai_system_id', 'evidence_logs', 'ai_systems', ['ai_system_id'], ['id'])
+    if not is_sqlite:
+        op.create_foreign_key('fk_evidence_logs_ai_system_id', 'evidence_logs', 'ai_systems', ['ai_system_id'], ['id'])
 
     op.add_column('review_tasks', sa.Column('ai_system_id', sa.String(), nullable=True))
     op.create_index(op.f('ix_review_tasks_ai_system_id'), 'review_tasks', ['ai_system_id'], unique=False)
-    op.create_foreign_key('fk_review_tasks_ai_system_id', 'review_tasks', 'ai_systems', ['ai_system_id'], ['id'])
+    if not is_sqlite:
+        op.create_foreign_key('fk_review_tasks_ai_system_id', 'review_tasks', 'ai_systems', ['ai_system_id'], ['id'])
 
 
 def downgrade() -> None:
-    op.drop_constraint('fk_review_tasks_ai_system_id', 'review_tasks', type_='foreignkey')
+    bind = op.get_bind()
+    is_sqlite = bind.dialect.name == "sqlite"
+
+    if not is_sqlite:
+        op.drop_constraint('fk_review_tasks_ai_system_id', 'review_tasks', type_='foreignkey')
     op.drop_index(op.f('ix_review_tasks_ai_system_id'), table_name='review_tasks')
     op.drop_column('review_tasks', 'ai_system_id')
 
-    op.drop_constraint('fk_evidence_logs_ai_system_id', 'evidence_logs', type_='foreignkey')
+    if not is_sqlite:
+        op.drop_constraint('fk_evidence_logs_ai_system_id', 'evidence_logs', type_='foreignkey')
     op.drop_index(op.f('ix_evidence_logs_evidence_domain'), table_name='evidence_logs')
     op.drop_index(op.f('ix_evidence_logs_ai_system_id'), table_name='evidence_logs')
     op.drop_column('evidence_logs', 'evidence_domain')
     op.drop_column('evidence_logs', 'ai_system_id')
 
-    op.drop_constraint('fk_ai_features_ai_system_id', 'ai_features', type_='foreignkey')
+    if not is_sqlite:
+        op.drop_constraint('fk_ai_features_ai_system_id', 'ai_features', type_='foreignkey')
     op.drop_index(op.f('ix_ai_features_ai_system_id'), table_name='ai_features')
     op.drop_column('ai_features', 'ai_system_id')
 

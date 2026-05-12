@@ -4,7 +4,10 @@ __pycache__/
 .env
 app/data/*.db
 app/data/*.sqlite
+app/data/*.backup*
 .pytest_cache/
 .coverage
 htmlcov/
 .DS_Store
+*.log
+test_out.txt

@@ -25,6 +25,11 @@ FIRECRAWL_API_KEY = get_secret("FIRECRAWL_API_KEY")
 FIRECRAWL_API_URL = get_secret("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1")
 FIRECRAWL_ALLOWED_DOMAINS = get_secret("FIRECRAWL_ALLOWED_DOMAINS", "")
 
+STRIPE_API_KEY = get_secret("STRIPE_API_KEY", "sk_test_mock")
+STRIPE_WEBHOOK_SECRET = get_secret("STRIPE_WEBHOOK_SECRET", "whsec_mock")
+FRONTEND_URL = get_secret("FRONTEND_URL", "http://localhost:3000")
+
+
 try:
     FIRECRAWL_TIMEOUT = int(get_secret("FIRECRAWL_TIMEOUT", "30"))
     if FIRECRAWL_TIMEOUT <= 0:

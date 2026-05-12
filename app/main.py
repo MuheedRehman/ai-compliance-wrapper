@@ -1,19 +1,40 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.errors import register_exception_handlers
 from app.routes.chat import router as chat_router
 from app.routes.features import router as features_router
 from app.routes.logs import router as logs_router
 from app.routes.reviews import router as reviews_router
 from app.routes.ai_systems import router as ai_systems_router
+from app.routes.billing import router as billing_router
+from app.routes.webhooks_stripe import router as webhooks_router
+from app.routes.classification import router as classification_router
+from app.routes.obligations import router as obligations_router
+from app.routes.reports import router as reports_router
+from app.routes.compliance import router as compliance_router
 from app.config import EVIDENCE_CHAIN_MODE
 
 app = FastAPI(title="AI Compliance & Governance Wrapper", version="0.5.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For staging/MVP, configure appropriately in production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(chat_router)
 app.include_router(features_router)
 app.include_router(logs_router)
 app.include_router(reviews_router)
 app.include_router(ai_systems_router)
+app.include_router(billing_router)
+app.include_router(webhooks_router)
+app.include_router(classification_router)
+app.include_router(obligations_router)
+app.include_router(reports_router)
+app.include_router(compliance_router)
 
 register_exception_handlers(app)
 
@@ -24,6 +45,6 @@ def health_check():
         "status": "ok",
         "service": "AI Compliance & Governance Wrapper",
         "version": "0.5.0",
-        "sprint": "Phase 3 Registry Endpoints",
+        "sprint": "Phase 4.5 Assessment & Report Engine",
         "evidence_chain": EVIDENCE_CHAIN_MODE,
     }
