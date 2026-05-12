@@ -19,6 +19,16 @@ output "cloud_run_service_url" {
   value       = var.deploy_cloud_run ? google_cloud_run_v2_service.backend_service[0].uri : "Not deployed yet"
 }
 
+output "cloud_run_service_account_email" {
+  description = "Service account used by Cloud Run services and jobs"
+  value       = google_service_account.cloud_run_sa.email
+}
+
+output "cloud_build_service_account_email" {
+  description = "Cloud Build service account granted deploy permissions"
+  value       = local.cloud_build_service_account
+}
+
 output "recommended_database_url" {
   description = "Recommended DATABASE_URL format (update with generated password)"
   value       = "postgresql+psycopg2://${google_sql_user.app_user.name}:<PASSWORD>@/${google_sql_database.app_database.name}?host=/cloudsql/${google_sql_database_instance.postgres_instance.connection_name}"

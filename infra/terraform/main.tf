@@ -10,6 +10,10 @@ locals {
   ]
 }
 
+data "google_project" "current" {
+  project_id = var.project_id
+}
+
 resource "google_project_service" "api_services" {
   for_each                   = toset(local.services)
   project                    = var.project_id
@@ -53,7 +57,7 @@ resource "google_sql_database_instance" "postgres_instance" {
   name             = var.db_instance_name
   database_version = "POSTGRES_15"
   region           = var.region
-  
+
   # Explicitly disabled for staging ease of teardown
   deletion_protection = false
 
@@ -61,7 +65,7 @@ resource "google_sql_database_instance" "postgres_instance" {
     # db-f1-micro is the intended low-cost starting tier.
     # Note: Must be validated by terraform plan/apply in europe-west3 as availability can vary.
     tier = "db-f1-micro"
-    
+
     # Enable IPv4 for potential direct debugging. Cloud Run connects via Unix socket.
     ip_configuration {
       ipv4_enabled = true
@@ -75,9 +79,8 @@ resource "google_sql_database" "app_database" {
 }
 
 resource "random_password" "db_password" {
-  length  = 16
-  special = true
-  override_special = "!#$%&*()-_=+[]{}<>:?"
+  length  = 24
+  special = false
 }
 
 resource "google_sql_user" "app_user" {
@@ -108,9 +111,31 @@ resource "google_project_iam_member" "sql_client" {
   member  = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
+locals {
+  cloud_build_service_account = "${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cloud_build_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_project_iam_member" "cloud_build_artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_service_account_iam_member" "cloud_build_run_as" {
+  service_account_id = google_service_account.cloud_run_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloud_build_service_account}"
+}
+
 # 6. Cloud Run Backend Service
 resource "google_cloud_run_v2_service" "backend_service" {
-  count      = var.deploy_cloud_run ? 1 : 0
+  count = var.deploy_cloud_run ? 1 : 0
   depends_on = [
     google_project_service.api_services,
     google_project_iam_member.sql_client
@@ -135,12 +160,12 @@ resource "google_cloud_run_v2_service" "backend_service" {
         name       = "cloudsql"
         mount_path = "/cloudsql"
       }
-      
+
       env {
         name  = "INSTANCE_CONNECTION_NAME"
         value = google_sql_database_instance.postgres_instance.connection_name
       }
-      
+
       # Inject secret values as environment variables
       dynamic "env" {
         for_each = toset(local.secrets)
@@ -155,7 +180,7 @@ resource "google_cloud_run_v2_service" "backend_service" {
         }
       }
     }
-    
+
     volumes {
       name = "cloudsql"
       cloud_sql_instance {

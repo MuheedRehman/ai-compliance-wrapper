@@ -12,14 +12,22 @@ from app.routes.classification import router as classification_router
 from app.routes.obligations import router as obligations_router
 from app.routes.reports import router as reports_router
 from app.routes.compliance import router as compliance_router
-from app.config import EVIDENCE_CHAIN_MODE
+from app.config import EVIDENCE_CHAIN_MODE, FRONTEND_URL
 
 app = FastAPI(title="AI Compliance & Governance Wrapper", version="0.5.0")
 
+
+def _cors_origins() -> list[str]:
+    origins = [origin.strip() for origin in FRONTEND_URL.split(",") if origin.strip()]
+    return origins or ["http://localhost:3000"]
+
+
+cors_origins = _cors_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For staging/MVP, configure appropriately in production
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials="*" not in cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

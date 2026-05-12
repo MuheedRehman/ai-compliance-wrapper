@@ -5,6 +5,8 @@
 /* ── Design Tokens ─────────────────────────────────────────── */
 @layer base {
   :root {
+    --font-inter: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, ui-monospace, monospace;
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 6% 6%;
