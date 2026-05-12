@@ -59,6 +59,9 @@ class ReportService:
         if not check_entitlement(db, tenant_id, "report_generation"):
             raise HTTPException(status_code=403, detail="Report generation not entitled for this tenant")
 
+        ai_system_id = payload.ai_system_id or None
+        feature_id = payload.feature_id or None
+
         # Basic report shell
         report_id = f"rpt-{uuid.uuid4().hex[:8]}"
         title = payload.title or f"{payload.report_type.replace('_', ' ').title()} - {datetime.now().strftime('%Y-%m-%d')}"
@@ -72,13 +75,13 @@ class ReportService:
         
         # System-level context
         system_name = "Generic Scope"
-        system = ReportService._require_system(db, tenant_id, payload.ai_system_id)
+        system = ReportService._require_system(db, tenant_id, ai_system_id)
         if system:
             system_name = system.name
             source_refs.append({"type": "ai_system", "id": system.id, "name": system.name})
 
         # Feature-level context
-        feature = ReportService._require_feature(db, tenant_id, payload.feature_id)
+        feature = ReportService._require_feature(db, tenant_id, feature_id)
         if feature:
             source_refs.append({"type": "ai_feature", "id": feature.id, "feature_id": feature.feature_id, "name": feature.name})
 
@@ -86,8 +89,8 @@ class ReportService:
         if payload.report_type == "compliance_readiness_summary":
             # Check for FRIAs
             frias = db.query(FRIARecord).filter(FRIARecord.tenant_id == tenant_id)
-            if payload.ai_system_id:
-                frias = frias.filter(FRIARecord.ai_system_id == payload.ai_system_id)
+            if ai_system_id:
+                frias = frias.filter(FRIARecord.ai_system_id == ai_system_id)
             fria_list = frias.all()
             
             for f in fria_list:
@@ -100,8 +103,8 @@ class ReportService:
 
             # Check for Oversight
             oversights = db.query(OversightAssignment).filter(OversightAssignment.tenant_id == tenant_id)
-            if payload.ai_system_id:
-                oversights = oversights.filter(OversightAssignment.ai_system_id == payload.ai_system_id)
+            if ai_system_id:
+                oversights = oversights.filter(OversightAssignment.ai_system_id == ai_system_id)
             ovs_list = oversights.all()
             
             if not ovs_list:
@@ -112,8 +115,8 @@ class ReportService:
                 for o in ovs_list: source_refs.append({"type": "oversight", "id": o.id})
 
             controls = db.query(ComplianceControl).filter(ComplianceControl.tenant_id == tenant_id)
-            if payload.ai_system_id:
-                controls = controls.filter(ComplianceControl.ai_system_id == payload.ai_system_id)
+            if ai_system_id:
+                controls = controls.filter(ComplianceControl.ai_system_id == ai_system_id)
             control_list = controls.all()
             completed_statuses = {"completed", "signed_off"}
             completed_controls = [c for c in control_list if c.status in completed_statuses]
@@ -153,8 +156,8 @@ class ReportService:
 
         elif payload.report_type == "incident_summary":
             incidents = db.query(IncidentRecord).filter(IncidentRecord.tenant_id == tenant_id)
-            if payload.ai_system_id:
-                incidents = incidents.filter(IncidentRecord.ai_system_id == payload.ai_system_id)
+            if ai_system_id:
+                incidents = incidents.filter(IncidentRecord.ai_system_id == ai_system_id)
             inc_list = incidents.all()
             
             for inc in inc_list:
@@ -171,8 +174,8 @@ class ReportService:
 
         # Evidence gathering
         evidence_logs = db.query(EvidenceLog).filter(EvidenceLog.tenant_id == tenant_id)
-        if payload.ai_system_id:
-            evidence_logs = evidence_logs.filter(EvidenceLog.ai_system_id == payload.ai_system_id)
+        if ai_system_id:
+            evidence_logs = evidence_logs.filter(EvidenceLog.ai_system_id == ai_system_id)
         logs = evidence_logs.limit(10).all() # Sample evidence
         for log in logs:
             evidence_refs.append({"id": log.event_id, "domain": log.evidence_domain, "type": log.event_type})
@@ -219,8 +222,8 @@ class ReportService:
             },
             legal_basis_json=legal_basis,
             generation_manifest_json=manifest,
-            ai_system_id=payload.ai_system_id,
-            feature_id=payload.feature_id
+            ai_system_id=ai_system_id,
+            feature_id=feature_id
         )
         db.add(report)
         db.commit()

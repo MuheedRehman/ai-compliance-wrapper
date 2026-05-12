@@ -28,7 +28,11 @@ export default function ReportRunForm({ onSuccess }: ReportRunFormProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await api.createReport(formData);
+      const res = await api.createReport({
+        ...formData,
+        title: formData.title.trim() || undefined,
+        ai_system_id: formData.ai_system_id || undefined,
+      });
       onSuccess(res);
     } catch (err: any) {
       setError(err.body?.detail || 'Failed to generate report');
