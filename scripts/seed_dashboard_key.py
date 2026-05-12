@@ -40,6 +40,7 @@ def seed():
         if not tenant:
             tenant = Tenant(tenant_id=TENANT_ID, name=TENANT_NAME)
             db.add(tenant)
+            db.flush()
             print(f"Created tenant: {TENANT_ID}")
         else:
             print(f"Tenant already exists: {TENANT_ID}")
@@ -93,6 +94,7 @@ def seed():
                 registration_status="draft",
             )
             db.add(system)
+            db.flush()
             print(f"Created AI system: {DEMO_SYSTEM_ID}")
 
         feature = db.query(AiFeature).filter(
