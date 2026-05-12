@@ -22,6 +22,7 @@ apps/dashboard/.env.local
 
 # Terraform local state
 infra/terraform/.terraform/
+infra/terraform/tfplan
 infra/terraform/*.tfstate
 infra/terraform/*.tfstate.*
 infra/terraform/*.tfvars
