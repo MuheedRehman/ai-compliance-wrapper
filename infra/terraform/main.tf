@@ -115,7 +115,8 @@ resource "google_project_iam_member" "sql_client" {
 }
 
 locals {
-  cloud_build_service_account = "${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+  cloud_build_service_account         = "${data.google_project.current.number}@cloudbuild.gserviceaccount.com"
+  cloud_build_compute_service_account = "${data.google_project.current.number}-compute@developer.gserviceaccount.com"
 }
 
 resource "google_project_iam_member" "cloud_build_run_admin" {
@@ -124,10 +125,13 @@ resource "google_project_iam_member" "cloud_build_run_admin" {
   member  = "serviceAccount:${local.cloud_build_service_account}"
 }
 
-resource "google_project_iam_member" "cloud_build_artifact_writer" {
-  project = var.project_id
-  role    = "roles/artifactregistry.writer"
-  member  = "serviceAccount:${local.cloud_build_service_account}"
+resource "google_cloud_run_v2_service_iam_member" "cloud_build_compute_backend_run_admin" {
+  count    = var.deploy_cloud_run ? 1 : 0
+  project  = google_cloud_run_v2_service.backend_service[0].project
+  location = google_cloud_run_v2_service.backend_service[0].location
+  name     = google_cloud_run_v2_service.backend_service[0].name
+  role     = "roles/run.admin"
+  member   = "serviceAccount:${local.cloud_build_compute_service_account}"
 }
 
 resource "google_service_account_iam_member" "cloud_build_run_as" {
@@ -136,10 +140,22 @@ resource "google_service_account_iam_member" "cloud_build_run_as" {
   member             = "serviceAccount:${local.cloud_build_service_account}"
 }
 
+resource "google_project_iam_member" "cloud_build_artifact_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:${local.cloud_build_service_account}"
+}
+
 resource "google_secret_manager_secret_iam_member" "cloud_build_dashboard_password_accessor" {
   secret_id = google_secret_manager_secret.app_secrets["DASHBOARD_ADMIN_PASSWORD"].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_build_compute_dashboard_password_accessor" {
+  secret_id = google_secret_manager_secret.app_secrets["DASHBOARD_ADMIN_PASSWORD"].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${local.cloud_build_compute_service_account}"
 }
 
 # 6. Cloud Run Backend Service
