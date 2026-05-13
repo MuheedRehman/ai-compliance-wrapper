@@ -78,7 +78,7 @@ steps:
       - --args
       - upgrade,head
       - --max-retries
-      - '0'
+      - '1'
       - --execute-now
       - --wait
     waitFor:

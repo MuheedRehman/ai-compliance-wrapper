@@ -3,8 +3,10 @@ Seed script: creates a default tenant, API key, entitlements, and demo records
 for dashboard development.
 Run once:  python scripts/seed_dashboard_key.py
 """
-import sys, os, uuid
+import sys, os, time, uuid
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from sqlalchemy.exc import OperationalError
 
 from app.db import SessionLocal
 from app.models import AiFeature, AiSystem, Entitlement, Tenant, ApiKey
@@ -18,6 +20,8 @@ RAW_API_KEY = os.getenv("DASHBOARD_API_KEY")
 KEY_ID = os.getenv("DASHBOARD_KEY_ID", f"key-dashboard-{APP_ENV}")
 DEMO_SYSTEM_ID = "sys-dashboard-demo"
 DEMO_FEATURE_ID = "dashboard_demo_assistant"
+DB_RETRIES = int(os.getenv("SEED_DB_RETRIES", "5"))
+DB_RETRY_DELAY_SECONDS = float(os.getenv("SEED_DB_RETRY_DELAY_SECONDS", "2"))
 
 ENTITLEMENTS = [
     "report_generation",
@@ -27,6 +31,19 @@ ENTITLEMENTS = [
 ]
 
 def seed():
+    for attempt in range(1, DB_RETRIES + 1):
+        try:
+            return _seed_once()
+        except OperationalError as exc:
+            if attempt == DB_RETRIES:
+                raise
+            delay = DB_RETRY_DELAY_SECONDS * attempt
+            print(f"Database connection failed during seed attempt {attempt}/{DB_RETRIES}; retrying in {delay:.1f}s.")
+            print(str(exc).splitlines()[0])
+            time.sleep(delay)
+
+
+def _seed_once():
     raw_api_key = RAW_API_KEY
     if not raw_api_key and APP_ENV == "development":
         raw_api_key = "test_api_key"
