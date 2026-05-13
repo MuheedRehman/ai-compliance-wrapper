@@ -1,12 +1,30 @@
 'use client';
 
-import { FormEvent, useState } from 'react';
-import { ShieldCheck } from 'lucide-react';
+import { FormEvent, useEffect, useState } from 'react';
+import { Chrome, ShieldCheck } from 'lucide-react';
+
+type AuthConfig = {
+  googleEnabled: boolean;
+  passwordEnabled: boolean;
+};
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [config, setConfig] = useState<AuthConfig>({ googleEnabled: false, passwordEnabled: true });
+
+  useEffect(() => {
+    fetch('/api/auth/config')
+      .then((response) => response.json())
+      .then((data: AuthConfig) => setConfig(data))
+      .catch(() => setConfig({ googleEnabled: false, passwordEnabled: true }));
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('error')) {
+      setError('Google sign-in could not be completed for this account.');
+    }
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -41,26 +59,42 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <form onSubmit={submit} className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
-          <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
-            Dashboard Password
-          </label>
-          <input
-            autoFocus
-            required
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500"
-          />
-          {error && <p className="mt-3 text-xs font-medium text-red-400">{error}</p>}
-          <button
-            disabled={loading}
-            className="mt-5 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign In'}
-          </button>
-        </form>
+        <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-5 shadow-2xl">
+          {config.googleEnabled && (
+            <a
+              href="/api/auth/google/start"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:border-zinc-500"
+            >
+              <Chrome className="h-4 w-4" />
+              Continue with Google
+            </a>
+          )}
+
+          {config.googleEnabled && config.passwordEnabled && <div className="my-5 h-px bg-zinc-800" />}
+
+          {config.passwordEnabled && (
+            <form onSubmit={submit}>
+              <label className="block text-xs font-bold uppercase tracking-widest text-zinc-500 mb-2">
+                Dashboard Password
+              </label>
+              <input
+                autoFocus
+                required
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 text-sm text-white outline-none focus:border-indigo-500"
+              />
+              {error && <p className="mt-3 text-xs font-medium text-red-400">{error}</p>}
+              <button
+                disabled={loading}
+                className="mt-5 w-full rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+          )}
+        </div>
       </div>
     </main>
   );

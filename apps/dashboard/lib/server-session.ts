@@ -5,9 +5,14 @@ const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
 type SessionPayload = {
   sub: string;
+  email?: string;
+  name?: string;
+  provider?: 'password' | 'google';
   iat: number;
   exp: number;
 };
+
+type SessionClaims = Pick<SessionPayload, 'email' | 'name' | 'provider'>;
 
 function sessionSecret() {
   return process.env.DASHBOARD_SESSION_SECRET || process.env.DASHBOARD_API_KEY || 'dev-session-secret';
@@ -21,9 +26,9 @@ function sign(payload: string) {
   return crypto.createHmac('sha256', sessionSecret()).update(payload).digest('base64url');
 }
 
-export function createSessionToken(subject = 'dashboard-admin') {
+export function createSessionToken(subject = 'dashboard-admin', claims: Partial<SessionClaims> = {}) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = base64url(JSON.stringify({ sub: subject, iat: now, exp: now + SESSION_TTL_SECONDS }));
+  const payload = base64url(JSON.stringify({ ...claims, sub: subject, iat: now, exp: now + SESSION_TTL_SECONDS }));
   return `${payload}.${sign(payload)}`;
 }
 

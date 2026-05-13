@@ -6,7 +6,11 @@ substitutions:
   _MIGRATION_JOB: ai-compliance-migrate
   _SEED_JOB: ai-compliance-seed
   _CLOUD_SQL_INSTANCE: ''
-  _CLOUD_RUN_SERVICE_ACCOUNT: ''
+  _BACKEND_SERVICE_ACCOUNT: ''
+  _DASHBOARD_SERVICE_ACCOUNT: ''
+  _AUTH_PASSWORD_ENABLED: 'true'
+  _GOOGLE_OIDC_ALLOWED_DOMAINS: ''
+  _GOOGLE_OIDC_ALLOWED_EMAILS: ''
 
 steps:
   - name: ubuntu
@@ -17,7 +21,8 @@ steps:
       - |
         set -euo pipefail
         test -n "$_CLOUD_SQL_INSTANCE" || (echo "ERROR: _CLOUD_SQL_INSTANCE is required." && exit 1)
-        test -n "$_CLOUD_RUN_SERVICE_ACCOUNT" || (echo "ERROR: _CLOUD_RUN_SERVICE_ACCOUNT is required." && exit 1)
+        test -n "$_BACKEND_SERVICE_ACCOUNT" || (echo "ERROR: _BACKEND_SERVICE_ACCOUNT is required." && exit 1)
+        test -n "$_DASHBOARD_SERVICE_ACCOUNT" || (echo "ERROR: _DASHBOARD_SERVICE_ACCOUNT is required." && exit 1)
 
   - name: python:3.11-slim
     id: run-backend-tests
@@ -61,7 +66,7 @@ steps:
       - --region
       - ${_REGION}
       - --service-account
-      - ${_CLOUD_RUN_SERVICE_ACCOUNT}
+      - ${_BACKEND_SERVICE_ACCOUNT}
       - --set-cloudsql-instances
       - ${_CLOUD_SQL_INSTANCE}
       - --set-env-vars
@@ -92,7 +97,7 @@ steps:
       - --region
       - ${_REGION}
       - --service-account
-      - ${_CLOUD_RUN_SERVICE_ACCOUNT}
+      - ${_BACKEND_SERVICE_ACCOUNT}
       - --set-cloudsql-instances
       - ${_CLOUD_SQL_INSTANCE}
       - --set-env-vars
@@ -124,7 +129,7 @@ steps:
       - --platform
       - managed
       - --service-account
-      - ${_CLOUD_RUN_SERVICE_ACCOUNT}
+      - ${_BACKEND_SERVICE_ACCOUNT}
       - --add-cloudsql-instances
       - ${_CLOUD_SQL_INSTANCE}
       - --set-env-vars
@@ -178,14 +183,21 @@ steps:
       - |
         set -euo pipefail
         BACKEND_URL="$(cat /workspace/backend_url.txt)"
+        FRONTEND_SECRETS="DASHBOARD_API_KEY=DASHBOARD_API_KEY:latest,DASHBOARD_ADMIN_PASSWORD=DASHBOARD_ADMIN_PASSWORD:latest,DASHBOARD_SESSION_SECRET=DASHBOARD_SESSION_SECRET:latest"
+        if gcloud secrets versions describe latest --secret GOOGLE_OIDC_CLIENT_ID >/dev/null 2>&1 && \
+          gcloud secrets versions describe latest --secret GOOGLE_OIDC_CLIENT_SECRET >/dev/null 2>&1; then
+          FRONTEND_SECRETS="$$FRONTEND_SECRETS,GOOGLE_OIDC_CLIENT_ID=GOOGLE_OIDC_CLIENT_ID:latest,GOOGLE_OIDC_CLIENT_SECRET=GOOGLE_OIDC_CLIENT_SECRET:latest"
+        else
+          echo "Google OIDC secrets are not populated; Google login will remain disabled."
+        fi
         gcloud run deploy "$_FRONTEND_SERVICE" \
           --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID" \
           --region "$_REGION" \
           --platform managed \
-          --service-account "${_CLOUD_RUN_SERVICE_ACCOUNT}" \
+          --service-account "${_DASHBOARD_SERVICE_ACCOUNT}" \
           --port 3000 \
-          --set-env-vars "NODE_ENV=production,BACKEND_URL=$$BACKEND_URL,BACKEND_AUTH_MODE=google_id_token" \
-          --set-secrets "DASHBOARD_API_KEY=DASHBOARD_API_KEY:latest,DASHBOARD_ADMIN_PASSWORD=DASHBOARD_ADMIN_PASSWORD:latest,DASHBOARD_SESSION_SECRET=DASHBOARD_SESSION_SECRET:latest" \
+          --set-env-vars "NODE_ENV=production,BACKEND_URL=$$BACKEND_URL,BACKEND_AUTH_MODE=google_id_token,AUTH_PASSWORD_ENABLED=${_AUTH_PASSWORD_ENABLED},GOOGLE_OIDC_ALLOWED_DOMAINS=${_GOOGLE_OIDC_ALLOWED_DOMAINS},GOOGLE_OIDC_ALLOWED_EMAILS=${_GOOGLE_OIDC_ALLOWED_EMAILS}" \
+          --set-secrets "$$FRONTEND_SECRETS" \
           --max-instances 2
         gcloud run services describe "$_FRONTEND_SERVICE" \
           --region "$_REGION" \
@@ -203,7 +215,7 @@ steps:
         FRONTEND_URL="$(cat /workspace/frontend_url.txt)"
         gcloud run services add-iam-policy-binding "$_BACKEND_SERVICE" \
           --region "$_REGION" \
-          --member "serviceAccount:${_CLOUD_RUN_SERVICE_ACCOUNT}" \
+          --member "serviceAccount:${_DASHBOARD_SERVICE_ACCOUNT}" \
           --role roles/run.invoker
         if gcloud run services get-iam-policy "$_BACKEND_SERVICE" \
           --region "$_REGION" \

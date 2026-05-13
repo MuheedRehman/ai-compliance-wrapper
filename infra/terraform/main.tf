@@ -33,19 +33,27 @@ resource "google_artifact_registry_repository" "backend_repo" {
 
 # 3. Secret Manager (Containers only)
 locals {
-  secrets = [
+  backend_secret_ids = [
     "DASHBOARD_API_KEY",
     "OPENAI_API_KEY",
     "EVIDENCE_HMAC_SECRET",
     "FIRECRAWL_API_KEY",
-    "DATABASE_URL",
-    "DASHBOARD_ADMIN_PASSWORD",
-    "DASHBOARD_SESSION_SECRET"
+    "DATABASE_URL"
   ]
+
+  dashboard_secret_ids = [
+    "DASHBOARD_API_KEY",
+    "DASHBOARD_ADMIN_PASSWORD",
+    "DASHBOARD_SESSION_SECRET",
+    "GOOGLE_OIDC_CLIENT_ID",
+    "GOOGLE_OIDC_CLIENT_SECRET"
+  ]
+
+  secrets = toset(concat(local.backend_secret_ids, local.dashboard_secret_ids))
 }
 
 resource "google_secret_manager_secret" "app_secrets" {
-  for_each   = toset(local.secrets)
+  for_each   = local.secrets
   depends_on = [google_project_service.api_services]
   secret_id  = each.value
 
@@ -99,12 +107,26 @@ resource "google_service_account" "cloud_run_sa" {
   display_name = "Cloud Run Service Account for Backend"
 }
 
-# Grant Secret Manager Secret Accessor to the SA
-resource "google_secret_manager_secret_iam_member" "secret_accessor" {
-  for_each  = toset(local.secrets)
+resource "google_service_account" "dashboard_run_sa" {
+  depends_on   = [google_project_service.api_services]
+  account_id   = "dashboard-run-sa"
+  display_name = "Cloud Run Service Account for Dashboard"
+}
+
+# Backend runtime and jobs only receive backend/migration/seed secrets.
+resource "google_secret_manager_secret_iam_member" "backend_secret_accessor" {
+  for_each  = toset(local.backend_secret_ids)
   secret_id = google_secret_manager_secret.app_secrets[each.key].id
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+}
+
+# Dashboard runtime receives dashboard auth/proxy secrets only.
+resource "google_secret_manager_secret_iam_member" "dashboard_secret_accessor" {
+  for_each  = toset(local.dashboard_secret_ids)
+  secret_id = google_secret_manager_secret.app_secrets[each.key].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.dashboard_run_sa.email}"
 }
 
 # Grant Cloud SQL Client to the SA
@@ -138,6 +160,24 @@ resource "google_service_account_iam_member" "cloud_build_run_as" {
   service_account_id = google_service_account.cloud_run_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_service_account_iam_member" "cloud_build_compute_backend_run_as" {
+  service_account_id = google_service_account.cloud_run_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloud_build_compute_service_account}"
+}
+
+resource "google_service_account_iam_member" "cloud_build_dashboard_run_as" {
+  service_account_id = google_service_account.dashboard_run_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_service_account_iam_member" "cloud_build_compute_dashboard_run_as" {
+  service_account_id = google_service_account.dashboard_run_sa.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:${local.cloud_build_compute_service_account}"
 }
 
 resource "google_project_iam_member" "cloud_build_artifact_writer" {
@@ -193,7 +233,7 @@ resource "google_cloud_run_v2_service" "backend_service" {
 
       # Inject secret values as environment variables
       dynamic "env" {
-        for_each = toset(local.secrets)
+        for_each = toset(local.backend_secret_ids)
         content {
           name = env.value
           value_source {

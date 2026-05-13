@@ -20,8 +20,18 @@ output "cloud_run_service_url" {
 }
 
 output "cloud_run_service_account_email" {
-  description = "Service account used by Cloud Run services and jobs"
+  description = "Backward-compatible output for the backend Cloud Run service account"
   value       = google_service_account.cloud_run_sa.email
+}
+
+output "backend_service_account_email" {
+  description = "Service account used by backend Cloud Run services and jobs"
+  value       = google_service_account.cloud_run_sa.email
+}
+
+output "dashboard_service_account_email" {
+  description = "Service account used by the dashboard Cloud Run service"
+  value       = google_service_account.dashboard_run_sa.email
 }
 
 output "cloud_build_service_account_email" {
