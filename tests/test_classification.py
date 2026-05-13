@@ -112,6 +112,47 @@ def test_get_intake_cross_tenant_404(client: TestClient, admin_headers, db_sessi
     response = client.get(f"/v1/intake/{other_id}", headers=admin_headers)
     assert response.status_code == 404
 
+
+def test_materialize_intake_control_plan(client: TestClient, admin_headers, db_session):
+    from app.models import AiSystem, ComplianceControl
+
+    system = AiSystem(id="sys-intake-plan", tenant_id="tenant_test", name="Intake Plan System")
+    db_session.add(system)
+    db_session.commit()
+
+    payload = {
+        "title": "Control Plan Assessment",
+        "answers": {
+            "is_deployer": True,
+            "is_high_risk_annex_iii": True,
+            "has_transparency_obligation": True,
+        },
+    }
+    create_res = client.post("/v1/intake", json=payload, headers=admin_headers)
+    assert create_res.status_code == 200
+    intake_id = create_res.json()["id"]
+
+    response = client.post(
+        f"/v1/intake/{intake_id}/control-plan?ai_system_id=sys-intake-plan",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    controls = response.json()
+    assert any(control["control_key"] == "intake_deployer_high_risk_operations" for control in controls)
+    assert any(control["control_key"] == "intake_transparency_notice" for control in controls)
+    assert all(control["ai_system_id"] == "sys-intake-plan" for control in controls)
+
+    response = client.post(
+        f"/v1/intake/{intake_id}/control-plan?ai_system_id=sys-intake-plan",
+        headers=admin_headers,
+    )
+    assert response.status_code == 200
+    assert db_session.query(ComplianceControl).filter_by(
+        tenant_id="tenant_test",
+        ai_system_id="sys-intake-plan",
+        control_key="intake_deployer_high_risk_operations",
+    ).count() == 1
+
 def test_classification_logic_ambiguous_precedence():
     # If both are true, Provider should win
     answers = {

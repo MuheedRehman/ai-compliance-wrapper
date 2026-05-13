@@ -15,19 +15,28 @@ import {
   BookOpen, 
   Scale,
   Gavel,
-  History
+  ListChecks,
+  RefreshCw
 } from 'lucide-react';
 
 export default function IntakeDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [intake, setIntake] = useState<any>(null);
+  const [systems, setSystems] = useState<any[]>([]);
+  const [selectedSystemId, setSelectedSystemId] = useState('');
+  const [createdControls, setCreatedControls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [materializing, setMaterializing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadDetail = useCallback(async () => {
     try {
-      const data = await api.getIntake(id);
+      const [data, systemData] = await Promise.all([
+        api.getIntake(id),
+        api.listSystems().catch(() => []),
+      ]);
       setIntake(data);
+      setSystems(systemData || []);
     } catch (err: any) {
       setError(err.body?.detail || 'Failed to load intake record');
     } finally {
@@ -41,6 +50,19 @@ export default function IntakeDetailPage({ params }: { params: { id: string } })
 
   if (loading) return <PageShell title="Loading assessment..."><Loading /></PageShell>;
   if (error) return <PageShell title="Error"><ErrorState message={error} onRetry={loadDetail} /></PageShell>;
+
+  async function createControlPlan() {
+    setMaterializing(true);
+    setError(null);
+    try {
+      const controls = await api.materializeIntakeControlPlan(id, selectedSystemId || undefined);
+      setCreatedControls(controls);
+    } catch (err: any) {
+      setError(err.body?.detail || 'Failed to create control plan');
+    } finally {
+      setMaterializing(false);
+    }
+  }
 
   return (
     <PageShell
@@ -133,6 +155,65 @@ export default function IntakeDetailPage({ params }: { params: { id: string } })
               </div>
             </Card>
 
+            <Card title="Obligation Control Plan" subtitle="Generate controls directly from this intake's obligation graph.">
+              <div className="space-y-5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {(intake.obligation_graph_json || []).map((item: any) => (
+                    <div key={item.key} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">{item.article}</span>
+                        <StatusBadge value={item.status} />
+                      </div>
+                      <p className="mt-2 text-xs font-medium leading-relaxed text-zinc-300">{item.summary}</p>
+                      <p className="mt-2 text-[10px] font-mono text-zinc-600">{item.evidence_domain}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-lg border border-zinc-800 bg-zinc-950 p-4 md:flex-row md:items-end">
+                  <div className="flex-1">
+                    <label className="mb-2 block text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                      Scope control plan
+                    </label>
+                    <select
+                      value={selectedSystemId}
+                      onChange={(event) => setSelectedSystemId(event.target.value)}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-200 outline-none focus:ring-2 focus:ring-indigo-500/30"
+                    >
+                      <option value="">Tenant-wide controls</option>
+                      {systems.map((system) => (
+                        <option key={system.id} value={system.id}>{system.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={createControlPlan}
+                    disabled={materializing}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 disabled:opacity-50"
+                  >
+                    {materializing ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ListChecks className="h-3.5 w-3.5" />}
+                    Create Control Plan
+                  </button>
+                </div>
+
+                {createdControls.length > 0 && (
+                  <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-bold text-emerald-300">
+                        {createdControls.length} controls are ready for ownership and tracking.
+                      </p>
+                      <Link
+                        href={`/controls${selectedSystemId ? `?ai_system_id=${selectedSystemId}` : ''}`}
+                        className="text-[10px] font-bold uppercase tracking-widest text-emerald-300 hover:text-emerald-200"
+                      >
+                        Open Controls
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
+
             <Card title="Intake Audit Trail" subtitle="Original inputs provided during assessment.">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.entries(intake.answers_json).map(([key, value]) => (
@@ -157,11 +238,11 @@ export default function IntakeDetailPage({ params }: { params: { id: string } })
                 </div>
                 <div className="flex gap-3">
                   <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">2</div>
-                  <p className="text-xs text-zinc-400 leading-relaxed">Initialize FRIA workflow (if required by high-risk classification).</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed">Create an obligation control plan from this classification.</p>
                 </div>
                 <div className="flex gap-3 opacity-40">
                   <div className="h-6 w-6 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">3</div>
-                  <p className="text-xs text-zinc-400 leading-relaxed italic">Generate pre-compliance report (Phase 4).</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed italic">Initialize FRIA workflow if high-risk deployer obligations apply.</p>
                 </div>
               </div>
             </Card>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import Card from '@/components/card';
@@ -23,8 +24,9 @@ import {
 const STATUS_OPTIONS = ['not_started', 'in_progress', 'blocked', 'completed', 'signed_off'];
 
 export default function ControlsPage() {
+  const searchParams = useSearchParams();
   const [systems, setSystems] = useState<any[]>([]);
-  const [selectedSystemId, setSelectedSystemId] = useState('');
+  const [selectedSystemId, setSelectedSystemId] = useState(searchParams.get('ai_system_id') || '');
   const [controls, setControls] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
   const [loading, setLoading] = useState(true);

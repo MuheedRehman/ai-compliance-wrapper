@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import IntakeAssessment
 from app.schemas import IntakeCreate
+from app.services.compliance_control_service import ComplianceControlService
 from app.services.regulatory_knowledge import build_obligation_graph, legal_basis_for_classification
 from typing import Any, Dict, List
 
@@ -122,3 +123,15 @@ class ClassificationService:
             raise HTTPException(status_code=404, detail="Intake assessment not found")
             
         return intake
+
+    @classmethod
+    def materialize_control_plan(cls, db: Session, tenant_id: str, intake_id: str, ai_system_id: str | None = None):
+        intake = cls.get_intake(db, tenant_id, intake_id)
+        return ComplianceControlService.seed_from_obligation_graph(
+            db,
+            tenant_id,
+            intake.obligation_graph_json or [],
+            intake_id=intake.id,
+            obligation_path=intake.obligation_path,
+            ai_system_id=ai_system_id,
+        )

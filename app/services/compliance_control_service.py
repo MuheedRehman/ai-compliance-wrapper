@@ -138,6 +138,61 @@ class ComplianceControlService:
         return created
 
     @staticmethod
+    def seed_from_obligation_graph(
+        db: Session,
+        tenant_id: str,
+        obligation_graph: list[dict],
+        *,
+        intake_id: str,
+        obligation_path: str,
+        ai_system_id: Optional[str] = None,
+    ) -> List[ComplianceControl]:
+        ComplianceControlService._require_system(db, tenant_id, ai_system_id)
+        created: list[ComplianceControl] = []
+
+        for item in obligation_graph:
+            key = item.get("key")
+            if not key:
+                continue
+
+            control_key = f"intake_{key}"
+            existing = db.query(ComplianceControl).filter(
+                ComplianceControl.tenant_id == tenant_id,
+                ComplianceControl.ai_system_id == ai_system_id,
+                ComplianceControl.control_key == control_key,
+            ).first()
+            if existing:
+                created.append(existing)
+                continue
+
+            control = ComplianceControl(
+                id=f"ctl-{uuid.uuid4().hex[:8]}",
+                tenant_id=tenant_id,
+                ai_system_id=ai_system_id,
+                control_key=control_key,
+                article=item.get("article") or "EU AI Act",
+                title=item.get("summary") or key.replace("_", " ").title(),
+                status=_status_from_obligation(item.get("status")),
+                evidence_domain=item.get("evidence_domain") or "classification",
+                details_json={
+                    "source": "intake_obligation_graph",
+                    "intake_id": intake_id,
+                    "obligation_key": key,
+                    "obligation_status": item.get("status"),
+                    "obligation_path": obligation_path,
+                    "owner_role": item.get("owner_role"),
+                    "summary": item.get("summary"),
+                },
+            )
+            db.add(control)
+            created.append(control)
+
+        db.commit()
+        for control in created:
+            db.refresh(control)
+        return created
+
+    @staticmethod
     def scorecard(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> dict:
         controls = ComplianceControlService.list_controls(db, tenant_id, ai_system_id)
         now = datetime.now(timezone.utc)
@@ -166,3 +221,9 @@ def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value
+
+
+def _status_from_obligation(status: Optional[str]) -> str:
+    if status in {"blocking", "review_required"}:
+        return "blocked"
+    return "not_started"

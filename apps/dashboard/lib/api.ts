@@ -117,6 +117,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+  materializeIntakeControlPlan: (id: string, aiSystemId?: string) => {
+    const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
+    return fetchApi<any[]>(`/v1/intake/${id}/control-plan${qs}`, { method: 'POST' });
+  },
 
   // Obligations (Phase 4)
   // FRIA
