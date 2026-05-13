@@ -156,9 +156,7 @@ steps:
       - -c
       - |
         set -euo pipefail
-        BACKEND_URL="$(cat /workspace/backend_url.txt)"
         docker build \
-          --build-arg NEXT_PUBLIC_API_URL="$$BACKEND_URL" \
           -t "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID" \
           apps/dashboard
     waitFor:
@@ -184,8 +182,10 @@ steps:
           --image "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_ARTIFACT_REPOSITORY}/ai-compliance-dashboard:$BUILD_ID" \
           --region "$_REGION" \
           --platform managed \
+          --service-account "${_CLOUD_RUN_SERVICE_ACCOUNT}" \
           --port 3000 \
-          --set-env-vars "NODE_ENV=production,NEXT_PUBLIC_API_URL=$$BACKEND_URL" \
+          --set-env-vars "NODE_ENV=production,BACKEND_URL=$$BACKEND_URL" \
+          --set-secrets "DASHBOARD_API_KEY=DASHBOARD_API_KEY:latest" \
           --max-instances 2
         gcloud run services describe "$_FRONTEND_SERVICE" \
           --region "$_REGION" \

@@ -6,6 +6,8 @@ The dashboard has a Playwright product smoke suite that covers:
 - Main navigation rendering and visible error detection.
 - Critical create flows for systems, features, controls, intake, oversight, incidents, reports, and governed runtime.
 
+Staging routes browser API calls through the dashboard server. The dashboard service reads `DASHBOARD_API_KEY` from Secret Manager and forwards requests to the backend without exposing the key in browser JavaScript. This keeps public staging easy to open, but it is not the production authentication model. Production should replace this with OAuth/JWT-backed user sessions.
+
 ## Local
 
 Start the backend and dashboard, then run:
