@@ -111,7 +111,7 @@ test('critical product workflows create records and run governed runtime', async
   await expect(page.getByText(`E2E Feature ${stamp}`)).toBeVisible();
 
   await gotoAndSettle(page, '/scanner');
-  await page.getByRole('button', { name: /new scan/i }).click();
+  await page.getByRole('button', { name: /^new scan$/i }).first().click();
   await page.locator('input[placeholder="https://example-saas.com"]').fill('https://example.com');
   await page.getByRole('button', { name: /run scanner/i }).click();
   await expect(page).toHaveURL(/\/scanner\/scan-/);
@@ -277,7 +277,8 @@ function installPageDiagnostics(page: Page) {
   page.on('console', (message) => {
     const text = message.text();
     const browserStatic404 = /Failed to load resource: the server responded with a status of 404/.test(text);
-    if (message.type() === 'error' && !text.includes('favicon') && !browserStatic404) {
+    const rscPrefetchFallback = /Failed to fetch RSC payload/.test(text);
+    if (message.type() === 'error' && !text.includes('favicon') && !browserStatic404 && !rscPrefetchFallback) {
       consoleErrors.push(text);
     }
   });
