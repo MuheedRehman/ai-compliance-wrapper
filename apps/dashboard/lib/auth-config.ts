@@ -12,7 +12,9 @@ export function isPasswordLoginEnabled() {
 }
 
 export function getGoogleOidcConfig(request?: NextRequest) {
-  const origin = request?.nextUrl.origin;
+  const forwardedHost = request?.headers.get('x-forwarded-host');
+  const forwardedProto = request?.headers.get('x-forwarded-proto') || 'https';
+  const origin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : request?.nextUrl.origin;
   const redirectUri = process.env.GOOGLE_OIDC_REDIRECT_URI || (origin ? `${origin}/api/auth/google/callback` : '');
   const clientId = process.env.GOOGLE_OIDC_CLIENT_ID || '';
   const clientSecret = process.env.GOOGLE_OIDC_CLIENT_SECRET || '';

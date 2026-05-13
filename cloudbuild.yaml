@@ -9,6 +9,7 @@ substitutions:
   _BACKEND_SERVICE_ACCOUNT: ''
   _DASHBOARD_SERVICE_ACCOUNT: ''
   _AUTH_PASSWORD_ENABLED: 'true'
+  _DASHBOARD_BASE_URL: ''
   _GOOGLE_OIDC_ALLOWED_DOMAINS: ''
   _GOOGLE_OIDC_ALLOWED_EMAILS: ''
 
@@ -183,6 +184,11 @@ steps:
       - |
         set -euo pipefail
         BACKEND_URL="$(cat /workspace/backend_url.txt)"
+        DASHBOARD_BASE_URL="${_DASHBOARD_BASE_URL}"
+        if [ -z "$$DASHBOARD_BASE_URL" ]; then
+          DASHBOARD_BASE_URL="$(gcloud run services describe "$_FRONTEND_SERVICE" --region "$_REGION" --format='value(status.url)' 2>/dev/null || true)"
+        fi
+        test -n "$$DASHBOARD_BASE_URL" || (echo "ERROR: _DASHBOARD_BASE_URL is required for first-time dashboard deployment." && exit 1)
         FRONTEND_SECRETS="DASHBOARD_API_KEY=DASHBOARD_API_KEY:latest,DASHBOARD_ADMIN_PASSWORD=DASHBOARD_ADMIN_PASSWORD:latest,DASHBOARD_SESSION_SECRET=DASHBOARD_SESSION_SECRET:latest"
         if gcloud secrets versions describe latest --secret GOOGLE_OIDC_CLIENT_ID >/dev/null 2>&1 && \
           gcloud secrets versions describe latest --secret GOOGLE_OIDC_CLIENT_SECRET >/dev/null 2>&1; then
@@ -196,7 +202,7 @@ steps:
           --platform managed \
           --service-account "${_DASHBOARD_SERVICE_ACCOUNT}" \
           --port 3000 \
-          --set-env-vars "NODE_ENV=production,BACKEND_URL=$$BACKEND_URL,BACKEND_AUTH_MODE=google_id_token,AUTH_PASSWORD_ENABLED=${_AUTH_PASSWORD_ENABLED},GOOGLE_OIDC_ALLOWED_DOMAINS=${_GOOGLE_OIDC_ALLOWED_DOMAINS},GOOGLE_OIDC_ALLOWED_EMAILS=${_GOOGLE_OIDC_ALLOWED_EMAILS}" \
+          --set-env-vars "NODE_ENV=production,BACKEND_URL=$$BACKEND_URL,BACKEND_AUTH_MODE=google_id_token,AUTH_PASSWORD_ENABLED=${_AUTH_PASSWORD_ENABLED},GOOGLE_OIDC_REDIRECT_URI=$$DASHBOARD_BASE_URL/api/auth/google/callback,GOOGLE_OIDC_ALLOWED_DOMAINS=${_GOOGLE_OIDC_ALLOWED_DOMAINS},GOOGLE_OIDC_ALLOWED_EMAILS=${_GOOGLE_OIDC_ALLOWED_EMAILS}" \
           --set-secrets "$$FRONTEND_SECRETS" \
           --max-instances 2
         gcloud run services describe "$_FRONTEND_SERVICE" \
