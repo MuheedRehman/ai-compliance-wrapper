@@ -193,10 +193,13 @@ async function loginRequest(request: APIRequestContext) {
 
 async function loginPage(page: Page) {
   test.skip(!DASHBOARD_PASSWORD, 'DASHBOARD_PASSWORD or DASHBOARD_ADMIN_PASSWORD is required for product E2E tests.');
-  await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  await page.locator('input[type="password"]').fill(DASHBOARD_PASSWORD);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  const response = await page.request.post('/api/auth/login', {
+    data: { password: DASHBOARD_PASSWORD },
+  });
+  expect(response.ok(), `Login failed with ${response.status()}: ${await response.text()}`).toBeTruthy();
+  await page.goto('/overview', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/overview/);
+  await expect(page.locator('body')).toContainText('Dashboard');
 }
 
 async function expectNoVisibleErrors(page: Page, route: string) {
