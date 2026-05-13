@@ -19,6 +19,8 @@ apps/dashboard/out/
 apps/dashboard/*.log
 apps/dashboard/tsconfig.tsbuildinfo
 apps/dashboard/.env.local
+apps/dashboard/playwright-report/
+apps/dashboard/test-results/
 
 # Terraform local state
 infra/terraform/.terraform/

@@ -7,6 +7,9 @@ export const metadata: Metadata = {
     template: '%s · AI Compliance',
   },
   description: 'EU AI Act Compliance & Governance Platform',
+  icons: {
+    icon: '/icon.svg',
+  },
 };
 
 export const viewport: Viewport = {
