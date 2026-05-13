@@ -129,6 +129,31 @@ resource "google_secret_manager_secret_iam_member" "dashboard_secret_accessor" {
   member    = "serviceAccount:${google_service_account.dashboard_run_sa.email}"
 }
 
+moved {
+  from = google_secret_manager_secret_iam_member.secret_accessor["DASHBOARD_API_KEY"]
+  to   = google_secret_manager_secret_iam_member.backend_secret_accessor["DASHBOARD_API_KEY"]
+}
+
+moved {
+  from = google_secret_manager_secret_iam_member.secret_accessor["DATABASE_URL"]
+  to   = google_secret_manager_secret_iam_member.backend_secret_accessor["DATABASE_URL"]
+}
+
+moved {
+  from = google_secret_manager_secret_iam_member.secret_accessor["EVIDENCE_HMAC_SECRET"]
+  to   = google_secret_manager_secret_iam_member.backend_secret_accessor["EVIDENCE_HMAC_SECRET"]
+}
+
+moved {
+  from = google_secret_manager_secret_iam_member.secret_accessor["FIRECRAWL_API_KEY"]
+  to   = google_secret_manager_secret_iam_member.backend_secret_accessor["FIRECRAWL_API_KEY"]
+}
+
+moved {
+  from = google_secret_manager_secret_iam_member.secret_accessor["OPENAI_API_KEY"]
+  to   = google_secret_manager_secret_iam_member.backend_secret_accessor["OPENAI_API_KEY"]
+}
+
 # Grant Cloud SQL Client to the SA
 resource "google_project_iam_member" "sql_client" {
   project = var.project_id
