@@ -8,6 +8,14 @@ type AuthConfig = {
   passwordEnabled: boolean;
 };
 
+const googleErrorMessages: Record<string, string> = {
+  email_not_allowed: 'This Google account is not allowed for this tenant.',
+  user_not_invited: 'This Google account has not been invited to this tenant.',
+  user_disabled: 'This tenant user is disabled.',
+  google_login_disabled: 'Google login is disabled for this tenant.',
+  google_account_not_allowed: 'This Google account is not allowed for this dashboard.',
+};
+
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,8 +29,9 @@ export default function LoginPage() {
       .catch(() => setConfig({ googleEnabled: false, passwordEnabled: true }));
 
     const params = new URLSearchParams(window.location.search);
-    if (params.has('error')) {
-      setError('Google sign-in could not be completed for this account.');
+    const reason = params.get('error');
+    if (reason) {
+      setError(googleErrorMessages[reason] || 'Google sign-in could not be completed for this account.');
     }
   }, []);
 

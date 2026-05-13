@@ -335,3 +335,116 @@ class WebsiteScanConvertResponse(BaseModel):
     scan: WebsiteScanResponse
     ai_system: AiSystemResponse
     intake: IntakeResponse
+
+
+# --- Tenant / User Administration ---
+
+TenantRole = Literal["owner", "admin", "reviewer", "auditor", "viewer"]
+TenantUserStatus = Literal["active", "invited", "disabled"]
+TenantInvitationStatus = Literal["pending", "accepted", "revoked", "expired"]
+
+
+class TenantAuthPolicyResponse(BaseModel):
+    tenant_id: str
+    google_login_enabled: bool
+    password_login_enabled: bool
+    allowed_domains: List[str] = Field(default_factory=list)
+    allowed_emails: List[str] = Field(default_factory=list)
+    auto_provision_google_users: bool
+    default_role: TenantRole
+    created_at: datetime
+    updated_at: datetime
+
+
+class TenantAuthPolicyUpdate(BaseModel):
+    google_login_enabled: Optional[bool] = None
+    password_login_enabled: Optional[bool] = None
+    allowed_domains: Optional[List[str]] = None
+    allowed_emails: Optional[List[str]] = None
+    auto_provision_google_users: Optional[bool] = None
+    default_role: Optional[TenantRole] = None
+
+
+class TenantUserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    name: Optional[str] = None
+    role: TenantRole = "viewer"
+    status: TenantUserStatus = "active"
+
+
+class TenantUserUpdate(BaseModel):
+    name: Optional[str] = None
+    role: Optional[TenantRole] = None
+    status: Optional[TenantUserStatus] = None
+
+
+class TenantUserResponse(BaseModel):
+    id: str
+    tenant_id: str
+    email: str
+    name: Optional[str] = None
+    role: TenantRole
+    status: TenantUserStatus
+    auth_provider: str
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TenantInvitationCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    role: TenantRole = "viewer"
+
+
+class TenantInvitationResponse(BaseModel):
+    id: str
+    tenant_id: str
+    email: str
+    role: TenantRole
+    status: TenantInvitationStatus
+    invited_by_email: Optional[str] = None
+    accepted_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TenantLoginAuditResponse(BaseModel):
+    id: str
+    tenant_id: Optional[str] = None
+    email: Optional[str] = None
+    provider: str
+    outcome: Literal["success", "failure"]
+    reason: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TenantLoginResolveRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    name: Optional[str] = None
+    provider: Literal["google", "password"] = "google"
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+
+
+class TenantLoginResolveResponse(BaseModel):
+    allowed: bool
+    reason: Optional[str] = None
+    tenant_id: str
+    user: Optional[TenantUserResponse] = None
+    permissions: List[str] = Field(default_factory=list)
+
+
+class TenantAdminSummaryResponse(BaseModel):
+    users: List[TenantUserResponse] = Field(default_factory=list)
+    invitations: List[TenantInvitationResponse] = Field(default_factory=list)
+    auth_policy: TenantAuthPolicyResponse
+    login_events: List[TenantLoginAuditResponse] = Field(default_factory=list)

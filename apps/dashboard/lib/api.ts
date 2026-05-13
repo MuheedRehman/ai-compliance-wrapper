@@ -13,6 +13,76 @@ export class ApiError extends Error {
   }
 }
 
+export type TenantRole = 'owner' | 'admin' | 'reviewer' | 'auditor' | 'viewer';
+export type TenantUserStatus = 'active' | 'invited' | 'disabled';
+
+export type TenantUser = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  name?: string | null;
+  role: TenantRole;
+  status: TenantUserStatus;
+  auth_provider: string;
+  last_login_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenantInvitation = {
+  id: string;
+  tenant_id: string;
+  email: string;
+  role: TenantRole;
+  status: 'pending' | 'accepted' | 'revoked' | 'expired';
+  invited_by_email?: string | null;
+  accepted_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenantAuthPolicy = {
+  tenant_id: string;
+  google_login_enabled: boolean;
+  password_login_enabled: boolean;
+  allowed_domains: string[];
+  allowed_emails: string[];
+  auto_provision_google_users: boolean;
+  default_role: TenantRole;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TenantLoginAudit = {
+  id: string;
+  tenant_id?: string | null;
+  email?: string | null;
+  provider: string;
+  outcome: 'success' | 'failure';
+  reason?: string | null;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+};
+
+export type TenantAdminSummary = {
+  users: TenantUser[];
+  invitations: TenantInvitation[];
+  auth_policy: TenantAuthPolicy;
+  login_events: TenantLoginAudit[];
+};
+
+export type CurrentSession = {
+  authenticated: boolean;
+  email?: string;
+  name?: string;
+  provider?: 'password' | 'google';
+  tenant_id?: string;
+  role?: TenantRole;
+  user_id?: string;
+};
+
 export async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {},
@@ -195,5 +265,37 @@ export const api = {
   convertWebsiteScan: (id: string) =>
     fetchApi<any>(`/v1/website-scans/${id}/convert`, {
       method: 'POST',
+    }),
+
+  // Tenant / User Administration
+  getCurrentSession: () => fetch('/api/auth/me', { cache: 'no-store' }).then((res) => {
+    if (!res.ok) throw new ApiError(res.status, {});
+    return res.json() as Promise<CurrentSession>;
+  }),
+  getTenantAdminSummary: () => fetchApi<TenantAdminSummary>('/v1/tenant-admin/summary'),
+  listTenantUsers: () => fetchApi<TenantUser[]>('/v1/tenant-admin/users'),
+  createTenantUser: (body: { email: string; name?: string; role: TenantRole; status: TenantUserStatus }) =>
+    fetchApi<TenantUser>('/v1/tenant-admin/users', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateTenantUser: (id: string, body: Partial<Pick<TenantUser, 'name' | 'role' | 'status'>>) =>
+    fetchApi<TenantUser>(`/v1/tenant-admin/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  inviteTenantUser: (body: { email: string; role: TenantRole }) =>
+    fetchApi<TenantInvitation>('/v1/tenant-admin/invitations', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  revokeTenantInvitation: (id: string) =>
+    fetchApi<TenantInvitation>(`/v1/tenant-admin/invitations/${id}/revoke`, {
+      method: 'POST',
+    }),
+  updateTenantAuthPolicy: (body: Partial<Pick<TenantAuthPolicy, 'google_login_enabled' | 'password_login_enabled' | 'allowed_domains' | 'allowed_emails' | 'auto_provision_google_users' | 'default_role'>>) =>
+    fetchApi<TenantAuthPolicy>('/v1/tenant-admin/auth-policy', {
+      method: 'PATCH',
+      body: JSON.stringify(body),
     }),
 };

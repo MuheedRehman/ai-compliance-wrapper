@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { backendAuthMode, backendUrl, getGoogleIdentityToken, serverApiKey } from '@/lib/backend-service';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/server-session';
 
 export const dynamic = 'force-dynamic';
@@ -9,24 +10,6 @@ type RouteContext = {
     path: string[];
   };
 };
-
-const backendUrl = () => process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const serverApiKey = () => process.env.DASHBOARD_API_KEY || '';
-const backendAuthMode = () => process.env.BACKEND_AUTH_MODE || 'none';
-
-async function getGoogleIdentityToken(audience: string) {
-  const response = await fetch(
-    `http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`,
-    {
-      headers: { 'Metadata-Flavor': 'Google' },
-      cache: 'no-store',
-    },
-  );
-  if (!response.ok) {
-    throw new Error(`Could not obtain backend identity token: ${response.status}`);
-  }
-  return response.text();
-}
 
 async function proxy(request: NextRequest, context: RouteContext) {
   const session = verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
@@ -44,6 +27,12 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
 
   headers.set('x-api-key', apiKey);
+  if (session.email) headers.set('x-dashboard-user-email', session.email);
+  if (session.name) headers.set('x-dashboard-user-name', session.name);
+  if (session.provider) headers.set('x-dashboard-user-provider', session.provider);
+  if (session.role) headers.set('x-dashboard-user-role', session.role);
+  if (session.user_id) headers.set('x-dashboard-user-id', session.user_id);
+  if (session.tenant_id) headers.set('x-dashboard-tenant-id', session.tenant_id);
   headers.delete('authorization');
   headers.delete('host');
   headers.delete('connection');

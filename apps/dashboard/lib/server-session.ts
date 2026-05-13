@@ -3,16 +3,19 @@ import crypto from 'crypto';
 export const SESSION_COOKIE = 'dashboard_session';
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 
-type SessionPayload = {
+export type SessionPayload = {
   sub: string;
   email?: string;
   name?: string;
   provider?: 'password' | 'google';
+  tenant_id?: string;
+  role?: 'owner' | 'admin' | 'reviewer' | 'auditor' | 'viewer';
+  user_id?: string;
   iat: number;
   exp: number;
 };
 
-type SessionClaims = Pick<SessionPayload, 'email' | 'name' | 'provider'>;
+type SessionClaims = Pick<SessionPayload, 'email' | 'name' | 'provider' | 'tenant_id' | 'role' | 'user_id'>;
 
 function sessionSecret() {
   return process.env.DASHBOARD_SESSION_SECRET || process.env.DASHBOARD_API_KEY || 'dev-session-secret';

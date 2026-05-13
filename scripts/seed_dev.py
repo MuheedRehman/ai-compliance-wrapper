@@ -1,6 +1,6 @@
 import uuid
 from app.db import SessionLocal
-from app.models import ApiKey, AiFeature, Tenant
+from app.models import ApiKey, AiFeature, Tenant, TenantAuthPolicy
 from app.services.hashing import hash_api_key
 
 TENANT_ID = "tenant_demo"
@@ -28,7 +28,10 @@ def main():
         db.add(Tenant(tenant_id=TENANT_ID, name="Demo Tenant"))
 
     upsert_api_key(db, "dev_app_key", "Development App Key", APP_KEY, "app", ["invoke_ai", "logs:read", "features:read"])
-    upsert_api_key(db, "dev_admin_key", "Development Admin Key", ADMIN_KEY, "admin", ["invoke_ai", "logs:read", "features:read", "features:write", "reviews:read", "reviews:write", "admin"])
+    upsert_api_key(db, "dev_admin_key", "Development Admin Key", ADMIN_KEY, "admin", ["invoke_ai", "logs:read", "features:read", "features:write", "reviews:read", "reviews:write", "tenant:read", "tenant:admin", "tenant:login", "admin"])
+
+    if not db.query(TenantAuthPolicy).filter(TenantAuthPolicy.tenant_id == TENANT_ID).first():
+        db.add(TenantAuthPolicy(tenant_id=TENANT_ID))
 
     existing_feature = db.query(AiFeature).filter(AiFeature.tenant_id == TENANT_ID, AiFeature.feature_id == "customer_support_bot").first()
 

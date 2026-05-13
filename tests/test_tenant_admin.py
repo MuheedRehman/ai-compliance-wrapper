@@ -1,0 +1,129 @@
+from tests.conftest import TENANT_ID
+
+
+def test_tenant_admin_summary_bootstraps_policy(client, admin_headers):
+    response = client.get("/v1/tenant-admin/summary", headers=admin_headers)
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["auth_policy"]["tenant_id"] == TENANT_ID
+    assert data["auth_policy"]["google_login_enabled"] is True
+    assert data["users"] == []
+    assert data["invitations"] == []
+
+
+def test_owner_session_can_manage_users_policy_and_invitations(client, admin_headers):
+    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner", "x-dashboard-user-email": "owner@example.com"}
+
+    user_response = client.post(
+        "/v1/tenant-admin/users",
+        headers=owner_headers,
+        json={"email": "Reviewer@Example.com", "role": "reviewer", "status": "active", "name": "Reviewer"},
+    )
+    assert user_response.status_code == 200
+    user = user_response.json()
+    assert user["email"] == "reviewer@example.com"
+    assert user["role"] == "reviewer"
+
+    update_response = client.patch(
+        f"/v1/tenant-admin/users/{user['id']}",
+        headers=owner_headers,
+        json={"role": "auditor"},
+    )
+    assert update_response.status_code == 200
+    assert update_response.json()["role"] == "auditor"
+
+    policy_response = client.patch(
+        "/v1/tenant-admin/auth-policy",
+        headers=owner_headers,
+        json={"allowed_domains": ["Example.com"], "auto_provision_google_users": False, "default_role": "viewer"},
+    )
+    assert policy_response.status_code == 200
+    assert policy_response.json()["allowed_domains"] == ["example.com"]
+
+    invite_response = client.post(
+        "/v1/tenant-admin/invitations",
+        headers=owner_headers,
+        json={"email": "Auditor@Example.com", "role": "auditor"},
+    )
+    assert invite_response.status_code == 200
+    invitation = invite_response.json()
+    assert invitation["email"] == "auditor@example.com"
+    assert invitation["status"] == "pending"
+    assert invitation["invited_by_email"] == "owner@example.com"
+
+
+def test_viewer_session_cannot_write_tenant_admin_data(client, admin_headers):
+    viewer_headers = {**admin_headers, "x-dashboard-user-role": "viewer"}
+
+    response = client.post(
+        "/v1/tenant-admin/users",
+        headers=viewer_headers,
+        json={"email": "viewer@example.com", "role": "viewer"},
+    )
+
+    assert response.status_code == 403
+
+
+def test_login_resolve_first_google_user_becomes_owner_and_is_audited(client, admin_headers):
+    response = client.post(
+        "/v1/tenant-admin/login/resolve",
+        headers=admin_headers,
+        json={"email": "Founder@Example.com", "name": "Founder", "provider": "google"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["allowed"] is True
+    assert data["user"]["email"] == "founder@example.com"
+    assert data["user"]["role"] == "owner"
+    assert "tenant:admin" in data["permissions"]
+
+    audit_response = client.get("/v1/tenant-admin/login-audit", headers=admin_headers)
+    assert audit_response.status_code == 200
+    assert audit_response.json()[0]["outcome"] == "success"
+
+
+def test_login_policy_blocks_unallowed_google_identity(client, admin_headers):
+    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner"}
+    policy_response = client.patch(
+        "/v1/tenant-admin/auth-policy",
+        headers=owner_headers,
+        json={"allowed_domains": ["example.com"]},
+    )
+    assert policy_response.status_code == 200
+
+    response = client.post(
+        "/v1/tenant-admin/login/resolve",
+        headers=admin_headers,
+        json={"email": "blocked@other.com", "name": "Blocked", "provider": "google"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["allowed"] is False
+    assert response.json()["reason"] == "email_not_allowed"
+
+
+def test_pending_invitation_is_accepted_on_matching_google_login(client, admin_headers):
+    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner"}
+    invite_response = client.post(
+        "/v1/tenant-admin/invitations",
+        headers=owner_headers,
+        json={"email": "auditor@example.com", "role": "auditor"},
+    )
+    assert invite_response.status_code == 200
+
+    response = client.post(
+        "/v1/tenant-admin/login/resolve",
+        headers=admin_headers,
+        json={"email": "auditor@example.com", "name": "Auditor", "provider": "google"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["allowed"] is True
+    assert data["user"]["role"] == "auditor"
+
+    invitations_response = client.get("/v1/tenant-admin/invitations", headers=admin_headers)
+    assert invitations_response.status_code == 200
+    assert invitations_response.json()[0]["status"] == "accepted"

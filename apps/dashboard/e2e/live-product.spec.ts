@@ -18,6 +18,7 @@ const routes = [
   '/reports',
   '/runtime',
   '/billing',
+  '/settings/users',
 ];
 
 const apiChecks = [
@@ -35,6 +36,7 @@ const apiChecks = [
   '/v1/reports',
   '/v1/compliance/controls',
   '/v1/compliance/scorecard',
+  '/v1/tenant-admin/summary',
 ];
 
 const visibleErrorPhrases = [
@@ -238,7 +240,7 @@ async function inventoryButtons(page: Page) {
 
 async function clickSafeButtons(page: Page, route: string) {
   const unsafe =
-    /delete|remove|submit|generate|execute|upgrade|portal|report incident|add oversight|new report|new assessment|start assessment|create assignment|seed baseline|save|cancel/i;
+    /delete|remove|submit|generate|execute|upgrade|portal|report incident|add oversight|new report|new assessment|start assessment|create assignment|seed baseline|save|cancel|invite user|revoke/i;
   const buttons = page.locator('button');
   const count = await buttons.count();
 

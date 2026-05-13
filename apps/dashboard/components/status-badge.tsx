@@ -3,13 +3,17 @@
 const colorMap: Record<string, string> = {
   // statuses
   active:       'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  success:      'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   open:         'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  pending:      'bg-amber-500/10 text-amber-400 border-amber-500/20',
   closed:       'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
   draft:        'bg-zinc-500/10 text-zinc-400 border-zinc-500/20',
   deployed:     'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
   retired:      'bg-red-500/10 text-red-400 border-red-500/20',
   registered:   'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   rejected:     'bg-red-500/10 text-red-400 border-red-500/20',
+  revoked:      'bg-red-500/10 text-red-400 border-red-500/20',
+  failure:      'bg-red-500/10 text-red-400 border-red-500/20',
   completed:    'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   blocked:      'bg-red-500/10 text-red-400 border-red-500/20',
   error:        'bg-red-500/10 text-red-400 border-red-500/20',

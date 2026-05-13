@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from sqlalchemy.exc import OperationalError
 
 from app.db import SessionLocal
-from app.models import AiFeature, AiSystem, Entitlement, Tenant, ApiKey
+from app.models import AiFeature, AiSystem, Entitlement, Tenant, ApiKey, TenantAuthPolicy, TenantUser
 from app.services.hashing import hash_api_key
 from app.services.compliance_control_service import ComplianceControlService
 
@@ -22,6 +22,8 @@ DEMO_SYSTEM_ID = "sys-dashboard-demo"
 DEMO_FEATURE_ID = "dashboard_demo_assistant"
 DB_RETRIES = int(os.getenv("SEED_DB_RETRIES", "5"))
 DB_RETRY_DELAY_SECONDS = float(os.getenv("SEED_DB_RETRY_DELAY_SECONDS", "2"))
+DASHBOARD_OWNER_EMAIL = os.getenv("DASHBOARD_OWNER_EMAIL", "").strip().lower()
+DASHBOARD_OWNER_NAME = os.getenv("DASHBOARD_OWNER_NAME", "Dashboard Owner")
 
 ENTITLEMENTS = [
     "report_generation",
@@ -29,6 +31,10 @@ ENTITLEMENTS = [
     "oversight_management",
     "incident_management",
 ]
+
+
+def _csv_values(env_name: str) -> list[str]:
+    return [value.strip().lower().removeprefix("@") for value in os.getenv(env_name, "").split(",") if value.strip()]
 
 def seed():
     for attempt in range(1, DB_RETRIES + 1):
@@ -61,6 +67,44 @@ def _seed_once():
             print(f"Created tenant: {TENANT_ID}")
         else:
             print(f"Tenant already exists: {TENANT_ID}")
+
+        policy = db.query(TenantAuthPolicy).filter(TenantAuthPolicy.tenant_id == TENANT_ID).first()
+        if not policy:
+            policy = TenantAuthPolicy(
+                tenant_id=TENANT_ID,
+                allowed_domains_json=_csv_values("GOOGLE_OIDC_ALLOWED_DOMAINS"),
+                allowed_emails_json=_csv_values("GOOGLE_OIDC_ALLOWED_EMAILS"),
+                auto_provision_google_users=True,
+                default_role="viewer",
+            )
+            db.add(policy)
+            print("Created tenant authentication policy")
+        else:
+            seed_domains = _csv_values("GOOGLE_OIDC_ALLOWED_DOMAINS")
+            seed_emails = _csv_values("GOOGLE_OIDC_ALLOWED_EMAILS")
+            if seed_domains and not policy.allowed_domains_json:
+                policy.allowed_domains_json = seed_domains
+                print("Applied Google allowed domains from deployment configuration")
+            if seed_emails and not policy.allowed_emails_json:
+                policy.allowed_emails_json = seed_emails
+                print("Applied Google allowed emails from deployment configuration")
+
+        if DASHBOARD_OWNER_EMAIL:
+            owner = db.query(TenantUser).filter(
+                TenantUser.tenant_id == TENANT_ID,
+                TenantUser.email == DASHBOARD_OWNER_EMAIL,
+            ).first()
+            if not owner:
+                db.add(TenantUser(
+                    id=f"usr_{uuid.uuid4().hex}",
+                    tenant_id=TENANT_ID,
+                    email=DASHBOARD_OWNER_EMAIL,
+                    name=DASHBOARD_OWNER_NAME,
+                    role="owner",
+                    status="active",
+                    auth_provider="google",
+                ))
+                print(f"Created tenant owner user: {DASHBOARD_OWNER_EMAIL}")
 
         # Upsert API key
         key_hash = hash_api_key(raw_api_key)

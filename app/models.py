@@ -37,6 +37,76 @@ class ApiKey(Base):
     revoked_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class TenantAuthPolicy(Base):
+    __tablename__ = "tenant_auth_policies"
+
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), primary_key=True)
+    google_login_enabled = Column(Boolean, nullable=False, default=True)
+    password_login_enabled = Column(Boolean, nullable=False, default=True)
+    allowed_domains_json = Column(JSON, nullable=False, default=list)
+    allowed_emails_json = Column(JSON, nullable=False, default=list)
+    auto_provision_google_users = Column(Boolean, nullable=False, default=True)
+    default_role = Column(String, nullable=False, default="viewer")
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class TenantUser(Base):
+    __tablename__ = "tenant_users"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    name = Column(String, nullable=True)
+    role = Column(String, nullable=False, default="viewer")
+    status = Column(String, nullable=False, default="active", index=True)
+    auth_provider = Column(String, nullable=False, default="google")
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "email", name="uq_tenant_user_email"),
+    )
+
+
+class TenantInvitation(Base):
+    __tablename__ = "tenant_invitations"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    role = Column(String, nullable=False, default="viewer")
+    status = Column(String, nullable=False, default="pending", index=True)
+    invited_by_email = Column(String, nullable=True)
+    accepted_at = Column(DateTime(timezone=True), nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        Index("ix_tenant_invitation_lookup", "tenant_id", "email", "status"),
+    )
+
+
+class TenantLoginAudit(Base):
+    __tablename__ = "tenant_login_audit"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=True, index=True)
+    email = Column(String, nullable=True, index=True)
+    provider = Column(String, nullable=False)
+    outcome = Column(String, nullable=False, index=True)
+    reason = Column(String, nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(Text, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class AiSystem(Base):
     __tablename__ = "ai_systems"
 

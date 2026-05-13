@@ -19,6 +19,7 @@ import {
   AlertCircle,
   ListChecks,
   LogOut,
+  Users,
 } from 'lucide-react';
 
 const navSections = [
@@ -57,6 +58,7 @@ const navSections = [
   {
     label: 'Operations',
     items: [
+      { href: '/settings/users', label: 'Users & Access', icon: Users },
       { href: '/billing',  label: 'Subscription',  icon: CreditCard },
       { href: '/runtime',  label: 'Playground',    icon: Terminal },
     ],

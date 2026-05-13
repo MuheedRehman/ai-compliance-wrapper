@@ -18,6 +18,15 @@ export async function POST(request: NextRequest) {
   }
 
   const response = NextResponse.json({ ok: true });
-  response.cookies.set(SESSION_COOKIE, createSessionToken('dashboard-admin', { provider: 'password' }), cookieOptions());
+  response.cookies.set(
+    SESSION_COOKIE,
+    createSessionToken('dashboard-admin', {
+      email: process.env.DASHBOARD_OWNER_EMAIL || 'dashboard-admin@local',
+      provider: 'password',
+      tenant_id: process.env.DASHBOARD_TENANT_ID || 'tenant-dashboard-dev',
+      role: 'owner',
+    }),
+    cookieOptions(),
+  );
   return response;
 }
