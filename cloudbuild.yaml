@@ -205,10 +205,16 @@ steps:
           --region "$_REGION" \
           --member "serviceAccount:${_CLOUD_RUN_SERVICE_ACCOUNT}" \
           --role roles/run.invoker
-        gcloud run services remove-iam-policy-binding "$_BACKEND_SERVICE" \
+        if gcloud run services get-iam-policy "$_BACKEND_SERVICE" \
           --region "$_REGION" \
-          --member allUsers \
-          --role roles/run.invoker || true
+          --format=json | grep -q '"allUsers"'; then
+          gcloud run services remove-iam-policy-binding "$_BACKEND_SERVICE" \
+            --region "$_REGION" \
+            --member allUsers \
+            --role roles/run.invoker
+        else
+          echo "Backend allUsers invoker binding already absent."
+        fi
         gcloud run services update "$_BACKEND_SERVICE" \
           --region "$_REGION" \
           --update-env-vars "FRONTEND_URL=$$FRONTEND_URL"
