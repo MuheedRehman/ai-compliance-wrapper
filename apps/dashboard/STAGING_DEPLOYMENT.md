@@ -1,167 +1,38 @@
-# Phase 3C – Dashboard MVP Staging Deployment Guide
+# Dashboard Staging Deployment
 
-## Architecture
+## Current Access Model
 
-```
-┌─────────────────────────────────────────────────┐
-│  Browser                                        │
-│  ┌─────────────────────────────────────────┐    │
-│  │  Next.js Dashboard (apps/dashboard)     │    │
-│  │  Port 3000                              │    │
-│  └──────────────┬──────────────────────────┘    │
-│                 │ API calls (x-api-key header)  │
-│  ┌──────────────▼──────────────────────────┐    │
-│  │  FastAPI Backend (backend/)             │    │
-│  │  Port 8000                              │    │
-│  │  CORS: allows FRONTEND_URL origins      │    │
-│  └─────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────┘
-```
+The browser authenticates to the dashboard with a signed, HTTP-only session cookie.
+The browser never receives the backend API key.
 
-## Local Development
+Request flow:
 
-### 1. Seed the database (first time only)
+1. User signs in at `/login` with `DASHBOARD_ADMIN_PASSWORD`.
+2. The dashboard issues a signed `dashboard_session` cookie using `DASHBOARD_SESSION_SECRET`.
+3. Browser API calls go to `/api/backend/...` on the dashboard service.
+4. The dashboard server verifies the session cookie.
+5. The dashboard server forwards the request to the backend with:
+   - `x-api-key` from server-side `DASHBOARD_API_KEY`
+   - Cloud Run identity token when `BACKEND_AUTH_MODE=google_id_token`
 
-```bash
-cd backend
-.\venv\Scripts\activate
-python scripts/seed_dashboard_key.py
-```
+## Required Dashboard Runtime Secrets
 
-This creates:
-- Tenant: `tenant-dashboard-dev`
-- API key: `test_api_key` with `admin` scope
+- `DASHBOARD_API_KEY`
+- `DASHBOARD_ADMIN_PASSWORD`
+- `DASHBOARD_SESSION_SECRET`
 
-### 2. Start the backend
+## Required Dashboard Runtime Environment
 
-```bash
-cd backend
-.\venv\Scripts\activate
-uvicorn app.main:app --reload --port 8000
-```
+- `BACKEND_URL`
+- `BACKEND_AUTH_MODE=google_id_token` for Cloud Run staging
 
-### 3. Start the dashboard
+## Cloud Run Access
 
-```bash
-cd apps/dashboard
-npm install    # first time only
-npm run dev
-```
+The dashboard may stay public for staging sign-in, but the backend should not grant
+`roles/run.invoker` to `allUsers`. The backend should grant `roles/run.invoker`
+only to the dashboard runtime service account.
 
-- Dashboard: http://localhost:3000
-- Backend: http://localhost:8000
+## E2E Gate
 
-### 4. API Key configuration
-
-The dashboard resolves the API key in this order:
-1. **localStorage** — if a key was stored via browser (manual override)
-2. **`NEXT_PUBLIC_API_TOKEN`** — env var in `.env.local` (default: `test_api_key`)
-
-For local dev, the env var default + seed script is sufficient.
-
----
-
-## Staging Deployment
-
-### Backend (Cloud Run)
-
-The backend deploys via the existing `cloudbuild.yaml`. Required env vars:
-
-| Variable | Required | Purpose |
-|---|---|---|
-| `DATABASE_URL` | Yes | Cloud SQL connection string |
-| `EVIDENCE_HMAC_SECRET` | Yes | HMAC signing key for evidence chain |
-| `FRONTEND_URL` | Yes | Dashboard origin for CORS (e.g. `https://dashboard.example.com`). Comma-separated for multiple origins. |
-| `STRIPE_API_KEY` | Yes | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe webhook signing secret |
-
-### Dashboard (Vercel / Cloud Run)
-
-#### Option A: Vercel
-
-1. Connect the `apps/dashboard` directory to Vercel.
-2. Set environment variables:
-   - `NEXT_PUBLIC_API_URL` = `https://<backend-cloud-run-url>`
-   - `NEXT_PUBLIC_API_TOKEN` = your staging API key
-3. Deploy.
-
-#### Option B: Cloud Run
-
-The dashboard uses `output: 'standalone'` in `next.config.js` for optimized Docker builds.
-
-```dockerfile
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY . .
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
-EXPOSE 3000
-CMD ["node", "server.js"]
-```
-
-Deploy:
-```bash
-gcloud run deploy dashboard \
-  --image gcr.io/PROJECT/dashboard \
-  --set-env-vars NEXT_PUBLIC_API_URL=https://backend-url,NEXT_PUBLIC_API_TOKEN=staging_key \
-  --port 3000 \
-  --allow-unauthenticated
-```
-
----
-
-## CORS Configuration
-
-The backend reads `FRONTEND_URL` from config and uses it as the CORS `allow_origins` list.
-- Default: `http://localhost:3000`
-- Supports comma-separated origins: `https://dash.example.com,http://localhost:3000`
-- Credentials are allowed (cookies, auth headers).
-
----
-
-## Environment Variables Reference
-
-| Variable | Where | Default | Purpose |
-|---|---|---|---|
-| `NEXT_PUBLIC_API_URL` | Dashboard | `http://localhost:8000` | Backend API base URL |
-| `NEXT_PUBLIC_API_TOKEN` | Dashboard | `test_api_key` | Fallback API key for auth |
-| `FRONTEND_URL` | Backend | `http://localhost:3000` | CORS allowed origins |
-| `STRIPE_API_KEY` | Backend | — | Stripe secret key |
-| `STRIPE_WEBHOOK_SECRET` | Backend | — | Stripe webhook signing secret |
-
----
-
-## Pages Available
-
-| Route | Description |
-|---|---|
-| `/systems` | List and navigate AI systems |
-| `/systems/:id` | System detail with linked features |
-| `/features` | List registered features |
-| `/features/:id` | Feature detail with versions |
-| `/reviews` | Review tasks with status filtering |
-| `/evidence` | Evidence logs with risk/decision filters |
-| `/billing` | Subscription, entitlements, checkout |
-| `/runtime` | Governed request playground |
-
----
-
-## Backend Changes for Phase 3C
-
-Two minimal backend changes were made:
-
-1. **CORS Middleware** — Added `CORSMiddleware` to `app/main.py` using `FRONTEND_URL`
-   from config as the allowed origin list. No wildcard in staging/production.
-
-2. **Seed Script** — Added `scripts/seed_dashboard_key.py` to create a dev tenant
-   and API key for local dashboard testing.
-
-No new endpoints, models, or services were added.
+Cloud Build runs the dashboard Playwright suite after deployment. Deployments fail
+if the live product smoke tests fail.

@@ -1,7 +1,6 @@
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page, test } from '@playwright/test';
 
-const DASHBOARD_API_KEY = process.env.DASHBOARD_API_KEY || process.env.NEXT_PUBLIC_API_TOKEN || '';
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || process.env.DASHBOARD_ADMIN_PASSWORD || '';
 
 const routes = [
   '/',
@@ -54,22 +53,17 @@ const visibleErrorPhrases = [
 test.describe.configure({ mode: 'serial' });
 
 test('backend API preflight endpoints are healthy', async ({ request }) => {
-  test.skip(!DASHBOARD_API_KEY, 'DASHBOARD_API_KEY or NEXT_PUBLIC_API_TOKEN is required for API preflight.');
+  await loginRequest(request);
 
   for (const path of apiChecks) {
-    const response = await request.get(`${BACKEND_URL}${path}`, {
-      headers: {
-        'x-api-key': DASHBOARD_API_KEY,
-        'content-type': 'application/json',
-      },
-    });
+    const response = await request.get(`/api/backend${path}`);
 
     expect(response.ok(), `${path} returned ${response.status()}: ${(await response.text()).slice(0, 240)}`).toBeTruthy();
   }
 });
 
 test('main navigation pages render without visible API failures', async ({ page }) => {
-  await seedApiKey(page);
+  await loginPage(page);
   const diagnostics = installPageDiagnostics(page);
   const buttonInventory: Record<string, { text: string; disabled: boolean }[]> = {};
 
@@ -90,7 +84,7 @@ test('main navigation pages render without visible API failures', async ({ page 
 });
 
 test('critical product workflows create records and run governed runtime', async ({ page }) => {
-  await seedApiKey(page);
+  await loginPage(page);
   const diagnostics = installPageDiagnostics(page);
   const stamp = Date.now();
 
@@ -189,9 +183,20 @@ async function gotoAndSettle(page: Page, route: string) {
   await page.waitForTimeout(400);
 }
 
-async function seedApiKey(page: Page) {
-  test.skip(!DASHBOARD_API_KEY, 'DASHBOARD_API_KEY or NEXT_PUBLIC_API_TOKEN is required for product E2E tests.');
-  await page.addInitScript((key) => localStorage.setItem('api_key', key), DASHBOARD_API_KEY);
+async function loginRequest(request: APIRequestContext) {
+  test.skip(!DASHBOARD_PASSWORD, 'DASHBOARD_PASSWORD or DASHBOARD_ADMIN_PASSWORD is required for product E2E tests.');
+  const response = await request.post('/api/auth/login', {
+    data: { password: DASHBOARD_PASSWORD },
+  });
+  expect(response.ok(), `Login failed with ${response.status()}: ${await response.text()}`).toBeTruthy();
+}
+
+async function loginPage(page: Page) {
+  test.skip(!DASHBOARD_PASSWORD, 'DASHBOARD_PASSWORD or DASHBOARD_ADMIN_PASSWORD is required for product E2E tests.');
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page.locator('input[type="password"]').fill(DASHBOARD_PASSWORD);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/overview/);
 }
 
 async function expectNoVisibleErrors(page: Page, route: string) {

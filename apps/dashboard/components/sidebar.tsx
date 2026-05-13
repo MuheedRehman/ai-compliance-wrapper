@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   AlertCircle,
   ListChecks,
+  LogOut,
 } from 'lucide-react';
 
 const navSections = [
@@ -65,6 +66,11 @@ const navSections = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    window.location.href = '/login';
+  }
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
@@ -138,6 +144,13 @@ export default function Sidebar() {
           <p className="text-[10px] text-zinc-600 mt-1 leading-relaxed font-medium">
             EU AI Act Compliance v0.5.0
           </p>
+          <button
+            onClick={logout}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900"
+          >
+            <LogOut className="h-3 w-3" />
+            Sign Out
+          </button>
         </div>
       </div>
     </>

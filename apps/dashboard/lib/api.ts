@@ -1,10 +1,5 @@
 // Central API client for the AI Compliance Dashboard.
 // All backend calls go through this module.
-//
-// Auth: uses getApiKey() from lib/auth.ts which reads
-// localStorage first, then falls back to NEXT_PUBLIC_API_TOKEN.
-
-import { getApiKey } from '@/lib/auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/backend';
 
@@ -25,7 +20,6 @@ export async function fetchApi<T = any>(
   const url = `${API_BASE_URL}${endpoint}`;
 
   const headers: Record<string, string> = {
-    'x-api-key': getApiKey(),
     ...(options.headers as Record<string, string> || {}),
   };
 
@@ -152,7 +146,6 @@ export const api = {
   getArtifactUrl: (id: string, artifact: string) => `${API_BASE_URL}/v1/reports/${id}/artifacts/${artifact}`,
   downloadArtifact: async (id: string, artifact: string) => {
     const res = await fetch(`${API_BASE_URL}/v1/reports/${id}/artifacts/${artifact}`, {
-      headers: { 'x-api-key': getApiKey() },
       cache: 'no-store',
     });
 

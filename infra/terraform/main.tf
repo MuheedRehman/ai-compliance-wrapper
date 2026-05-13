@@ -38,7 +38,9 @@ locals {
     "OPENAI_API_KEY",
     "EVIDENCE_HMAC_SECRET",
     "FIRECRAWL_API_KEY",
-    "DATABASE_URL"
+    "DATABASE_URL",
+    "DASHBOARD_ADMIN_PASSWORD",
+    "DASHBOARD_SESSION_SECRET"
   ]
 }
 
@@ -132,6 +134,12 @@ resource "google_service_account_iam_member" "cloud_build_run_as" {
   service_account_id = google_service_account.cloud_run_sa.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:${local.cloud_build_service_account}"
+}
+
+resource "google_secret_manager_secret_iam_member" "cloud_build_dashboard_password_accessor" {
+  secret_id = google_secret_manager_secret.app_secrets["DASHBOARD_ADMIN_PASSWORD"].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${local.cloud_build_service_account}"
 }
 
 # 6. Cloud Run Backend Service
