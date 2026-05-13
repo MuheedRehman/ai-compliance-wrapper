@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGoogleOidcConfig } from '@/lib/auth-config';
+import { getGoogleOidcConfig, getPublicOrigin } from '@/lib/auth-config';
 import {
   exchangeCodeForTokens,
   GOOGLE_OAUTH_NONCE_COOKIE,
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 function redirectToLogin(request: NextRequest, reason: string) {
-  return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(reason)}`, request.url));
+  return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(reason)}`, getPublicOrigin(request)));
 }
 
 function clearOauthCookies(response: NextResponse) {
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       return response;
     }
 
-    const response = NextResponse.redirect(new URL('/overview', request.url));
+    const response = NextResponse.redirect(new URL('/overview', getPublicOrigin(request)));
     response.cookies.set(
       SESSION_COOKIE,
       createSessionToken(`google:${identity.sub}`, {
@@ -67,7 +67,8 @@ export async function GET(request: NextRequest) {
     );
     clearOauthCookies(response);
     return response;
-  } catch {
+  } catch (error) {
+    console.error('Google login failed', error instanceof Error ? error.message : 'Unknown error');
     const response = redirectToLogin(request, 'google_login_failed');
     clearOauthCookies(response);
     return response;

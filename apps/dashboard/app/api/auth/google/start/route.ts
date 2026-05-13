@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGoogleOidcConfig } from '@/lib/auth-config';
+import { getGoogleOidcConfig, getPublicOrigin } from '@/lib/auth-config';
 import {
   createOauthValue,
   GOOGLE_OAUTH_NONCE_COOKIE,
@@ -22,7 +22,7 @@ function oauthCookieOptions() {
 export async function GET(request: NextRequest) {
   const config = getGoogleOidcConfig(request);
   if (!config.enabled) {
-    return NextResponse.redirect(new URL('/login?error=google_not_configured', request.url));
+    return NextResponse.redirect(new URL('/login?error=google_not_configured', getPublicOrigin(request)));
   }
 
   const state = createOauthValue();
