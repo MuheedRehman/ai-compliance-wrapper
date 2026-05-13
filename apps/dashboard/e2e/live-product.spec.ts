@@ -178,7 +178,7 @@ test('critical product workflows create records and run governed runtime', async
 });
 
 async function gotoAndSettle(page: Page, route: string) {
-  await page.goto(route, { waitUntil: 'domcontentloaded' });
+  await gotoWithRetry(page, route);
   await page.waitForLoadState('networkidle', { timeout: 6_000 }).catch(() => undefined);
   await page.waitForTimeout(400);
 }
@@ -197,9 +197,21 @@ async function loginPage(page: Page) {
     data: { password: DASHBOARD_PASSWORD },
   });
   expect(response.ok(), `Login failed with ${response.status()}: ${await response.text()}`).toBeTruthy();
-  await page.goto('/overview', { waitUntil: 'domcontentloaded' });
+  await gotoWithRetry(page, '/overview');
   await expect(page).toHaveURL(/\/overview/);
   await expect(page.locator('body')).toContainText('Dashboard');
+}
+
+async function gotoWithRetry(page: Page, route: string) {
+  try {
+    await page.goto(route, { waitUntil: 'domcontentloaded' });
+  } catch (error: any) {
+    if (!String(error?.message || error).includes('net::ERR_ABORTED')) {
+      throw error;
+    }
+    await page.waitForTimeout(500);
+    await page.goto(route, { waitUntil: 'domcontentloaded' });
+  }
 }
 
 async function expectNoVisibleErrors(page: Page, route: string) {
