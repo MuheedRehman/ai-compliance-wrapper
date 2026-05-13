@@ -35,7 +35,7 @@ TENANT_ID = "tenant_test"
 
 def truncate_postgres_tables(db):
     db.execute(text(
-        "TRUNCATE TABLE compliance_controls, reports, intake_assessments, evidence_bundles, incident_records, oversight_assignments, fria_records, evidence_logs, review_tasks, feature_versions, ai_features, ai_systems, api_keys, tenants RESTART IDENTITY CASCADE"
+        "TRUNCATE TABLE website_scans, compliance_controls, reports, intake_assessments, evidence_bundles, incident_records, oversight_assignments, fria_records, evidence_logs, review_tasks, feature_versions, ai_features, ai_systems, api_keys, tenants RESTART IDENTITY CASCADE"
     ))
     db.commit()
 
@@ -89,6 +89,8 @@ def reset_database():
             "oversight:write",
             "incidents:read",
             "incidents:write",
+            "scanner:read",
+            "scanner:write",
             "admin",
         ],
         revoked=False,

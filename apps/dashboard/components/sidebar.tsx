@@ -8,6 +8,7 @@ import {
   Layers,
   ClipboardCheck,
   FileSearch,
+  ScanSearch,
   CreditCard,
   Terminal,
   ShieldCheck,
@@ -30,6 +31,7 @@ const navSections = [
     label: 'Registry',
     items: [
       { href: '/intake',   label: 'Intake',        icon: ClipboardCheck },
+      { href: '/scanner',  label: 'Scanner',       icon: ScanSearch },
       { href: '/systems',  label: 'AI Systems',    icon: Cpu },
       { href: '/features', label: 'Features',      icon: Layers },
     ],

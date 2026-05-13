@@ -12,6 +12,7 @@ const routes = [
   '/evidence',
   '/controls',
   '/intake',
+  '/scanner',
   '/fria',
   '/oversight',
   '/incidents',
@@ -28,6 +29,7 @@ const apiChecks = [
   '/v1/billing/subscription',
   '/v1/billing/entitlements',
   '/v1/intake',
+  '/v1/website-scans',
   '/v1/obligations/fria',
   '/v1/obligations/oversight',
   '/v1/obligations/incidents',
@@ -107,6 +109,15 @@ test('critical product workflows create records and run governed runtime', async
   await selectFirstAvailableOption(page.locator('select').first(), false);
   await page.getByRole('button', { name: /^create$/i }).click();
   await expect(page.getByText(`E2E Feature ${stamp}`)).toBeVisible();
+
+  await gotoAndSettle(page, '/scanner');
+  await page.getByRole('button', { name: /new scan/i }).click();
+  await page.locator('input[placeholder="https://example-saas.com"]').fill('https://example.com');
+  await page.getByRole('button', { name: /run scanner/i }).click();
+  await expect(page).toHaveURL(/\/scanner\/scan-/);
+  await expect(page.getByText(/Preliminary Classification/i)).toBeVisible();
+  await page.getByRole('button', { name: /create system \+ intake/i }).click();
+  await expect(page.getByText(/converted/i)).toBeVisible();
 
   await gotoAndSettle(page, '/controls');
   await page.getByRole('button', { name: /seed baseline/i }).first().click();

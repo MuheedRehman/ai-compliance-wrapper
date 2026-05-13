@@ -373,3 +373,30 @@ class ComplianceControl(Base):
     __table_args__ = (
         UniqueConstraint("tenant_id", "ai_system_id", "control_key", name="uq_control_system_key"),
     )
+
+
+class WebsiteScan(Base):
+    __tablename__ = "website_scans"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+
+    url = Column(String, nullable=False)
+    normalized_url = Column(String, nullable=False)
+    status = Column(String, nullable=False, default="completed", index=True)
+    title = Column(String, nullable=True)
+    summary = Column(Text, nullable=True)
+
+    detected_signals_json = Column(JSON, nullable=False, default=list)
+    evidence_refs_json = Column(JSON, nullable=False, default=list)
+    gap_findings_json = Column(JSON, nullable=False, default=list)
+    classification_json = Column(JSON, nullable=False, default=dict)
+    suggested_actions_json = Column(JSON, nullable=False, default=list)
+    source_pages_json = Column(JSON, nullable=False, default=list)
+    confidence_score = Column(Integer, nullable=False, default=0)
+
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
+    intake_id = Column(String, ForeignKey("intake_assessments.id"), nullable=True, index=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

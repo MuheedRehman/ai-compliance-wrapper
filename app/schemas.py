@@ -299,3 +299,39 @@ class ReadinessScorecardResponse(BaseModel):
     overdue_controls: int
     readiness_score: int
     controls_by_status: Dict[str, int]
+
+
+# --- Website / SaaS Compliance Scanner ---
+
+class WebsiteScanCreate(BaseModel):
+    url: str
+    max_pages: int = Field(default=6, ge=1, le=12)
+
+
+class WebsiteScanResponse(BaseModel):
+    id: str
+    tenant_id: str
+    url: str
+    normalized_url: str
+    status: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    detected_signals_json: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_refs_json: List[Dict[str, Any]] = Field(default_factory=list)
+    gap_findings_json: List[Dict[str, Any]] = Field(default_factory=list)
+    classification_json: Dict[str, Any] = Field(default_factory=dict)
+    suggested_actions_json: List[Dict[str, Any]] = Field(default_factory=list)
+    source_pages_json: List[Dict[str, Any]] = Field(default_factory=list)
+    confidence_score: int
+    ai_system_id: Optional[str] = None
+    intake_id: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WebsiteScanConvertResponse(BaseModel):
+    scan: WebsiteScanResponse
+    ai_system: AiSystemResponse
+    intake: IntakeResponse

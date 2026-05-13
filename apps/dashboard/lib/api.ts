@@ -186,4 +186,17 @@ export const api = {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
     return fetchApi<any>(`/v1/compliance/scorecard${qs}`);
   },
+
+  // Website / SaaS Scanner
+  listWebsiteScans: () => fetchApi<any[]>('/v1/website-scans'),
+  getWebsiteScan: (id: string) => fetchApi<any>(`/v1/website-scans/${id}`),
+  createWebsiteScan: (body: { url: string; max_pages?: number }) =>
+    fetchApi<any>('/v1/website-scans', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  convertWebsiteScan: (id: string) =>
+    fetchApi<any>(`/v1/website-scans/${id}/convert`, {
+      method: 'POST',
+    }),
 };

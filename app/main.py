@@ -12,6 +12,7 @@ from app.routes.classification import router as classification_router
 from app.routes.obligations import router as obligations_router
 from app.routes.reports import router as reports_router
 from app.routes.compliance import router as compliance_router
+from app.routes.website_scans import router as website_scans_router
 from app.config import EVIDENCE_CHAIN_MODE, FRONTEND_URL
 
 app = FastAPI(title="AI Compliance & Governance Wrapper", version="0.5.0")
@@ -43,6 +44,7 @@ app.include_router(classification_router)
 app.include_router(obligations_router)
 app.include_router(reports_router)
 app.include_router(compliance_router)
+app.include_router(website_scans_router)
 
 register_exception_handlers(app)
 
