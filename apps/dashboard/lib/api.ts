@@ -118,6 +118,7 @@ export const api = {
   // AI Systems
   listSystems: () => fetchApi<any[]>('/v1/ai-systems'),
   getSystem: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}`),
+  getSystemWorkspace: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}/workspace`),
   createSystem: (body: { name: string; description?: string }) =>
     fetchApi<any>('/v1/ai-systems', {
       method: 'POST',

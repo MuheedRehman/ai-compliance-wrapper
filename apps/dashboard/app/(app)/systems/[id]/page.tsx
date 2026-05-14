@@ -1,163 +1,332 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  BarChart3,
+  Bot,
+  FileSearch,
+  FileText,
+  Layers,
+  ListChecks,
+  Scale,
+  ShieldCheck,
+  Users,
+} from 'lucide-react';
 import { api } from '@/lib/api';
+import Card from '@/components/card';
+import ErrorState from '@/components/error-state';
+import Loading from '@/components/loading';
 import PageShell from '@/components/page-shell';
 import StatusBadge from '@/components/status-badge';
-import Card from '@/components/card';
-import Loading from '@/components/loading';
-import ErrorState from '@/components/error-state';
-import Link from 'next/link';
-import { Layers, Calendar, Activity, Info, ChevronLeft } from 'lucide-react';
+
+function EmptyPanel({ label }: { label: string }) {
+  return (
+    <div className="rounded-lg border border-dashed border-zinc-800 bg-zinc-950/40 px-4 py-8 text-center text-xs font-bold uppercase tracking-widest text-zinc-600">
+      {label}
+    </div>
+  );
+}
+
+function metricColor(value: number) {
+  if (value >= 80) return 'text-emerald-400';
+  if (value >= 40) return 'text-amber-400';
+  return 'text-red-400';
+}
 
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
 
-  const [system, setSystem] = useState<any>(null);
-  const [features, setFeatures] = useState<any[]>([]);
+  const [workspace, setWorkspace] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    Promise.all([
-      api.getSystem(systemId),
-      api.listFeatures(),
-    ])
-      .then(([sys, featData]) => {
-        setSystem(sys);
-        const linked = (featData.features || []).filter(
-          (f: any) => f.ai_system_id === systemId,
-        );
-        setFeatures(linked);
-      })
-      .catch((err) => setError(err.message))
+    api.getSystemWorkspace(systemId)
+      .then(setWorkspace)
+      .catch((err) => setError(err.body?.detail || err.body?.error?.message || err.message || 'Failed to load AI system workspace'))
       .finally(() => setLoading(false));
   }, [systemId]);
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <Loading />;
-  if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!system) return <ErrorState message="System not found" />;
+  const system = workspace?.system;
+  const metrics = workspace?.metrics || {};
+  const scorecard = workspace?.readiness_scorecard || {};
+  const classification = workspace?.latest_classification;
+  const readinessScore = scorecard.readiness_score || 0;
 
-  const breadcrumbs = [
-    { label: 'AI Systems', href: '/systems' },
-    { label: system.name }
-  ];
+  const openControls = useMemo(
+    () => (workspace?.controls || []).filter((control: any) => !['completed', 'signed_off'].includes(control.status)),
+    [workspace],
+  );
+
+  if (loading) {
+    return (
+      <PageShell title="AI System Workspace" subtitle="Loading lifecycle record.">
+        <Loading />
+      </PageShell>
+    );
+  }
+
+  if (error || !workspace || !system) {
+    return (
+      <PageShell title="AI System Workspace" subtitle="Lifecycle record unavailable.">
+        <ErrorState message={error || 'AI system not found'} onRetry={load} />
+      </PageShell>
+    );
+  }
 
   return (
     <PageShell
       title={system.name}
-      subtitle={`Global Resource Identifier: ${system.id}`}
-      breadcrumbs={breadcrumbs}
+      subtitle={system.description || `System ID: ${system.id}`}
+      breadcrumbs={[{ label: 'AI Systems', href: '/systems' }, { label: system.name }]}
       actions={
-        <Link 
-          href="/systems"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-zinc-950 text-zinc-400 hover:text-white transition-all text-xs font-bold uppercase tracking-widest"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" />
-          BACK TO INVENTORY
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/systems" className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800">
+            <ArrowLeft className="h-4 w-4" />
+            BACK
+          </Link>
+          <Link href={`/controls?ai_system_id=${system.id}`} className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500">
+            <ListChecks className="h-4 w-4" />
+            CONTROLS
+          </Link>
+          <Link href={`/evidence?ai_system_id=${system.id}`} className="flex items-center gap-2 rounded-lg bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800">
+            <FileSearch className="h-4 w-4" />
+            EVIDENCE
+          </Link>
+        </div>
       }
     >
-      <div className="space-y-8 animate-slide-up">
-        {/* Core Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card title="Deployment Lifecycle" variant="stat">
-            <StatusBadge value={system.deployment_status} className="scale-110" />
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card title="Readiness" variant="stat">
+            <div className="space-y-2">
+              <span className={`text-4xl font-bold tabular-nums ${metricColor(readinessScore)}`}>{readinessScore}%</span>
+              <div className="h-2 rounded-full bg-zinc-900 overflow-hidden">
+                <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Math.max(0, readinessScore))}%` }} />
+              </div>
+            </div>
           </Card>
-          <Card title="Registry Governance" variant="stat">
-            <StatusBadge value={system.registration_status} className="scale-110" />
+          <Card title="Open Controls" variant="stat">
+            <div className="flex items-end gap-2">
+              <ListChecks className="h-5 w-5 text-amber-400 mb-1" />
+              <span className="text-3xl font-bold tabular-nums">{metrics.open_control_count || 0}</span>
+            </div>
           </Card>
-          <Card title="Last Reconciliation" variant="stat">
-            <div className="flex items-center gap-2 text-zinc-300">
-              <Activity className="h-4 w-4 text-indigo-500" />
-              <span className="text-xl font-bold">
-                {new Date(system.updated_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-              </span>
+          <Card title="Evidence Events" variant="stat">
+            <div className="flex items-end gap-2">
+              <FileSearch className="h-5 w-5 text-indigo-400 mb-1" />
+              <span className="text-3xl font-bold tabular-nums">{metrics.evidence_log_count || 0}</span>
+            </div>
+          </Card>
+          <Card title="Open Incidents" variant="stat">
+            <div className="flex items-end gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-400 mb-1" />
+              <span className="text-3xl font-bold tabular-nums">{metrics.open_incident_count || 0}</span>
             </div>
           </Card>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Details Sidebar */}
-          <div className="lg:col-span-4 space-y-6">
-            <Card title="Operational Details">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                    <Info className="h-3 w-3" />
-                    Functional Description
-                  </label>
-                  <p className="text-sm text-zinc-400 leading-relaxed font-medium">
-                    {system.description || 'No system description provided in registry.'}
-                  </p>
-                </div>
-                
-                <div className="space-y-2 pt-4 border-t border-border">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                    <Calendar className="h-3 w-3" />
-                    Audit Information
-                  </label>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-tight">Provisioned</span>
-                      <span className="text-[10px] text-zinc-400 font-mono font-bold">{new Date(system.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-tight">Tenant ID</span>
-                      <span className="text-[10px] text-zinc-400 font-mono font-bold truncate ml-4">{system.tenant_id}</span>
-                    </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <Card title="Lifecycle Snapshot" className="xl:col-span-1">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Deployment</span>
+                <StatusBadge value={system.deployment_status} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Registration</span>
+                <StatusBadge value={system.registration_status} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Features</span>
+                <span className="text-xs font-mono text-zinc-300">{metrics.feature_count || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Website scans</span>
+                <span className="text-xs font-mono text-zinc-300">{metrics.website_scan_count || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Reports</span>
+                <span className="text-xs font-mono text-zinc-300">{metrics.report_count || 0}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Current Classification" className="xl:col-span-2">
+            {classification ? (
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <Scale className="h-5 w-5 text-indigo-400 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-bold text-white">{classification.system_classification}</h3>
+                    <p className="text-xs text-zinc-500 mt-1">{classification.rationale}</p>
                   </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Actor</p>
+                    <p className="mt-1 text-xs font-bold text-zinc-200">{classification.actor_role}</p>
+                  </div>
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Path</p>
+                    <p className="mt-1 text-xs font-bold text-zinc-200">{classification.obligation_path}</p>
+                  </div>
+                  <Link href={`/intake/${classification.intake_id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-indigo-500/40">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Intake</p>
+                    <p className="mt-1 text-xs font-mono text-indigo-300">{classification.intake_id}</p>
+                  </Link>
+                </div>
               </div>
-            </Card>
-          </div>
-
-          {/* Linked Components */}
-          <div className="lg:col-span-8 space-y-6">
-            <Card 
-              title={`Associated Features (${features.length})`}
-              subtitle="Governed features architecturally linked to this AI system."
-            >
-              {features.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 border-2 border-dashed border-zinc-900 rounded-xl">
-                  <Layers className="h-8 w-8 text-zinc-800 mb-2" />
-                  <p className="text-xs text-zinc-600 font-bold uppercase tracking-widest">No active feature linkage</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {features.map((f: any) => (
-                    <Link
-                      key={f.id}
-                      href={`/features/${f.feature_id}`}
-                      className="flex items-center justify-between p-4 rounded-xl border border-border bg-zinc-950/40 hover:bg-zinc-900/60 hover:border-zinc-700 transition-all group"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="bg-zinc-900 p-2 rounded-lg group-hover:bg-indigo-500/10 transition-colors">
-                          <Layers className={`h-4 w-4 transition-colors ${f.risk_level_current?.toLowerCase() === 'high' ? 'text-red-500' : 'text-zinc-500 group-hover:text-indigo-400'}`} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-zinc-200">{f.name}</p>
-                          <p className="text-[10px] text-zinc-600 font-mono font-bold mt-0.5">{f.feature_id}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <StatusBadge value={f.compliance_status} />
-                        <div className="w-px h-4 bg-border" />
-                        <StatusBadge value={f.risk_level_current} />
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </Card>
-          </div>
+            ) : (
+              <EmptyPanel label="No classification linked yet" />
+            )}
+          </Card>
         </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <Card title={`Controls (${workspace.controls.length})`} subtitle="System-specific EU AI Act control plan.">
+            {workspace.controls.length === 0 ? (
+              <EmptyPanel label="No controls materialized" />
+            ) : (
+              <div className="space-y-3">
+                {workspace.controls.slice(0, 6).map((control: any) => (
+                  <Link key={control.id} href={`/controls?ai_system_id=${system.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{control.title}</p>
+                        <p className="mt-1 text-[10px] font-mono text-zinc-600">{control.article} / {control.evidence_domain}</p>
+                      </div>
+                      <StatusBadge value={control.status} />
+                    </div>
+                  </Link>
+                ))}
+                {openControls.length > 6 && (
+                  <Link href={`/controls?ai_system_id=${system.id}`} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
+                    View all open controls
+                  </Link>
+                )}
+              </div>
+            )}
+          </Card>
+
+          <Card title={`Evidence (${workspace.evidence_logs.length})`} subtitle="Recent traceability events for this system.">
+            {workspace.evidence_logs.length === 0 ? (
+              <EmptyPanel label="No evidence events yet" />
+            ) : (
+              <div className="space-y-3">
+                {workspace.evidence_logs.slice(0, 6).map((event: any) => (
+                  <Link key={event.event_id} href={`/evidence?ai_system_id=${system.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{event.event_type}</p>
+                        <p className="mt-1 text-[10px] font-mono text-zinc-600">{event.evidence_domain || 'runtime'} / {event.event_id.slice(0, 12)}</p>
+                      </div>
+                      <StatusBadge value={event.risk_level || 'unknown'} />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <Card title={`Scans (${workspace.website_scans.length})`}>
+            {workspace.website_scans.length === 0 ? (
+              <EmptyPanel label="No website scans" />
+            ) : (
+              <div className="space-y-3">
+                {workspace.website_scans.slice(0, 4).map((scan: any) => (
+                  <Link key={scan.id} href={`/scanner/${scan.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                    <p className="text-xs font-bold text-zinc-200">{scan.title || scan.normalized_url}</p>
+                    <p className="mt-1 text-[10px] text-zinc-600">{scan.classification_json?.classification || 'Unclassified'}</p>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title={`Reports (${workspace.reports.length})`}>
+            {workspace.reports.length === 0 ? (
+              <EmptyPanel label="No reports generated" />
+            ) : (
+              <div className="space-y-3">
+                {workspace.reports.slice(0, 4).map((report: any) => (
+                  <Link key={report.id} href={`/reports/${report.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                    <div className="flex items-start gap-2">
+                      <FileText className="h-4 w-4 text-emerald-400 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{report.title}</p>
+                        <p className="mt-1 text-[10px] text-zinc-600">{report.report_type}</p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Card>
+
+          <Card title="Governance Records">
+            <div className="grid grid-cols-2 gap-3">
+              <Link href={`/fria?ai_system_id=${system.id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                <ShieldCheck className="h-4 w-4 text-emerald-400 mb-2" />
+                <p className="text-2xl font-bold">{metrics.fria_count || 0}</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600">FRIA</p>
+              </Link>
+              <Link href={`/oversight?ai_system_id=${system.id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                <Users className="h-4 w-4 text-indigo-400 mb-2" />
+                <p className="text-2xl font-bold">{metrics.oversight_count || 0}</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600">Oversight</p>
+              </Link>
+              <Link href={`/incidents?ai_system_id=${system.id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                <Activity className="h-4 w-4 text-red-400 mb-2" />
+                <p className="text-2xl font-bold">{metrics.incident_count || 0}</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600">Incidents</p>
+              </Link>
+              <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                <BarChart3 className="h-4 w-4 text-amber-400 mb-2" />
+                <p className="text-2xl font-bold">{metrics.high_severity_incident_count || 0}</p>
+                <p className="text-[10px] uppercase tracking-widest text-zinc-600">Severe</p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <Card title={`Associated Features (${workspace.features.length})`} subtitle="Runtime-governed feature surfaces linked to this AI system.">
+          {workspace.features.length === 0 ? (
+            <EmptyPanel label="No linked runtime features" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {workspace.features.map((feature: any) => (
+                <Link key={feature.id} href={`/features/${feature.feature_id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <Bot className="h-4 w-4 text-indigo-400 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{feature.name}</p>
+                        <p className="mt-1 text-[10px] font-mono text-zinc-600">{feature.feature_id}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <StatusBadge value={feature.compliance_status || 'draft'} />
+                      <StatusBadge value={feature.risk_level_current || 'unknown'} />
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </Card>
       </div>
     </PageShell>
   );

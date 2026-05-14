@@ -83,6 +83,22 @@ class AiSystemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class AiSystemWorkspaceResponse(BaseModel):
+    system: AiSystemResponse
+    metrics: Dict[str, Any]
+    readiness_scorecard: Dict[str, Any]
+    latest_classification: Optional[Dict[str, Any]] = None
+    features: List[Dict[str, Any]] = Field(default_factory=list)
+    controls: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_logs: List[Dict[str, Any]] = Field(default_factory=list)
+    website_scans: List[Dict[str, Any]] = Field(default_factory=list)
+    intakes: List[Dict[str, Any]] = Field(default_factory=list)
+    fria_records: List[Dict[str, Any]] = Field(default_factory=list)
+    oversight_assignments: List[Dict[str, Any]] = Field(default_factory=list)
+    incidents: List[Dict[str, Any]] = Field(default_factory=list)
+    reports: List[Dict[str, Any]] = Field(default_factory=list)
+
+
 class SubscriptionStatusResponse(BaseModel):
     tenant_id: str
     plan_id: str

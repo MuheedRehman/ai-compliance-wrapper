@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, Header
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from app.db import get_db
-from app.schemas import AiSystemCreate, AiSystemUpdate, AiSystemResponse
+from app.schemas import AiSystemCreate, AiSystemUpdate, AiSystemResponse, AiSystemWorkspaceResponse
 from app.services.auth_service import authenticate_api_key
 from app.services import ai_system_service
 from typing import List
@@ -36,6 +37,17 @@ def get_ai_system(
     auth = authenticate_api_key(db, x_api_key, required_scope="systems:read")
     system = ai_system_service.get_ai_system(db, auth["tenant_id"], ai_system_id)
     return system
+
+
+@router.get("/{ai_system_id}/workspace", response_model=AiSystemWorkspaceResponse)
+def get_ai_system_workspace(
+    ai_system_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db)
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="systems:read")
+    workspace = ai_system_service.get_ai_system_workspace(db, auth["tenant_id"], ai_system_id)
+    return jsonable_encoder(workspace)
 
 @router.patch("/{ai_system_id}", response_model=AiSystemResponse)
 def update_ai_system(
