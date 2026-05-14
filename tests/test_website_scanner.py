@@ -16,6 +16,7 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
                 text=(
                     "HirePilot AI is an artificial intelligence recruiting assistant. "
                     "It helps with hiring workflows, resume screening, candidate ranking, "
+                    "chatbot candidate interactions, "
                     "human oversight, audit logs, privacy policy, GDPR, and security."
                 ),
                 links=[],
@@ -37,8 +38,22 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
     assert body["title"] == "HirePilot AI"
     assert body["classification_json"]["risk_level"] == "high"
     assert body["classification_json"]["intake_answers"]["is_high_risk_annex_iii"] is True
+    assert body["classification_json"]["canonical_classification"] == "High-Risk AI System"
+    assert body["classification_json"]["canonical_obligation_path"] == "FULL_COMPLIANCE_ART_16"
+    assert body["classification_json"]["manual_review_required"] is True
+    assert body["classification_json"]["legal_basis"]
+    dimensions = {
+        dimension["dimension_id"]: dimension
+        for dimension in body["classification_json"]["obligation_dimensions"]
+    }
+    assert dimensions["high_risk_classification"]["article"] == "Article 6 and Annex III"
+    assert dimensions["provider_high_risk_requirements"]["required_controls"]
+    assert dimensions["transparency_notice"]["article"] == "Article 50"
+    assert dimensions["transparency_notice"]["matched_public_signals"]
     assert body["confidence_score"] > 50
     assert any(signal["category"] == "high_risk_domain" for signal in body["detected_signals_json"])
+    assert any(gap.get("dimension_id") == "high_risk_classification" for gap in body["gap_findings_json"])
+    assert any(action.get("dimension_id") == "provider_high_risk_requirements" for action in body["suggested_actions_json"])
 
 
 @pytest.mark.asyncio

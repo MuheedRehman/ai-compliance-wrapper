@@ -173,6 +173,22 @@ class WebsiteScannerService:
         "compliance": ["compliance", "legal"],
     }
 
+    SIGNAL_CATEGORY_DIMENSIONS = {
+        "ai_claim": ["ai_literacy"],
+        "human_interaction": ["transparency_notice"],
+        "synthetic_content": ["transparency_notice"],
+        "high_risk_domain": ["high_risk_classification"],
+        "prohibited_risk": ["prohibited_practice_review"],
+        "gpai": ["gpai_provider_obligations"],
+        "governance": [
+            "ai_literacy",
+            "provider_high_risk_requirements",
+            "deployer_high_risk_operations",
+            "post_market_monitoring",
+        ],
+        "privacy_security": ["provider_high_risk_requirements"],
+    }
+
     @classmethod
     async def create_scan(cls, db: Session, tenant_id: str, payload: WebsiteScanCreate) -> WebsiteScan:
         try:
@@ -495,6 +511,9 @@ class WebsiteScannerService:
             classification = "No Clear Public AI Risk Signal"
             obligation_path = "MANUAL_REVIEW"
 
+        canonical = ClassificationService._run_classification_logic(answers)
+        obligation_dimensions = self.map_obligation_dimensions(signals, canonical["obligation_graph"])
+
         return {
             "classification": classification,
             "risk_level": risk_level,
@@ -502,7 +521,84 @@ class WebsiteScannerService:
             "actor_assumption": "Provider",
             "intake_answers": answers,
             "rationale": self.classification_rationale(classification, categories),
+            "canonical_actor_role": canonical["actor_role"],
+            "canonical_classification": canonical["system_classification"],
+            "canonical_obligation_path": canonical["obligation_path"],
+            "canonical_rationale": canonical["rationale"],
+            "legal_basis": canonical["legal_basis"],
+            "evidence_requirements": canonical["evidence_requirements"],
+            "obligation_dimensions": obligation_dimensions,
+            "manual_review_required": self.requires_manual_review(risk_level, obligation_dimensions),
+            "scanner_to_obligation_confidence": self.score_obligation_mapping_confidence(obligation_dimensions, signals),
         }
+
+    def map_obligation_dimensions(
+        self,
+        signals: list[dict[str, Any]],
+        obligation_graph: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        search_text = " ".join(
+            f"{signal.get('category', '')} {signal.get('label', '')} {signal.get('excerpt', '')}"
+            for signal in signals
+        ).lower()
+        mappings: list[dict[str, Any]] = []
+
+        for dimension in obligation_graph:
+            dimension_id = dimension["dimension_id"]
+            matched_public_signals: list[str] = []
+            for expected_signal in dimension.get("scanner_signals", []):
+                if expected_signal.lower() in search_text:
+                    matched_public_signals.append(expected_signal)
+            for signal in signals:
+                category = signal.get("category")
+                if dimension_id in self.SIGNAL_CATEGORY_DIMENSIONS.get(category, []):
+                    matched_public_signals.append(signal.get("label") or category)
+
+            matched_public_signals = self.dedupe_preserve_order(matched_public_signals)
+            signal_support = "direct_public_match" if matched_public_signals else "classification_inferred"
+
+            mappings.append({
+                "dimension_id": dimension_id,
+                "pillar": dimension["pillar"],
+                "chapter": dimension["chapter"],
+                "article": dimension["article"],
+                "articles": dimension.get("articles", []),
+                "annex_refs": dimension.get("annex_refs", []),
+                "status": dimension["status"],
+                "evidence_domain": dimension["evidence_domain"],
+                "summary": dimension["summary"],
+                "explanation": dimension["explanation"],
+                "required_controls": dimension.get("required_controls", []),
+                "required_evidence": dimension.get("required_evidence", []),
+                "scanner_signals": dimension.get("scanner_signals", []),
+                "matched_public_signals": matched_public_signals,
+                "signal_support": signal_support,
+                "confidence_policy": dimension.get("confidence_policy"),
+                "effective_dates": dimension.get("effective_dates", {}),
+            })
+
+        return mappings
+
+    @staticmethod
+    def requires_manual_review(risk_level: str, obligation_dimensions: list[dict[str, Any]]) -> bool:
+        if risk_level in {"high", "prohibited_review", "gpai"}:
+            return True
+        return any(
+            dimension.get("status") in {"blocking", "review_required", "screening_required"}
+            for dimension in obligation_dimensions
+        )
+
+    @staticmethod
+    def score_obligation_mapping_confidence(
+        obligation_dimensions: list[dict[str, Any]],
+        signals: list[dict[str, Any]],
+    ) -> int:
+        if not obligation_dimensions:
+            return 0
+        supported_count = sum(1 for dimension in obligation_dimensions if dimension.get("matched_public_signals"))
+        support_ratio = supported_count / len(obligation_dimensions)
+        signal_score = min(len(signals) * 6, 36)
+        return max(20, min(95, 30 + signal_score + int(support_ratio * 29)))
 
     def find_gaps(
         self,
@@ -519,30 +615,45 @@ class WebsiteScannerService:
                 "severity": "medium",
                 "title": "No public responsible AI governance signal found",
                 "detail": "The site appears to mention AI, but the scan did not find public language about oversight, risk management, audit logs, incidents, or responsible AI practices.",
+                "dimension_id": "ai_literacy",
+                "article": "Article 4",
+                "evidence_domain": "ai_literacy",
             })
         if classification["risk_level"] in {"high", "prohibited_review"}:
             gaps.append({
                 "severity": "high",
                 "title": "High-risk language requires manual legal validation",
                 "detail": "Public pages contain terms associated with Annex III or prohibited-risk review. Confirm the intended purpose and actual deployment context before relying on this classification.",
+                "dimension_id": "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification",
+                "article": "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III",
+                "evidence_domain": "classification",
             })
         if "human_interaction" in categories and "ai" not in page_urls and "responsible-ai" not in page_urls:
             gaps.append({
                 "severity": "medium",
                 "title": "AI interaction disclosure page not obvious",
                 "detail": "The scan found chatbot/assistant signals, but no obvious AI disclosure or responsible AI page in the crawled URLs.",
+                "dimension_id": "transparency_notice",
+                "article": "Article 50",
+                "evidence_domain": "transparency",
             })
         if "privacy_security" not in categories:
             gaps.append({
                 "severity": "medium",
                 "title": "Privacy/security evidence not found in scanned pages",
                 "detail": "The scanner did not find privacy, GDPR, security, SOC 2, or data processing signals in the crawled public pages.",
+                "dimension_id": "provider_high_risk_requirements",
+                "article": "Articles 8-16",
+                "evidence_domain": "provider_controls",
             })
         if not gaps:
             gaps.append({
                 "severity": "low",
                 "title": "No critical public-page gaps detected",
                 "detail": "The public website contains some governance or privacy evidence. Internal documentation is still required for compliance assurance.",
+                "dimension_id": "ai_literacy",
+                "article": "Article 4",
+                "evidence_domain": "ai_literacy",
             })
 
         return gaps
@@ -553,6 +664,8 @@ class WebsiteScannerService:
                 "priority": "high" if classification["risk_level"] in {"high", "prohibited_review"} else "medium",
                 "title": "Confirm intended purpose and actor role",
                 "detail": "Validate whether the organization is acting as provider, deployer, importer, or distributor, and document the intended purpose.",
+                "dimension_id": "high_risk_classification" if classification["risk_level"] == "high" else None,
+                "article": "Article 6 and Annex III" if classification["risk_level"] == "high" else None,
             },
             {
                 "priority": "medium",
@@ -565,6 +678,19 @@ class WebsiteScannerService:
                 "priority": "high",
                 "title": "Run counsel/compliance review",
                 "detail": "Escalate high-risk or prohibited-risk indicators before using this result in customer-facing claims.",
+                "dimension_id": "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification",
+                "article": "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III",
+            })
+        for dimension in classification.get("obligation_dimensions", [])[:5]:
+            if dimension["dimension_id"] == "ai_literacy" and len(classification.get("obligation_dimensions", [])) > 1:
+                continue
+            actions.append({
+                "priority": "high" if dimension["status"] in {"blocking", "review_required"} else "medium",
+                "title": f"Prepare {dimension['pillar']} evidence",
+                "detail": f"{dimension['article']}: {dimension['summary']}",
+                "dimension_id": dimension["dimension_id"],
+                "article": dimension["article"],
+                "evidence_domain": dimension["evidence_domain"],
             })
         return actions
 
@@ -695,3 +821,14 @@ class WebsiteScannerService:
         cleaned = re.sub(r"\\b|\(|\)|\?|\+|\*", "", pattern)
         cleaned = cleaned.replace("[sd]?", "d").replace("|", "/").replace("\\", "")
         return re.sub(r"\s+", " ", cleaned).strip().title()
+
+    @staticmethod
+    def dedupe_preserve_order(values: list[str]) -> list[str]:
+        seen: set[str] = set()
+        deduped: list[str] = []
+        for value in values:
+            if value in seen:
+                continue
+            seen.add(value)
+            deduped.append(value)
+        return deduped

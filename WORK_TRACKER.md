@@ -40,10 +40,10 @@ Current technical baseline:
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
-| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, and one-click compliance readiness report generation exist. | Harden crawl/extraction quality, improve gap detection, and polish report/audit pack output. |
+| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, one-click compliance readiness report generation, and scanner-to-obligation dimension output exist. | Harden crawl/extraction quality, add deeper public-page evidence extraction, and polish report/audit pack output. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, Google login resolution, dashboard settings page exist. | Verify role mapping, lock down staging assumptions, add/confirm audit coverage for important user actions. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
-| 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, `/v1/obligations/dimensions`, `/v1/obligations/explain/intake/{id}`, dashboard intake dimension display, and tests exist. | Add deeper Annex III subcategory mapping, scanner-to-dimension scoring, provider/deployer obligation branching, and more effective-date/deadline automation. |
+| 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, `/v1/obligations/dimensions`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add deeper Annex III subcategory mapping, provider/deployer obligation branching, and more effective-date/deadline automation. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
@@ -68,6 +68,7 @@ Recovered from repo state:
 - Evidence Vault dashboard form-control contrast fix deployed: global dark styling now covers inputs, selects, textareas, select options, and date picker icons.
 - EU AI Act best practices captured for Module 4: structured compliance dimensions, scanner-to-obligation mapping, modular explainable rules, API/security tests, and live E2E pipeline requirements.
 - Module 4 first obligation engine slice completed and deployed: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
+- Module 4 scanner-to-obligation slice completed locally: website scan results now include applicable EU AI Act dimensions, legal basis, evidence requirements, mapping confidence, dimension-linked gap/action output, and scanner detail dashboard display.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -93,6 +94,8 @@ Use this as the next session checklist.
 - [x] Capture EU AI Act best practices as Module 4 blueprint and coverage acceptance criteria.
 - [x] Implement Module 4 structured obligation dimensions from the blueprint.
 - [x] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
+- [x] Implement scanner-to-obligation dimension mapping and dashboard display.
+- [ ] Deploy scanner-to-obligation dimension mapping to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
