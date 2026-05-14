@@ -112,8 +112,10 @@ test('critical product workflows create records and run governed runtime', async
   await page.getByRole('button', { name: /run scanner/i }).click();
   await expect(page).toHaveURL(/\/scanner\/scan-/);
   await expect(page.getByText(/Preliminary Classification/i)).toBeVisible();
-  await page.getByRole('button', { name: /create system \+ intake/i }).click();
-  await expect(page.getByText(/converted/i)).toBeVisible();
+  await page.getByRole('button', { name: /create workspace/i }).click();
+  await expect(page.getByRole('button', { name: /workspace ready/i })).toBeVisible();
+  await expect(page.getByText(/Compliance Workspace Starter Pack/i)).toBeVisible();
+  await expect(page.getByRole('link', { name: /open ai system/i })).toBeVisible();
 
   await gotoAndSettle(page, '/controls');
   await page.getByRole('button', { name: /seed baseline/i }).first().click();
