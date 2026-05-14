@@ -45,6 +45,35 @@
   body {
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    color-scheme: dark;
+  }
+
+  input:not([type='checkbox']):not([type='radio']),
+  select,
+  textarea {
+    @apply rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 outline-none transition-colors placeholder:text-zinc-600 focus:border-indigo-500 disabled:cursor-not-allowed disabled:opacity-50;
+    color-scheme: dark;
+  }
+
+  select {
+    @apply pr-9;
+  }
+
+  option {
+    @apply bg-zinc-950 text-zinc-100;
+  }
+
+  textarea {
+    @apply resize-y;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.65;
+  }
+
+  input[type='date']::-webkit-calendar-picker-indicator:hover {
+    opacity: 1;
   }
 }
 
