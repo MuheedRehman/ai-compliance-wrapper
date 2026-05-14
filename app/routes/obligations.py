@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
+    AnnexIIICategoryResponse,
     ComplianceDimensionResponse,
     FRIACreate, FRIAUpdate, FRIAResponse,
     OversightCreate, OversightUpdate, OversightResponse,
@@ -11,7 +12,7 @@ from app.schemas import (
 from app.services.auth_service import authenticate_api_key
 from app.services.classification_service import ClassificationService
 from app.services.obligation_service import ObligationService
-from app.services.regulatory_knowledge import list_compliance_dimensions
+from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions
 from typing import List
 
 router = APIRouter(prefix="/v1/obligations", tags=["Obligation Workflows"])
@@ -22,6 +23,12 @@ router = APIRouter(prefix="/v1/obligations", tags=["Obligation Workflows"])
 def list_dimensions(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     authenticate_api_key(db, x_api_key, required_scope="compliance:read")
     return list_compliance_dimensions()
+
+
+@router.get("/annex-iii", response_model=List[AnnexIIICategoryResponse])
+def list_annex_iii(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    return list_annex_iii_categories()
 
 
 @router.get("/explain/intake/{intake_id}", response_model=ObligationExplanationResponse)

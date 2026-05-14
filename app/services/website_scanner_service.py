@@ -18,6 +18,7 @@ from app.services import ai_system_service
 from app.services.classification_service import ClassificationService
 from app.services.compliance_control_service import ComplianceControlService
 from app.services.evidence_service import write_evidence_log
+from app.services.regulatory_knowledge import match_annex_iii_categories
 
 
 class WebsiteScannerError(Exception):
@@ -416,7 +417,8 @@ class WebsiteScannerService:
         combined = "\n".join(page.text for page in pages)
         title = pages[0].title or urlparse(normalized_url).hostname
         signals, evidence_refs = self.detect_signals(pages)
-        classification = self.classify(signals)
+        annex_iii_matches = match_annex_iii_categories(combined)
+        classification = self.classify(signals, annex_iii_matches)
         gaps = self.find_gaps(signals, pages, classification)
         suggested_actions = self.suggest_actions(classification, gaps)
         confidence = self.score_confidence(pages, signals)
@@ -478,17 +480,26 @@ class WebsiteScannerService:
 
         return signals, evidence_refs[:20]
 
-    def classify(self, signals: list[dict[str, Any]]) -> dict[str, Any]:
+    def classify(
+        self,
+        signals: list[dict[str, Any]],
+        annex_iii_matches: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         categories = {signal["category"] for signal in signals}
+        annex_iii_matches = annex_iii_matches or []
         answers = {
             "is_developer": True,
             "is_deployer": False,
             "is_prohibited_use": "prohibited_risk" in categories,
-            "is_high_risk_annex_iii": "high_risk_domain" in categories,
+            "is_high_risk_annex_iii": "high_risk_domain" in categories or bool(annex_iii_matches),
             "is_safety_component": False,
             "has_transparency_obligation": bool({"human_interaction", "synthetic_content"} & categories),
             "is_gpai": "gpai" in categories,
+            "annex_iii_matches": annex_iii_matches,
         }
+        if annex_iii_matches:
+            answers["annex_iii_area"] = annex_iii_matches[0]["subcategory_id"]
+            answers["annex_iii_category"] = annex_iii_matches[0]["category_id"]
 
         if answers["is_prohibited_use"]:
             risk_level = "prohibited_review"
@@ -526,6 +537,7 @@ class WebsiteScannerService:
             "canonical_obligation_path": canonical["obligation_path"],
             "canonical_rationale": canonical["rationale"],
             "legal_basis": canonical["legal_basis"],
+            "annex_iii_matches": annex_iii_matches,
             "evidence_requirements": canonical["evidence_requirements"],
             "obligation_dimensions": obligation_dimensions,
             "manual_review_required": self.requires_manual_review(risk_level, obligation_dimensions),
@@ -570,6 +582,7 @@ class WebsiteScannerService:
                 "explanation": dimension["explanation"],
                 "required_controls": dimension.get("required_controls", []),
                 "required_evidence": dimension.get("required_evidence", []),
+                "annex_iii_matches": dimension.get("annex_iii_matches", []),
                 "scanner_signals": dimension.get("scanner_signals", []),
                 "matched_public_signals": matched_public_signals,
                 "signal_support": signal_support,

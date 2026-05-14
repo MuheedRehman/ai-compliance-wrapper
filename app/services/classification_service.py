@@ -41,6 +41,13 @@ class ClassificationService:
             rationale_parts.append("The system uses prohibited AI practices (Art 5).")
         elif is_high_risk:
             system_classification = "High-Risk AI System"
+            annex_matches = answers.get("annex_iii_matches") or []
+            if annex_matches:
+                annex_labels = ", ".join(
+                    f"{match.get('annex_ref')}: {match.get('subcategory')}"
+                    for match in annex_matches[:3]
+                )
+                rationale_parts.append(f"Annex III category evidence detected: {annex_labels}.")
             if actor_role == "Provider":
                 obligation_path = "FULL_COMPLIANCE_ART_16"
                 rationale_parts.append("System is high-risk; provider must follow Art 16 obligations (QMS, Technical Doc, Conformity Assessment).")
@@ -73,6 +80,7 @@ class ClassificationService:
             "obligation_path": obligation_path,
             "obligation_graph": obligation_graph,
             "legal_basis": legal_basis,
+            "annex_iii_matches": answers.get("annex_iii_matches", []),
             "evidence_requirements": [
                 {
                     "key": item["key"],

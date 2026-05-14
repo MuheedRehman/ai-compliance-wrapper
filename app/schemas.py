@@ -169,6 +169,20 @@ class ComplianceDimensionResponse(BaseModel):
     summary: str
 
 
+class AnnexIIICategoryResponse(BaseModel):
+    category_id: str
+    area_number: int
+    area: str
+    subcategory_id: str
+    subcategory: str
+    annex_ref: str
+    article: str
+    source: str
+    source_url: str
+    summary: str
+    scanner_terms: List[str] = Field(default_factory=list)
+
+
 class ObligationExplanationResponse(BaseModel):
     actor_role: str
     system_classification: str

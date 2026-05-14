@@ -1,6 +1,6 @@
 from app.models import IntakeAssessment
 from app.services.classification_service import ClassificationService
-from app.services.regulatory_knowledge import list_compliance_dimensions
+from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions, match_annex_iii_categories
 
 
 def test_obligation_dimension_catalog_is_structured():
@@ -21,18 +21,42 @@ def test_obligation_dimension_catalog_is_structured():
     assert "applies_when" not in provider
 
 
+def test_annex_iii_catalog_and_matcher_map_high_risk_subcategories():
+    categories = list_annex_iii_categories()
+    ids = {category["subcategory_id"] for category in categories}
+
+    assert "employment_recruitment_selection" in ids
+    assert "essential_services_creditworthiness" in ids
+    assert "education_test_monitoring" in ids
+
+    matches = match_annex_iii_categories(
+        "Our AI screens resumes, ranks candidates for hiring, and supports credit scoring decisions."
+    )
+    matched_ids = {match["subcategory_id"] for match in matches}
+
+    assert "employment_recruitment_selection" in matched_ids
+    assert "essential_services_creditworthiness" in matched_ids
+    assert all(match["manual_review_required"] is True for match in matches)
+
+
 def test_classification_returns_enriched_obligation_graph():
     result = ClassificationService._run_classification_logic({
         "is_deployer": True,
         "is_high_risk_annex_iii": True,
         "has_transparency_obligation": True,
         "is_public_body": True,
+        "annex_iii_matches": [{
+            "subcategory_id": "essential_services_creditworthiness",
+            "annex_ref": "Annex III 5(b)",
+            "subcategory": "Creditworthiness or credit scoring",
+        }],
     })
 
     dimensions = {item["dimension_id"]: item for item in result["obligation_graph"]}
     assert dimensions["deployer_high_risk_operations"]["article"] == "Article 26"
     assert dimensions["fria_screening"]["status"] == "required"
     assert dimensions["transparency_notice"]["article"] == "Article 50"
+    assert dimensions["high_risk_classification"]["annex_iii_matches"]
     assert dimensions["deployer_high_risk_operations"]["required_controls"]
     assert dimensions["deployer_high_risk_operations"]["explanation"].startswith("Because")
     assert any(item["dimension_id"] == "fria_screening" for item in result["evidence_requirements"])
@@ -45,6 +69,10 @@ def test_obligation_dimensions_endpoint_requires_compliance_scope(client, admin_
     allowed = client.get("/v1/obligations/dimensions", headers=admin_headers)
     assert allowed.status_code == 200
     assert any(item["dimension_id"] == "gpai_provider_obligations" for item in allowed.json())
+
+    annex = client.get("/v1/obligations/annex-iii", headers=admin_headers)
+    assert annex.status_code == 200
+    assert any(item["subcategory_id"] == "employment_recruitment_selection" for item in annex.json())
 
 
 def test_explain_intake_obligations_endpoint(client, admin_headers):

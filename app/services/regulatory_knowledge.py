@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -7,6 +8,7 @@ from typing import Any
 
 AI_ACT_SOURCE = "Regulation (EU) 2024/1689"
 AI_ACT_SERVICE_DESK_BASE = "https://ai-act-service-desk.ec.europa.eu/en/ai-act"
+ANNEX_III_SOURCE_URL = f"{AI_ACT_SERVICE_DESK_BASE}/annex-3"
 
 
 REGULATORY_ARTICLES: dict[str, dict[str, str]] = {
@@ -80,6 +82,286 @@ REGULATORY_ARTICLES: dict[str, dict[str, str]] = {
 
 def article_refs(*keys: str) -> list[dict[str, str]]:
     return [{"source": AI_ACT_SOURCE, **REGULATORY_ARTICLES[key]} for key in keys]
+
+
+def _annex_iii_item(
+    *,
+    category_id: str,
+    area_number: int,
+    area: str,
+    subcategory_id: str,
+    subcategory: str,
+    annex_ref: str,
+    summary: str,
+    scanner_terms: list[str],
+) -> dict[str, Any]:
+    return {
+        "category_id": category_id,
+        "area_number": area_number,
+        "area": area,
+        "subcategory_id": subcategory_id,
+        "subcategory": subcategory,
+        "annex_ref": annex_ref,
+        "article": "Article 6(2)",
+        "source": AI_ACT_SOURCE,
+        "source_url": ANNEX_III_SOURCE_URL,
+        "summary": summary,
+        "scanner_terms": scanner_terms,
+    }
+
+
+ANNEX_III_CATEGORIES: list[dict[str, Any]] = [
+    _annex_iii_item(
+        category_id="biometrics",
+        area_number=1,
+        area="Biometrics",
+        subcategory_id="biometrics_remote_identification",
+        subcategory="Remote biometric identification",
+        annex_ref="Annex III 1(a)",
+        summary="Remote biometric identification, excluding systems used only to verify a claimed identity.",
+        scanner_terms=["remote biometric identification", "biometric identification", "facial recognition", "face recognition"],
+    ),
+    _annex_iii_item(
+        category_id="biometrics",
+        area_number=1,
+        area="Biometrics",
+        subcategory_id="biometrics_sensitive_categorisation",
+        subcategory="Sensitive biometric categorisation",
+        annex_ref="Annex III 1(b)",
+        summary="Biometric categorisation by sensitive or protected attributes inferred from biometric data.",
+        scanner_terms=["biometric categorisation", "biometric categorization", "sensitive attribute", "protected attribute"],
+    ),
+    _annex_iii_item(
+        category_id="biometrics",
+        area_number=1,
+        area="Biometrics",
+        subcategory_id="biometrics_emotion_recognition",
+        subcategory="Emotion recognition",
+        annex_ref="Annex III 1(c)",
+        summary="Emotion recognition where permitted outside prohibited-practice contexts.",
+        scanner_terms=["emotion recognition", "emotion detection", "detect emotions"],
+    ),
+    _annex_iii_item(
+        category_id="critical_infrastructure",
+        area_number=2,
+        area="Critical infrastructure",
+        subcategory_id="critical_infrastructure_safety_component",
+        subcategory="Critical infrastructure safety component",
+        annex_ref="Annex III 2",
+        summary="Safety components for critical digital infrastructure, road traffic, or water, gas, heating, or electricity supply.",
+        scanner_terms=["critical infrastructure", "road traffic", "water supply", "gas supply", "electricity grid", "power grid", "digital infrastructure"],
+    ),
+    _annex_iii_item(
+        category_id="education",
+        area_number=3,
+        area="Education and vocational training",
+        subcategory_id="education_access_admission",
+        subcategory="Education access or admission",
+        annex_ref="Annex III 3(a)",
+        summary="Determining access, admission, or assignment to education or vocational training institutions.",
+        scanner_terms=["admission", "admissions", "student placement", "school placement", "vocational training admission"],
+    ),
+    _annex_iii_item(
+        category_id="education",
+        area_number=3,
+        area="Education and vocational training",
+        subcategory_id="education_learning_evaluation",
+        subcategory="Learning outcome evaluation",
+        annex_ref="Annex III 3(b)",
+        summary="Evaluating learning outcomes, including when used to steer learning processes.",
+        scanner_terms=["learning outcomes", "grading", "exam scoring", "student assessment", "education assessment"],
+    ),
+    _annex_iii_item(
+        category_id="education",
+        area_number=3,
+        area="Education and vocational training",
+        subcategory_id="education_level_assessment",
+        subcategory="Education level assessment",
+        annex_ref="Annex III 3(c)",
+        summary="Assessing the education level a person will receive or can access.",
+        scanner_terms=["education level", "course placement", "placement test", "learning path"],
+    ),
+    _annex_iii_item(
+        category_id="education",
+        area_number=3,
+        area="Education and vocational training",
+        subcategory_id="education_test_monitoring",
+        subcategory="Test behaviour monitoring",
+        annex_ref="Annex III 3(d)",
+        summary="Monitoring and detecting prohibited student behaviour during tests.",
+        scanner_terms=["exam monitoring", "test monitoring", "proctoring", "detect cheating", "prohibited behaviour"],
+    ),
+    _annex_iii_item(
+        category_id="employment",
+        area_number=4,
+        area="Employment, worker management, and self-employment",
+        subcategory_id="employment_recruitment_selection",
+        subcategory="Recruitment or candidate selection",
+        annex_ref="Annex III 4(a)",
+        summary="Recruitment or selection, including job ad targeting, application filtering, and candidate evaluation.",
+        scanner_terms=["recruiting", "recruitment", "hiring", "candidate ranking", "resume screening", "cv screening", "job application", "targeted job ad"],
+    ),
+    _annex_iii_item(
+        category_id="employment",
+        area_number=4,
+        area="Employment, worker management, and self-employment",
+        subcategory_id="employment_worker_management",
+        subcategory="Worker management decisions",
+        annex_ref="Annex III 4(b)",
+        summary="Work-related decisions such as promotion, termination, task allocation, monitoring, or performance evaluation.",
+        scanner_terms=["performance evaluation", "employee monitoring", "worker monitoring", "task allocation", "promotion", "termination", "workforce management"],
+    ),
+    _annex_iii_item(
+        category_id="essential_services",
+        area_number=5,
+        area="Essential private and public services",
+        subcategory_id="essential_services_public_benefits",
+        subcategory="Public benefits and services eligibility",
+        annex_ref="Annex III 5(a)",
+        summary="Eligibility, grant, reduction, revocation, or reclaiming of essential public assistance benefits or services.",
+        scanner_terms=["public assistance", "public benefits", "social benefits", "benefits eligibility", "healthcare services", "welfare eligibility"],
+    ),
+    _annex_iii_item(
+        category_id="essential_services",
+        area_number=5,
+        area="Essential private and public services",
+        subcategory_id="essential_services_creditworthiness",
+        subcategory="Creditworthiness or credit scoring",
+        annex_ref="Annex III 5(b)",
+        summary="Evaluating creditworthiness or establishing a credit score, except financial fraud detection.",
+        scanner_terms=["creditworthiness", "credit score", "credit scoring", "loan eligibility", "lending", "borrower risk"],
+    ),
+    _annex_iii_item(
+        category_id="essential_services",
+        area_number=5,
+        area="Essential private and public services",
+        subcategory_id="essential_services_insurance_pricing",
+        subcategory="Life or health insurance risk and pricing",
+        annex_ref="Annex III 5(c)",
+        summary="Risk assessment and pricing for natural persons in life or health insurance.",
+        scanner_terms=["life insurance", "health insurance", "insurance pricing", "insurance risk", "underwriting"],
+    ),
+    _annex_iii_item(
+        category_id="essential_services",
+        area_number=5,
+        area="Essential private and public services",
+        subcategory_id="essential_services_emergency_response",
+        subcategory="Emergency call and response prioritisation",
+        annex_ref="Annex III 5(d)",
+        summary="Emergency call evaluation, dispatch priority, first response dispatch, or emergency healthcare triage.",
+        scanner_terms=["emergency call", "emergency dispatch", "first response", "patient triage", "emergency healthcare"],
+    ),
+    _annex_iii_item(
+        category_id="law_enforcement",
+        area_number=6,
+        area="Law enforcement",
+        subcategory_id="law_enforcement_victim_risk",
+        subcategory="Victim risk assessment",
+        annex_ref="Annex III 6(a)",
+        summary="Assessing the risk of a natural person becoming a victim of criminal offences.",
+        scanner_terms=["victim risk", "crime victim risk", "risk of victimisation", "risk of victimization"],
+    ),
+    _annex_iii_item(
+        category_id="law_enforcement",
+        area_number=6,
+        area="Law enforcement",
+        subcategory_id="law_enforcement_polygraph",
+        subcategory="Polygraph or similar law-enforcement tools",
+        annex_ref="Annex III 6(b)",
+        summary="Polygraphs or similar tools used by or for law enforcement authorities.",
+        scanner_terms=["polygraph", "lie detector", "deception detection"],
+    ),
+    _annex_iii_item(
+        category_id="law_enforcement",
+        area_number=6,
+        area="Law enforcement",
+        subcategory_id="law_enforcement_evidence_reliability",
+        subcategory="Evidence reliability evaluation",
+        annex_ref="Annex III 6(c)",
+        summary="Evaluating reliability of evidence during investigation or prosecution of criminal offences.",
+        scanner_terms=["evidence reliability", "criminal evidence", "prosecution evidence", "investigation evidence"],
+    ),
+    _annex_iii_item(
+        category_id="law_enforcement",
+        area_number=6,
+        area="Law enforcement",
+        subcategory_id="law_enforcement_offending_risk",
+        subcategory="Offending or re-offending risk",
+        annex_ref="Annex III 6(d)",
+        summary="Assessing risk of offending or re-offending, personality traits, characteristics, or past criminal behaviour.",
+        scanner_terms=["re-offending", "recidivism", "criminal risk", "offending risk", "past criminal behaviour"],
+    ),
+    _annex_iii_item(
+        category_id="law_enforcement",
+        area_number=6,
+        area="Law enforcement",
+        subcategory_id="law_enforcement_criminal_profiling",
+        subcategory="Criminal profiling",
+        annex_ref="Annex III 6(e)",
+        summary="Profiling natural persons during detection, investigation, or prosecution of criminal offences.",
+        scanner_terms=["criminal profiling", "law enforcement profiling", "offender profile"],
+    ),
+    _annex_iii_item(
+        category_id="migration_border_control",
+        area_number=7,
+        area="Migration, asylum, and border control",
+        subcategory_id="migration_polygraph",
+        subcategory="Migration polygraph or similar tools",
+        annex_ref="Annex III 7(a)",
+        summary="Polygraphs or similar tools used by competent public authorities in migration, asylum, or border control contexts.",
+        scanner_terms=["migration polygraph", "border polygraph", "asylum polygraph"],
+    ),
+    _annex_iii_item(
+        category_id="migration_border_control",
+        area_number=7,
+        area="Migration, asylum, and border control",
+        subcategory_id="migration_security_health_risk",
+        subcategory="Migration, security, or health risk assessment",
+        annex_ref="Annex III 7(b)",
+        summary="Assessing security, irregular migration, or health risks for persons entering or already in a Member State.",
+        scanner_terms=["irregular migration", "border risk", "migration risk", "security risk assessment", "health risk assessment"],
+    ),
+    _annex_iii_item(
+        category_id="migration_border_control",
+        area_number=7,
+        area="Migration, asylum, and border control",
+        subcategory_id="migration_application_examination",
+        subcategory="Asylum, visa, or residence application examination",
+        annex_ref="Annex III 7(c)",
+        summary="Assisting examination of asylum, visa, residence permit, or associated complaint eligibility.",
+        scanner_terms=["asylum", "visa", "residence permit", "immigration application", "border control"],
+    ),
+    _annex_iii_item(
+        category_id="migration_border_control",
+        area_number=7,
+        area="Migration, asylum, and border control",
+        subcategory_id="migration_person_identification",
+        subcategory="Migration context person identification",
+        annex_ref="Annex III 7(d)",
+        summary="Detecting, recognising, or identifying natural persons in migration, asylum, or border control contexts, excluding travel document verification.",
+        scanner_terms=["border identification", "migration identification", "identify travellers", "identify travelers"],
+    ),
+    _annex_iii_item(
+        category_id="justice_democracy",
+        area_number=8,
+        area="Administration of justice and democratic processes",
+        subcategory_id="justice_legal_fact_law_assistance",
+        subcategory="Judicial fact and law assistance",
+        annex_ref="Annex III 8(a)",
+        summary="Assisting judicial authorities with researching, interpreting, or applying facts and law, including similar ADR use.",
+        scanner_terms=["judicial", "legal research", "case law", "apply the law", "alternative dispute resolution"],
+    ),
+    _annex_iii_item(
+        category_id="justice_democracy",
+        area_number=8,
+        area="Administration of justice and democratic processes",
+        subcategory_id="democratic_process_election_influence",
+        subcategory="Election or referendum influence",
+        annex_ref="Annex III 8(b)",
+        summary="Influencing election or referendum outcomes or voting behaviour where natural persons are directly exposed to the output.",
+        scanner_terms=["election", "referendum", "voter behaviour", "voter behavior", "political campaign influence"],
+    ),
+]
 
 
 def _dimension(
@@ -375,6 +657,49 @@ def list_compliance_dimensions() -> list[dict[str, Any]]:
     return [_public_dimension(dimension) for dimension in COMPLIANCE_DIMENSIONS]
 
 
+def list_annex_iii_categories() -> list[dict[str, Any]]:
+    return [deepcopy(category) for category in ANNEX_III_CATEGORIES]
+
+
+def match_annex_iii_categories(text: str) -> list[dict[str, Any]]:
+    value = f" {text.lower()} "
+    matches: list[dict[str, Any]] = []
+
+    for category in ANNEX_III_CATEGORIES:
+        matched_terms = [
+            term
+            for term in category["scanner_terms"]
+            if _contains_term(value, term)
+        ]
+        if not matched_terms:
+            continue
+
+        confidence_score = min(95, 55 + (len(matched_terms) * 12))
+        item = {
+            key: deepcopy(category[key])
+            for key in [
+                "category_id",
+                "area_number",
+                "area",
+                "subcategory_id",
+                "subcategory",
+                "annex_ref",
+                "article",
+                "source",
+                "source_url",
+                "summary",
+            ]
+        }
+        item["matched_terms"] = matched_terms
+        item["confidence"] = "high" if confidence_score >= 79 else "medium"
+        item["confidence_score"] = confidence_score
+        item["manual_review_required"] = True
+        matches.append(item)
+
+    matches.sort(key=lambda item: (-item["confidence_score"], item["area_number"], item["subcategory_id"]))
+    return matches
+
+
 def build_obligation_graph(actor_role: str, classification: str, answers: dict[str, Any]) -> list[dict[str, Any]]:
     dimensions = applicable_dimensions(actor_role, classification, answers)
     obligations: list[dict[str, Any]] = []
@@ -402,6 +727,8 @@ def build_obligation_graph(actor_role: str, classification: str, answers: dict[s
             "summary": dimension["summary"],
             "explanation": _render_explanation(dimension, actor_role, classification, answers),
         }
+        if dimension["dimension_id"] == "high_risk_classification":
+            obligation["annex_iii_matches"] = answers.get("annex_iii_matches", [])
         obligations.append(obligation)
 
     return obligations
@@ -561,6 +888,11 @@ def _dedupe_dicts(items: list[dict[str, Any]], *keys: str) -> list[dict[str, Any
     return deduped
 
 
+def _contains_term(text: str, term: str) -> bool:
+    pattern = r"(?<!\w)" + re.escape(term.lower()) + r"(?!\w)"
+    return bool(re.search(pattern, text))
+
+
 def _infer_actor_role(answers: dict[str, Any]) -> str:
     if answers.get("is_developer", False):
         return "Provider"
@@ -573,6 +905,11 @@ def _fria_likely_required(answers: dict[str, Any]) -> bool:
     return bool(
         answers.get("is_public_body")
         or answers.get("provides_public_service")
-        or answers.get("annex_iii_area") in {"essential_services_credit", "insurance_risk_assessment"}
+        or answers.get("annex_iii_area") in {
+            "essential_services_creditworthiness",
+            "essential_services_insurance_pricing",
+            "essential_services_public_benefits",
+            "essential_services_emergency_response",
+        }
         or answers.get("fria_required")
     )

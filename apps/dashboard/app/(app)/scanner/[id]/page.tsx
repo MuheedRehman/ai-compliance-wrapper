@@ -65,6 +65,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
   const classification = scan.classification_json || {};
   const highRisk = ['high', 'prohibited_review'].includes(classification.risk_level);
   const obligationDimensions = classification.obligation_dimensions || [];
+  const annexMatches = classification.annex_iii_matches || [];
 
   return (
     <PageShell
@@ -147,6 +148,37 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
             )}
           </div>
         </Card>
+
+        {annexMatches.length > 0 && (
+          <Card title="Matched Annex III Categories">
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+                {annexMatches.map((match: any) => (
+                  <div key={match.subcategory_id} className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[10px] font-mono uppercase text-amber-300">{match.annex_ref} | {match.article}</p>
+                        <h3 className="mt-1 text-sm font-bold text-white">{match.subcategory}</h3>
+                        <p className="mt-1 text-xs font-medium text-zinc-400">{match.area}</p>
+                      </div>
+                      <span className="rounded bg-amber-500/10 px-2 py-1 text-[10px] font-mono uppercase text-amber-300 ring-1 ring-amber-500/20">
+                        {match.confidence} {match.confidence_score}%
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-zinc-500">{match.summary}</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {(match.matched_terms || []).map((term: string) => (
+                        <span key={term} className="rounded bg-zinc-950 px-2 py-1 text-[10px] font-mono uppercase text-zinc-400 ring-1 ring-zinc-800">
+                          {term}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
 
         {obligationDimensions.length > 0 && (
           <Card title="Applicable EU AI Act Dimensions">

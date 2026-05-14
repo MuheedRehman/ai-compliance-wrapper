@@ -42,11 +42,19 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
     assert body["classification_json"]["canonical_obligation_path"] == "FULL_COMPLIANCE_ART_16"
     assert body["classification_json"]["manual_review_required"] is True
     assert body["classification_json"]["legal_basis"]
+    annex_matches = {
+        match["subcategory_id"]: match
+        for match in body["classification_json"]["annex_iii_matches"]
+    }
+    assert "employment_recruitment_selection" in annex_matches
+    assert annex_matches["employment_recruitment_selection"]["annex_ref"] == "Annex III 4(a)"
+    assert body["classification_json"]["intake_answers"]["annex_iii_area"] == "employment_recruitment_selection"
     dimensions = {
         dimension["dimension_id"]: dimension
         for dimension in body["classification_json"]["obligation_dimensions"]
     }
     assert dimensions["high_risk_classification"]["article"] == "Article 6 and Annex III"
+    assert dimensions["high_risk_classification"]["annex_iii_matches"]
     assert dimensions["provider_high_risk_requirements"]["required_controls"]
     assert dimensions["transparency_notice"]["article"] == "Article 50"
     assert dimensions["transparency_notice"]["matched_public_signals"]
