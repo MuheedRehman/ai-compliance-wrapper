@@ -2,6 +2,8 @@
 
 Last updated: 2026-05-14
 
+Cleanup execution status: outer duplicate shell archived locally on 2026-05-14.
+
 ## Decision
 
 The canonical working repo is:
@@ -94,7 +96,11 @@ Goal: preserve the roadmap and current module status before any cleanup.
 
 ### Phase 2: Stop using the outer Git repo
 
-Recommended action after approval:
+Completed locally:
+
+- Outer `.git` was moved to `_archive_outer_git_2026-05-14`.
+
+Original recommendation:
 
 - Archive or remove the outer `.git` folder so `git status` from the outer folder stops showing misleading staged duplicate files.
 
@@ -108,7 +114,11 @@ Cleaner option:
 
 ### Phase 3: Archive or remove outer duplicate project files
 
-Recommended action after approval:
+Completed locally:
+
+- Outer duplicate files were moved to `_archive_outer_duplicate_2026-05-14`.
+
+Original recommendation:
 
 - Archive the outer duplicate shell into `_archive_outer_duplicate_2026-05-14`, or delete it after verifying nothing valuable exists only in the outer copy.
 

@@ -24,7 +24,7 @@ Current technical baseline:
 - Alembic migrations exist through `0008_tenant_user_admin.py`.
 - Dashboard Next.js app exists under `backend/apps/dashboard`.
 - Tests exist for scanner, tenant admin, classification, controls, reports, billing, runtime, migrations, and feature lifecycle.
-- Canonical Git/project root is the nested `backend` folder. The outer `Sprint6B_Migrations_Postgres_CI` folder contains a misleading duplicate shell; cleanup plan lives in `REPO_CLEANUP_PLAN.md`.
+- Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 
 ## Module Status Board
 
@@ -66,8 +66,8 @@ Use this as the next session checklist.
 - [ ] Make "convert scan" create or update a useful AI system profile.
 - [ ] Connect scanner result to controls/evidence/report generation.
 - [ ] Decide whether to finish Module 1 before further Module 2 hardening.
-- [ ] Commit roadmap/tracker/cleanup docs inside the canonical `backend` repo.
-- [ ] Clean up or archive the misleading outer duplicate shell after approval.
+- [x] Commit roadmap/tracker/cleanup docs inside the canonical `backend` repo.
+- [x] Clean up or archive the misleading outer duplicate shell after approval.
 - [ ] Commit a baseline so repo history starts preserving work.
 
 ## Tracking Rules Going Forward
