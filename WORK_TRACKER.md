@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `c285b61` via Cloud Build `ac44d91e-a03f-4e41-af5b-536a8edc4ee5` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `35bf228` via Cloud Build `4adb932b-81fd-464c-9bad-0a07be29b04a` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00024-kkf`
-  - Backend: `ai-compliance-backend-00045-gqh`
+  - Dashboard: `ai-compliance-dashboard-00025-ttb`
+  - Backend: `ai-compliance-backend-00047-pmn`
 
 ## Module Status Board
 
@@ -65,6 +65,7 @@ Recovered from repo state:
 - Module 3 first workspace slice completed: `/v1/ai-systems/{id}/workspace` aggregates lifecycle records, and the AI system detail dashboard now presents readiness, classification, controls, evidence, scans, reports, governance records, and features in one workspace.
 - Deployment pipeline restored after UI/test wording drift: live scanner E2E now verifies the current `CREATE WORKSPACE` flow, GitHub is pushed, and GCP Cloud Build deploys backend/dashboard with live E2E passing.
 - Module 5 first evidence vault slice completed locally: `/v1/evidence/items` and `/v1/evidence/summary` manage signed vault items, the dashboard Evidence page now combines vault items with immutable logs, and AI system workspaces count/show vault items.
+- Evidence Vault dashboard form-control contrast fix deployed: global dark styling now covers inputs, selects, textareas, select options, and date picker icons.
 - EU AI Act best practices captured for Module 4: structured compliance dimensions, scanner-to-obligation mapping, modular explainable rules, API/security tests, and live E2E pipeline requirements.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
