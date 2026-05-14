@@ -27,13 +27,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `0f54cd2` via Cloud Build `c1bd8fba-15fc-4c98-9f7b-8b18680a7f12` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `c285b61` via Cloud Build `ac44d91e-a03f-4e41-af5b-536a8edc4ee5` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00023-kbq`
-  - Backend: `ai-compliance-backend-00043-jtr`
+  - Dashboard: `ai-compliance-dashboard-00024-kkf`
+  - Backend: `ai-compliance-backend-00045-gqh`
 
 ## Module Status Board
 
@@ -85,7 +85,7 @@ Use this as the next session checklist.
 - [x] Commit and push the recovery/module baseline to GitHub.
 - [x] Deploy latest pushed baseline to GCP staging and verify live dashboard response.
 - [x] Start Module 5 Evidence Vault first-class evidence item model and workflow.
-- [ ] Deploy Module 5 Evidence Vault slice to GCP staging and update the deployed baseline.
+- [x] Deploy Module 5 Evidence Vault slice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
