@@ -90,7 +90,9 @@ Add:
 
 Target output: "Because you answered X, obligations A/B/C apply."
 
-Status: early foundation exists through intake classification and obligation paths.
+Best-practice implementation guide: `docs/obligation-engine-2-blueprint.md`.
+
+Status: early foundation exists through intake classification and obligation paths. The next implementation should follow the structured compliance-dimension pattern: pillar, article, Annex reference, actor role, trigger condition, scanner signals, required controls, required evidence, confidence, and effective date.
 
 ### Module 5: Evidence Vault
 
@@ -116,7 +118,7 @@ Each evidence item should have:
 - Related AI system
 - Expiry/review date
 
-Status: foundation exists through evidence logs and linked evidence concepts; full vault workflow remains to build.
+Status: first slice deployed. Signed evidence items, source/owner/type/status, related control/system, review/expiry dates, API routes, dashboard vault UI, and workspace linkage exist. File/object storage and stronger evidence-to-control attachment remain to build.
 
 ### Module 6: Control Management
 
@@ -237,6 +239,7 @@ Status: billing and provider foundations exist; broader integrations remain futu
 - `0006_compliance_critical_patch.py`: compliance controls/reporting patch
 - `0007_website_scanner.py`: website scan records
 - `0008_tenant_user_admin.py`: tenant users, invitations, auth policies, login audit
+- `0009_evidence_vault_items.py`: signed first-class evidence vault items
 
 ## May 13, 2026 Implementation Trail
 
