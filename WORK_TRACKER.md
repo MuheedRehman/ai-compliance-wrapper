@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `c1d588c` via Cloud Build `3572a668-5d22-45be-aa80-101b99b4cc2c` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `b95eca0` via Cloud Build `b9b39b58-5a3e-474d-8f38-b1a72a6dbe31` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00026-249`
-  - Backend: `ai-compliance-backend-00049-5gr`
+  - Dashboard: `ai-compliance-dashboard-00027-v4g`
+  - Backend: `ai-compliance-backend-00051-5sf`
 
 ## Module Status Board
 
@@ -68,7 +68,7 @@ Recovered from repo state:
 - Evidence Vault dashboard form-control contrast fix deployed: global dark styling now covers inputs, selects, textareas, select options, and date picker icons.
 - EU AI Act best practices captured for Module 4: structured compliance dimensions, scanner-to-obligation mapping, modular explainable rules, API/security tests, and live E2E pipeline requirements.
 - Module 4 first obligation engine slice completed and deployed: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
-- Module 4 scanner-to-obligation slice completed locally: website scan results now include applicable EU AI Act dimensions, legal basis, evidence requirements, mapping confidence, dimension-linked gap/action output, and scanner detail dashboard display.
+- Module 4 scanner-to-obligation slice completed and deployed: website scan results now include applicable EU AI Act dimensions, legal basis, evidence requirements, mapping confidence, dimension-linked gap/action output, and scanner detail dashboard display.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -95,7 +95,7 @@ Use this as the next session checklist.
 - [x] Implement Module 4 structured obligation dimensions from the blueprint.
 - [x] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
 - [x] Implement scanner-to-obligation dimension mapping and dashboard display.
-- [ ] Deploy scanner-to-obligation dimension mapping to GCP staging and update the deployed baseline.
+- [x] Deploy scanner-to-obligation dimension mapping to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
