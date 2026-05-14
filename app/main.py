@@ -4,6 +4,7 @@ from app.errors import register_exception_handlers
 from app.routes.chat import router as chat_router
 from app.routes.features import router as features_router
 from app.routes.logs import router as logs_router
+from app.routes.evidence import router as evidence_router
 from app.routes.reviews import router as reviews_router
 from app.routes.ai_systems import router as ai_systems_router
 from app.routes.billing import router as billing_router
@@ -37,6 +38,7 @@ app.add_middleware(
 app.include_router(chat_router)
 app.include_router(features_router)
 app.include_router(logs_router)
+app.include_router(evidence_router)
 app.include_router(reviews_router)
 app.include_router(ai_systems_router)
 app.include_router(billing_router)

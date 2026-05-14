@@ -36,6 +36,8 @@ const apiChecks = [
   '/v1/reports',
   '/v1/compliance/controls',
   '/v1/compliance/scorecard',
+  '/v1/evidence/items',
+  '/v1/evidence/summary',
   '/v1/tenant-admin/summary',
 ];
 

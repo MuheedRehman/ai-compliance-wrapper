@@ -339,6 +339,34 @@ class EvidenceBundle(Base):
     completed_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class EvidenceItem(Base):
+    __tablename__ = "evidence_items"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=True, index=True)
+    control_id = Column(String, ForeignKey("compliance_controls.id"), nullable=True, index=True)
+
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    evidence_type = Column(String, nullable=False, default="policy", index=True)
+    source = Column(String, nullable=False)
+    source_url = Column(String, nullable=True)
+    owner_email = Column(String, nullable=True, index=True)
+    status = Column(String, nullable=False, default="active", index=True)
+
+    collected_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    review_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True, index=True)
+
+    evidence_hash = Column(String, nullable=False)
+    hmac_signature = Column(String, nullable=False)
+    metadata_json = Column(JSON, nullable=False, default=dict)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
 class TenantSubscription(Base):
     __tablename__ = "tenant_subscriptions"
     

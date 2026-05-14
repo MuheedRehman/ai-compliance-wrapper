@@ -90,6 +90,7 @@ class AiSystemWorkspaceResponse(BaseModel):
     latest_classification: Optional[Dict[str, Any]] = None
     features: List[Dict[str, Any]] = Field(default_factory=list)
     controls: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_items: List[Dict[str, Any]] = Field(default_factory=list)
     evidence_logs: List[Dict[str, Any]] = Field(default_factory=list)
     website_scans: List[Dict[str, Any]] = Field(default_factory=list)
     intakes: List[Dict[str, Any]] = Field(default_factory=list)
@@ -315,6 +316,78 @@ class ReadinessScorecardResponse(BaseModel):
     overdue_controls: int
     readiness_score: int
     controls_by_status: Dict[str, int]
+
+
+# --- Evidence Vault ---
+
+EvidenceItemStatus = Literal["draft", "active", "needs_review", "expired", "archived"]
+
+
+class EvidenceItemCreate(BaseModel):
+    title: str = Field(..., min_length=1)
+    evidence_type: str = "policy"
+    source: str = Field(..., min_length=1)
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+    owner_email: Optional[str] = None
+    status: EvidenceItemStatus = "active"
+    ai_system_id: Optional[str] = None
+    control_id: Optional[str] = None
+    collected_at: Optional[datetime] = None
+    review_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
+
+
+class EvidenceItemUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1)
+    evidence_type: Optional[str] = None
+    source: Optional[str] = Field(default=None, min_length=1)
+    description: Optional[str] = None
+    source_url: Optional[str] = None
+    owner_email: Optional[str] = None
+    status: Optional[EvidenceItemStatus] = None
+    ai_system_id: Optional[str] = None
+    control_id: Optional[str] = None
+    collected_at: Optional[datetime] = None
+    review_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    metadata_json: Optional[Dict[str, Any]] = None
+
+
+class EvidenceItemResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: Optional[str] = None
+    control_id: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    evidence_type: str
+    source: str
+    source_url: Optional[str] = None
+    owner_email: Optional[str] = None
+    status: str
+    collected_at: datetime
+    review_at: Optional[datetime] = None
+    expires_at: Optional[datetime] = None
+    evidence_hash: str
+    hmac_signature: str
+    metadata_json: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EvidenceVaultSummaryResponse(BaseModel):
+    tenant_id: str
+    ai_system_id: Optional[str] = None
+    total_items: int
+    linked_system_count: int
+    due_for_review_count: int
+    expiring_soon_count: int
+    items_by_status: Dict[str, int]
+    items_by_type: Dict[str, int]
 
 
 # --- Website / SaaS Compliance Scanner ---

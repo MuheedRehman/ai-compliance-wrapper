@@ -42,7 +42,7 @@ const navSections = [
     label: 'Governance',
     items: [
       { href: '/reviews',  label: 'Review Tasks',  icon: ClipboardCheck },
-      { href: '/evidence', label: 'Evidence Logs', icon: FileSearch },
+      { href: '/evidence', label: 'Evidence Vault', icon: FileSearch },
     ],
   },
   {

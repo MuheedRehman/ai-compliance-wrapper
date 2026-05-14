@@ -5,6 +5,7 @@ from app.models import (
     AiFeature,
     AiSystem,
     ComplianceControl,
+    EvidenceItem,
     EvidenceLog,
     FRIARecord,
     IncidentRecord,
@@ -68,6 +69,13 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         .limit(25)
         .all()
     )
+    evidence_items = (
+        db.query(EvidenceItem)
+        .filter(EvidenceItem.tenant_id == tenant_id, EvidenceItem.ai_system_id == ai_system_id)
+        .order_by(EvidenceItem.created_at.desc())
+        .limit(25)
+        .all()
+    )
     website_scans = (
         db.query(WebsiteScan)
         .filter(WebsiteScan.tenant_id == tenant_id, WebsiteScan.ai_system_id == ai_system_id)
@@ -119,6 +127,7 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
             "feature_count": len(features),
             "control_count": len(controls),
             "open_control_count": len(open_controls),
+            "evidence_item_count": len(evidence_items),
             "evidence_log_count": len(evidence_logs),
             "website_scan_count": len(website_scans),
             "report_count": len(reports),
@@ -145,6 +154,7 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         ),
         "features": features,
         "controls": controls,
+        "evidence_items": evidence_items,
         "evidence_logs": evidence_logs,
         "website_scans": website_scans,
         "intakes": intakes,

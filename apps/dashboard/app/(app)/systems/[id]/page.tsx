@@ -122,10 +122,10 @@ export default function SystemDetailPage() {
               <span className="text-3xl font-bold tabular-nums">{metrics.open_control_count || 0}</span>
             </div>
           </Card>
-          <Card title="Evidence Events" variant="stat">
+          <Card title="Evidence Vault" variant="stat">
             <div className="flex items-end gap-2">
               <FileSearch className="h-5 w-5 text-indigo-400 mb-1" />
-              <span className="text-3xl font-bold tabular-nums">{metrics.evidence_log_count || 0}</span>
+              <span className="text-3xl font-bold tabular-nums">{metrics.evidence_item_count || 0}</span>
             </div>
           </Card>
           <Card title="Open Incidents" variant="stat">
@@ -219,11 +219,22 @@ export default function SystemDetailPage() {
             )}
           </Card>
 
-          <Card title={`Evidence (${workspace.evidence_logs.length})`} subtitle="Recent traceability events for this system.">
-            {workspace.evidence_logs.length === 0 ? (
-              <EmptyPanel label="No evidence events yet" />
+          <Card title={`Evidence Vault (${workspace.evidence_items?.length || 0})`} subtitle="Signed audit artifacts and recent traceability events.">
+            {(workspace.evidence_items?.length || 0) === 0 && workspace.evidence_logs.length === 0 ? (
+              <EmptyPanel label="No evidence items yet" />
             ) : (
               <div className="space-y-3">
+                {(workspace.evidence_items || []).slice(0, 4).map((item: any) => (
+                  <Link key={item.id} href={`/evidence?ai_system_id=${system.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{item.title}</p>
+                        <p className="mt-1 text-[10px] font-mono text-zinc-600">{item.evidence_type} / {item.evidence_hash.slice(0, 12)}</p>
+                      </div>
+                      <StatusBadge value={item.status} />
+                    </div>
+                  </Link>
+                ))}
                 {workspace.evidence_logs.slice(0, 6).map((event: any) => (
                   <Link key={event.event_id} href={`/evidence?ai_system_id=${system.id}`} className="block rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-zinc-700">
                     <div className="flex items-start justify-between gap-3">

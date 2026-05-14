@@ -154,6 +154,24 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return fetchApi<{ tenant_id: string; logs: any[] }>(`/v1/logs${qs}`);
   },
+  listEvidenceItems: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return fetchApi<any[]>(`/v1/evidence/items${qs}`);
+  },
+  getEvidenceSummary: (aiSystemId?: string) => {
+    const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
+    return fetchApi<any>(`/v1/evidence/summary${qs}`);
+  },
+  createEvidenceItem: (body: any) =>
+    fetchApi<any>('/v1/evidence/items', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateEvidenceItem: (id: string, body: any) =>
+    fetchApi<any>(`/v1/evidence/items/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
 
   // Billing
   getSubscription: () => fetchApi<any>('/v1/billing/subscription'),
