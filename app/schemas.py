@@ -149,6 +149,38 @@ class IntakeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ComplianceDimensionResponse(BaseModel):
+    dimension_id: str
+    pillar: str
+    chapter: str
+    articles: List[Dict[str, Any]]
+    article: str
+    annex_refs: List[str] = Field(default_factory=list)
+    actor_roles: List[str] = Field(default_factory=list)
+    risk_tiers: List[str] = Field(default_factory=list)
+    trigger_conditions: List[str] = Field(default_factory=list)
+    required_controls: List[Dict[str, Any]] = Field(default_factory=list)
+    required_evidence: List[Dict[str, Any]] = Field(default_factory=list)
+    scanner_signals: List[str] = Field(default_factory=list)
+    effective_dates: Dict[str, str] = Field(default_factory=dict)
+    confidence_policy: str
+    status: str
+    evidence_domain: str
+    summary: str
+
+
+class ObligationExplanationResponse(BaseModel):
+    actor_role: str
+    system_classification: str
+    obligation_path: str
+    applicable_dimensions: List[Dict[str, Any]] = Field(default_factory=list)
+    legal_basis: List[Dict[str, Any]] = Field(default_factory=list)
+    controls_to_create: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_requirements: List[Dict[str, Any]] = Field(default_factory=list)
+    explanations: List[str] = Field(default_factory=list)
+    manual_review_required: bool = False
+
+
 # --- Phase 4: Obligation Workflows ---
 
 # FRIA

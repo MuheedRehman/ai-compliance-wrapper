@@ -212,6 +212,9 @@ export const api = {
   },
 
   // Obligations (Phase 4)
+  listObligationDimensions: () => fetchApi<any[]>('/v1/obligations/dimensions'),
+  explainIntakeObligations: (id: string) => fetchApi<any>(`/v1/obligations/explain/intake/${id}`),
+
   // FRIA
   listFrias: () => fetchApi<any[]>('/v1/obligations/fria'),
   getFria: (id: string) => fetchApi<any>(`/v1/obligations/fria/${id}`),

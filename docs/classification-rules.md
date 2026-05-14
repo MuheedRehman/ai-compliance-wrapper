@@ -11,7 +11,7 @@ The following fields are captured during the intake wizard:
 - `is_prohibited_use`: Boolean indicating practices forbidden under Article 5.
 - `is_high_risk_annex_iii`: Boolean indicating use cases listed in Annex III.
 - `is_safety_component`: Boolean indicating systems used as safety components in regulated products.
-- `has_transparency_obligation`: Boolean indicating systems like chatbots or deepfakes (Article 52).
+- `has_transparency_obligation`: Boolean indicating systems like chatbots, deepfakes, or synthetic-content disclosure scenarios (Article 50).
 - `is_gpai`: Boolean indicating General Purpose AI models.
 
 ## Actor Role Determination
@@ -31,8 +31,8 @@ The engine evaluates inputs in a specific order of precedence:
 - `CEASE_AND_DESIST`: Assigned to Prohibited systems.
 - `FULL_COMPLIANCE_ART_16`: Assigned to High-Risk systems where the actor is a **Provider**.
 - `OPERATIONAL_GOVERNANCE_ART_29`: Assigned to High-Risk systems where the actor is a **Deployer**.
-- `GPAI_COMPLIANCE_ART_51_52`: Assigned to GPAI models.
-- `TRANSPARENCY_ART_52`: Assigned to Limited Risk systems.
+- `GPAI_COMPLIANCE_ART_51_53`: Assigned to GPAI models.
+- `TRANSPARENCY_ART_50`: Assigned to Limited Risk systems.
 - `VOLUNTARY_CODE_OF_CONDUCT`: Assigned to Minimal Risk systems.
 
 ## Data Persistence

@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-14
+Last updated: 2026-05-15
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -14,18 +14,18 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Keep the EU AI Act best-practice blueprint as the acceptance standard for Module 4: Obligation Engine 2.0.
-2. Move into Module 5: Evidence Vault as the current product slice.
-2. Keep Module 3 AI System Lifecycle Workspace usable as the command center for each AI system.
-3. Keep Module 1 scanner output tightly connected to each AI system workspace.
-4. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
+1. Build Module 4: Obligation Engine 2.0 from the EU AI Act best-practice blueprint.
+2. Keep Module 5 Evidence Vault connected to obligation evidence requirements.
+3. Keep Module 3 AI System Lifecycle Workspace usable as the command center for each AI system.
+4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
+5. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
 
 Current technical baseline:
 
 - Backend FastAPI app exists.
 - Alembic migrations exist through `0009_evidence_vault_items.py`.
 - Dashboard Next.js app exists under `backend/apps/dashboard`.
-- Tests exist for scanner, tenant admin, classification, controls, reports, billing, runtime, migrations, and feature lifecycle.
+- Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
 - Latest deployed staging baseline: commit `35bf228` via Cloud Build `4adb932b-81fd-464c-9bad-0a07be29b04a` with status `SUCCESS`.
@@ -43,7 +43,7 @@ Current technical baseline:
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, and one-click compliance readiness report generation exist. | Harden crawl/extraction quality, improve gap detection, and polish report/audit pack output. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, Google login resolution, dashboard settings page exist. | Verify role mapping, lock down staging assumptions, add/confirm audit coverage for important user actions. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
-| 4. Obligation Engine 2.0 | Foundation only | Intake classification and obligation paths exist. Best-practice blueprint is captured in `docs/obligation-engine-2-blueprint.md`, and coverage gaps are tracked in `docs/compliance-coverage-matrix.md`. | Add structured compliance-dimension rules with article mapping, Annex III categories, actor roles, effective dates, scanner signals, evidence requirements, and explainable "because X, obligations Y apply" output. |
+| 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, `/v1/obligations/dimensions`, `/v1/obligations/explain/intake/{id}`, dashboard intake dimension display, and tests exist. | Add deeper Annex III subcategory mapping, scanner-to-dimension scoring, provider/deployer obligation branching, and more effective-date/deadline automation. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
@@ -67,6 +67,7 @@ Recovered from repo state:
 - Module 5 first evidence vault slice completed locally: `/v1/evidence/items` and `/v1/evidence/summary` manage signed vault items, the dashboard Evidence page now combines vault items with immutable logs, and AI system workspaces count/show vault items.
 - Evidence Vault dashboard form-control contrast fix deployed: global dark styling now covers inputs, selects, textareas, select options, and date picker icons.
 - EU AI Act best practices captured for Module 4: structured compliance dimensions, scanner-to-obligation mapping, modular explainable rules, API/security tests, and live E2E pipeline requirements.
+- Module 4 first obligation engine slice completed locally: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -77,7 +78,7 @@ Recovered from repo state:
 Use this as the next session checklist.
 
 - [x] Run backend test suite from `backend`.
-- [x] Confirm Alembic head is `0008_tenant_user_admin.py`.
+- [x] Confirm Alembic head is `0009_evidence_vault_items.py`.
 - [x] Validate Module 1 scanner happy path in API and dashboard.
 - [ ] Improve scanner extraction/gap output if results are shallow.
 - [x] Make "convert scan" create or update a useful AI system profile.
@@ -90,7 +91,8 @@ Use this as the next session checklist.
 - [x] Start Module 5 Evidence Vault first-class evidence item model and workflow.
 - [x] Deploy Module 5 Evidence Vault slice to GCP staging and update the deployed baseline.
 - [x] Capture EU AI Act best practices as Module 4 blueprint and coverage acceptance criteria.
-- [ ] Implement Module 4 structured obligation dimensions from the blueprint.
+- [x] Implement Module 4 structured obligation dimensions from the blueprint.
+- [ ] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

@@ -22,6 +22,7 @@ import {
 export default function IntakeDetailPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [intake, setIntake] = useState<any>(null);
+  const [obligationExplanation, setObligationExplanation] = useState<any>(null);
   const [systems, setSystems] = useState<any[]>([]);
   const [selectedSystemId, setSelectedSystemId] = useState('');
   const [createdControls, setCreatedControls] = useState<any[]>([]);
@@ -37,6 +38,9 @@ export default function IntakeDetailPage({ params }: { params: { id: string } })
       ]);
       setIntake(data);
       setSystems(systemData || []);
+      api.explainIntakeObligations(id)
+        .then(setObligationExplanation)
+        .catch(() => setObligationExplanation(null));
     } catch (err: any) {
       setError(err.body?.detail || 'Failed to load intake record');
     } finally {
@@ -154,6 +158,35 @@ export default function IntakeDetailPage({ params }: { params: { id: string } })
                 </div>
               </div>
             </Card>
+
+            {obligationExplanation && (
+              <Card title="Applicable EU AI Act Dimensions" subtitle="Structured obligation engine output for this intake.">
+                <div className="space-y-3">
+                  {(obligationExplanation.applicable_dimensions || []).map((dimension: any) => (
+                    <div key={dimension.dimension_id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold text-zinc-200">{dimension.pillar}</p>
+                          <p className="mt-1 text-[10px] font-mono text-indigo-300">{dimension.article}</p>
+                        </div>
+                        <StatusBadge value={dimension.status} />
+                      </div>
+                      <p className="mt-3 text-xs leading-relaxed text-zinc-400">{dimension.explanation}</p>
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Controls</p>
+                          <p className="mt-1 text-xs text-zinc-300">{(dimension.required_controls || []).map((control: any) => control.title).join(', ') || 'Manual review'}</p>
+                        </div>
+                        <div className="rounded border border-zinc-800 bg-zinc-900/40 p-3">
+                          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Evidence</p>
+                          <p className="mt-1 text-xs text-zinc-300">{(dimension.required_evidence || []).map((item: any) => item.type).join(', ') || dimension.evidence_domain}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
 
             <Card title="Obligation Control Plan" subtitle="Generate controls directly from this intake's obligation graph.">
               <div className="space-y-5">

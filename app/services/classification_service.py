@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from app.models import IntakeAssessment
 from app.schemas import IntakeCreate
 from app.services.compliance_control_service import ComplianceControlService
-from app.services.regulatory_knowledge import build_obligation_graph, legal_basis_for_classification
+from app.services.regulatory_knowledge import build_obligation_graph, explain_obligations, legal_basis_for_classification
 from typing import Any, Dict, List
 
 class ClassificationService:
@@ -50,22 +50,22 @@ class ClassificationService:
             else:
                 # Importer / Distributor
                 obligation_path = "IMPORTER_DISTRIBUTOR_REVIEW_REQUIRED"
-                rationale_parts.append("System is high-risk; importers and distributors must verify compliance and cooperate with authorities (Art 26, 27). Separate review required under this model.")
+                rationale_parts.append("System is high-risk; importers and distributors must verify value-chain compliance and supporting documentation. Separate review required under this model.")
         elif is_gpai:
             system_classification = "General Purpose AI (GPAI)"
             obligation_path = "GPAI_COMPLIANCE_ART_51_53"
             rationale_parts.append("System is a GPAI model; specific transparency and technical documentation required.")
         elif is_limited_risk:
             system_classification = "Limited Risk AI System"
-            obligation_path = "TRANSPARENCY_ART_52"
-            rationale_parts.append("System carries transparency risks (e.g. chatbots, deepfakes) requiring disclosure to users.")
+            obligation_path = "TRANSPARENCY_ART_50"
+            rationale_parts.append("System carries transparency risks (e.g. chatbots, deepfakes) requiring Article 50 disclosure to users.")
         else:
             system_classification = "Minimal Risk AI System"
             obligation_path = "VOLUNTARY_CODE_OF_CONDUCT"
             rationale_parts.append("System falls outside specific high/limited risk categories. Voluntary codes of conduct encouraged.")
             
         obligation_graph = build_obligation_graph(actor_role, system_classification, answers)
-        legal_basis = legal_basis_for_classification(system_classification, answers)
+        legal_basis = legal_basis_for_classification(system_classification, answers, actor_role)
 
         return {
             "actor_role": actor_role,
@@ -76,9 +76,11 @@ class ClassificationService:
             "evidence_requirements": [
                 {
                     "key": item["key"],
+                    "dimension_id": item.get("dimension_id", item["key"]),
                     "article": item["article"],
                     "evidence_domain": item["evidence_domain"],
                     "status": item["status"],
+                    "required_evidence": item.get("required_evidence", []),
                 }
                 for item in obligation_graph
             ],
@@ -123,6 +125,16 @@ class ClassificationService:
             raise HTTPException(status_code=404, detail="Intake assessment not found")
             
         return intake
+
+    @classmethod
+    def explain_intake(cls, db: Session, tenant_id: str, intake_id: str) -> dict:
+        intake = cls.get_intake(db, tenant_id, intake_id)
+        return explain_obligations(
+            intake.actor_role,
+            intake.system_classification,
+            intake.obligation_path,
+            intake.answers_json or {},
+        )
 
     @classmethod
     def materialize_control_plan(cls, db: Session, tenant_id: str, intake_id: str, ai_system_id: str | None = None):

@@ -2,15 +2,33 @@ from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
+    ComplianceDimensionResponse,
     FRIACreate, FRIAUpdate, FRIAResponse,
     OversightCreate, OversightUpdate, OversightResponse,
-    IncidentCreate, IncidentUpdate, IncidentResponse
+    IncidentCreate, IncidentUpdate, IncidentResponse,
+    ObligationExplanationResponse,
 )
 from app.services.auth_service import authenticate_api_key
+from app.services.classification_service import ClassificationService
 from app.services.obligation_service import ObligationService
+from app.services.regulatory_knowledge import list_compliance_dimensions
 from typing import List
 
 router = APIRouter(prefix="/v1/obligations", tags=["Obligation Workflows"])
+
+
+# --- Obligation Engine 2.0 ---
+@router.get("/dimensions", response_model=List[ComplianceDimensionResponse])
+def list_dimensions(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    return list_compliance_dimensions()
+
+
+@router.get("/explain/intake/{intake_id}", response_model=ObligationExplanationResponse)
+def explain_intake_obligations(intake_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    auth = authenticate_api_key(db, x_api_key, required_scope="intake:read")
+    return ClassificationService.explain_intake(db, auth["tenant_id"], intake_id)
+
 
 # --- FRIA ---
 @router.get("/fria", response_model=List[FRIAResponse])

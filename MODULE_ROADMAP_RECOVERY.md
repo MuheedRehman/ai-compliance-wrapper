@@ -92,7 +92,7 @@ Target output: "Because you answered X, obligations A/B/C apply."
 
 Best-practice implementation guide: `docs/obligation-engine-2-blueprint.md`.
 
-Status: early foundation exists through intake classification and obligation paths. The next implementation should follow the structured compliance-dimension pattern: pillar, article, Annex reference, actor role, trigger condition, scanner signals, required controls, required evidence, confidence, and effective date.
+Status: first slice implemented locally. Structured compliance dimensions now include pillar, article, Annex reference, actor role, trigger condition, scanner signals, required controls, required evidence, confidence policy, and effective dates. Intake records now produce enriched obligation graphs and an explanation endpoint.
 
 ### Module 5: Evidence Vault
 
