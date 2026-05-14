@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, useEffect, use } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { 
   ArrowLeft, 
@@ -17,8 +17,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 
-export default function ReportDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
+export default function ReportDetailPage({ params }: { params: { id: string } }) {
+  const { id } = params;
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +77,16 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const { report_json: data, source_refs_json: sources } = report;
+  const data = report.report_json || {};
+  const sources = Array.isArray(report.source_refs_json) ? report.source_refs_json : [];
+  const findings = Array.isArray(data.findings) ? data.findings : [];
+  const remediationActions = Array.isArray(data.remediation_actions) ? data.remediation_actions : [];
+  const evidenceReferences = Array.isArray(data.evidence_references) ? data.evidence_references : [];
+  const readinessSummary = data.readiness_summary || {};
+  const readinessStatus = readinessSummary.status || report.status || 'unknown';
+  const reportTypeLabel = String(report.report_type || 'report').replace(/_/g, ' ');
+  const executiveSummary = data.executive_summary || 'This report was generated, but no executive summary was recorded.';
+  const readinessRationale = readinessSummary.rationale || 'No generation rationale was recorded for this report.';
 
   return (
     <div className="max-w-[1000px] mx-auto space-y-8 pb-24">
@@ -109,7 +118,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
           <div>
             <div className="flex items-center gap-3 mb-4">
               <span className="bg-indigo-500/10 text-indigo-400 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-md border border-indigo-500/20">
-                {report.report_type.replace('_', ' ')}
+                {reportTypeLabel}
               </span>
               <span className="text-zinc-600 font-bold">•</span>
               <span className="text-zinc-500 text-[12px] font-medium uppercase tracking-wider">
@@ -118,19 +127,19 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
             </div>
             <h1 className="text-3xl font-bold text-white tracking-tight mb-4">{report.title}</h1>
             <p className="text-zinc-400 text-[15px] leading-relaxed max-w-2xl italic">
-              &ldquo;{data.executive_summary}&rdquo;
+              &ldquo;{executiveSummary}&rdquo;
             </p>
           </div>
 
           <div className={`shrink-0 p-6 rounded-2xl border flex flex-col items-center gap-2 min-w-[180px]
-            ${data.readiness_summary.status === 'ready' 
+            ${readinessStatus === 'ready'
               ? 'bg-emerald-500/5 border-emerald-500/20' 
               : 'bg-amber-500/5 border-amber-500/20'}`}>
-            <ShieldCheck className={`h-8 w-8 ${data.readiness_summary.status === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`} />
+            <ShieldCheck className={`h-8 w-8 ${readinessStatus === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`} />
             <div className="text-center">
               <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">Status</div>
-              <div className={`text-lg font-bold uppercase tracking-tight ${data.readiness_summary.status === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {data.readiness_summary.status.replace('_', ' ')}
+              <div className={`text-lg font-bold uppercase tracking-tight ${readinessStatus === 'ready' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {readinessStatus.replace(/_/g, ' ')}
               </div>
             </div>
           </div>
@@ -145,12 +154,12 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center gap-2 mb-2">
               <h2 className="text-lg font-bold text-white tracking-tight">Key Findings</h2>
               <div className="px-2 py-0.5 bg-zinc-800 rounded text-[10px] font-bold text-zinc-400">
-                {data.findings.length}
+                {findings.length}
               </div>
             </div>
             
             <div className="space-y-4">
-              {data.findings.map((f: any, i: number) => (
+              {findings.map((f: any, i: number) => (
                 <div key={i} className="bg-zinc-900/20 border border-zinc-800/60 rounded-xl p-5">
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="font-bold text-white text-[15px]">{f.title}</h3>
@@ -164,7 +173,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                   <p className="text-zinc-400 text-sm leading-relaxed">{f.description}</p>
                 </div>
               ))}
-              {data.findings.length === 0 && (
+              {findings.length === 0 && (
                 <div className="p-8 text-center bg-zinc-900/10 border border-dashed border-zinc-800 rounded-xl text-zinc-500 text-sm italic">
                   No issues identified in current scope.
                 </div>
@@ -176,7 +185,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
           <section className="space-y-4">
             <h2 className="text-lg font-bold text-white tracking-tight">Required Actions</h2>
             <div className="space-y-3">
-              {data.remediation_actions.map((a: any, i: number) => (
+              {remediationActions.map((a: any, i: number) => (
                 <div key={i} className="flex gap-4 p-4 bg-zinc-900/40 border border-zinc-800/40 rounded-xl items-start">
                   <div className="mt-1 h-2 w-2 rounded-full bg-indigo-500 shrink-0 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
                   <div>
@@ -185,7 +194,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
                   </div>
                 </div>
               ))}
-              {data.remediation_actions.length === 0 && (
+              {remediationActions.length === 0 && (
                 <div className="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/10 rounded-xl">
                   <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
                   <p className="text-emerald-400/70 text-sm font-medium">Compliance posture is currently stable.</p>
@@ -224,13 +233,13 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
               <History className="h-3.5 w-3.5" /> Evidence Trail
             </h3>
             <div className="space-y-2">
-              {data.evidence_references.slice(0, 5).map((e: any, i: number) => (
+              {evidenceReferences.slice(0, 5).map((e: any, i: number) => (
                 <div key={i} className="text-[11px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors cursor-default truncate">
                   <span className="text-zinc-700 mr-2">{i+1}.</span> {e.id}
                 </div>
               ))}
               <div className="pt-4 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-zinc-600">{data.evidence_references.length} Total Logs</span>
+                <span className="text-[11px] font-bold text-zinc-600">{evidenceReferences.length} Total Logs</span>
                 <Link href="/evidence" className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 flex items-center gap-1">
                   View Full <ExternalLink className="h-2.5 w-2.5" />
                 </Link>
@@ -245,7 +254,7 @@ export default function ReportDetailPage({ params }: { params: Promise<{ id: str
               <h3 className="text-sm font-bold text-white">Generation Rationale</h3>
             </div>
             <p className="text-[13px] text-zinc-400 leading-relaxed italic">
-              {data.readiness_summary.rationale}
+              {readinessRationale}
             </p>
           </section>
         </div>

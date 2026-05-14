@@ -46,6 +46,11 @@ export default function ReportsPage() {
     }
   };
 
+  const getReadinessLabel = (report: any) => {
+    const status = report.report_json?.readiness_summary?.status;
+    return status ? status.replace(/_/g, ' ').toUpperCase() : 'NOT SCORED';
+  };
+
   return (
     <div className="max-w-[1200px] mx-auto space-y-8 pb-12">
       {/* Header */}
@@ -150,7 +155,7 @@ export default function ReportsPage() {
                 <div className="pt-4 border-t border-zinc-800/40 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-[12px] font-medium text-zinc-400">
                     <ShieldCheck className="h-3.5 w-3.5 text-indigo-500/70" />
-                    {report.report_json?.readiness_summary?.status.replace('_', ' ').toUpperCase()}
+                    {getReadinessLabel(report)}
                   </div>
                   <ChevronRight className="h-4 w-4 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
                 </div>
