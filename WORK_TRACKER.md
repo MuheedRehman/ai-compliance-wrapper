@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `35bf228` via Cloud Build `4adb932b-81fd-464c-9bad-0a07be29b04a` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `c1d588c` via Cloud Build `3572a668-5d22-45be-aa80-101b99b4cc2c` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00025-ttb`
-  - Backend: `ai-compliance-backend-00047-pmn`
+  - Dashboard: `ai-compliance-dashboard-00026-249`
+  - Backend: `ai-compliance-backend-00049-5gr`
 
 ## Module Status Board
 
@@ -67,7 +67,7 @@ Recovered from repo state:
 - Module 5 first evidence vault slice completed locally: `/v1/evidence/items` and `/v1/evidence/summary` manage signed vault items, the dashboard Evidence page now combines vault items with immutable logs, and AI system workspaces count/show vault items.
 - Evidence Vault dashboard form-control contrast fix deployed: global dark styling now covers inputs, selects, textareas, select options, and date picker icons.
 - EU AI Act best practices captured for Module 4: structured compliance dimensions, scanner-to-obligation mapping, modular explainable rules, API/security tests, and live E2E pipeline requirements.
-- Module 4 first obligation engine slice completed locally: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
+- Module 4 first obligation engine slice completed and deployed: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -92,7 +92,7 @@ Use this as the next session checklist.
 - [x] Deploy Module 5 Evidence Vault slice to GCP staging and update the deployed baseline.
 - [x] Capture EU AI Act best practices as Module 4 blueprint and coverage acceptance criteria.
 - [x] Implement Module 4 structured obligation dimensions from the blueprint.
-- [ ] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
+- [x] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
