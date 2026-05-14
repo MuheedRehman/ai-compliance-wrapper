@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import StatusBadge from '@/components/status-badge';
@@ -11,6 +12,8 @@ import Card from '@/components/card';
 import { FileSearch, Clock, ShieldCheck, AlertOctagon } from 'lucide-react';
 
 export default function EvidencePage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,11 +26,12 @@ export default function EvidencePage() {
     const params: Record<string, string> = {};
     if (riskFilter) params.risk_level = riskFilter;
     if (decisionFilter) params.decision = decisionFilter;
+    if (systemFilter) params.ai_system_id = systemFilter;
     api.listLogs(Object.keys(params).length ? params : undefined)
       .then((data) => setLogs(data.logs || []))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [riskFilter, decisionFilter]);
+  }, [riskFilter, decisionFilter, systemFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -60,6 +64,16 @@ export default function EvidencePage() {
         {/* Filters Card */}
         <Card className="bg-zinc-950 px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center gap-6">
+            {systemFilter && (
+              <div className="space-y-2 flex-1">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                  AI System
+                </label>
+                <div className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded px-3 py-2">
+                  {systemFilter}
+                </div>
+              </div>
+            )}
             <div className="space-y-2 flex-1">
               <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
                 <AlertOctagon className="h-3 w-3" />

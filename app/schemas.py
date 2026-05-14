@@ -335,6 +335,8 @@ class WebsiteScanConvertResponse(BaseModel):
     scan: WebsiteScanResponse
     ai_system: AiSystemResponse
     intake: IntakeResponse
+    controls: List[ComplianceControlResponse] = Field(default_factory=list)
+    evidence_event_id: Optional[str] = None
 
 
 # --- Tenant / User Administration ---

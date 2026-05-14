@@ -12,10 +12,12 @@ import httpx
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import AiSystem, WebsiteScan
+from app.models import AiSystem, ComplianceControl, EvidenceLog, WebsiteScan
 from app.schemas import AiSystemCreate, IntakeCreate, WebsiteScanCreate
 from app.services import ai_system_service
 from app.services.classification_service import ClassificationService
+from app.services.compliance_control_service import ComplianceControlService
+from app.services.evidence_service import write_evidence_log
 
 
 class WebsiteScannerError(Exception):
@@ -225,38 +227,118 @@ class WebsiteScannerService:
         return scan
 
     @classmethod
-    def convert_scan(cls, db: Session, tenant_id: str, scan_id: str) -> tuple[WebsiteScan, AiSystem, Any]:
+    def convert_scan(
+        cls,
+        db: Session,
+        tenant_id: str,
+        scan_id: str,
+    ) -> tuple[WebsiteScan, AiSystem, Any, list[ComplianceControl], str | None]:
         scan = cls.get_scan(db, tenant_id, scan_id)
         if scan.status != "completed":
             raise HTTPException(status_code=400, detail="Only completed scans can be converted")
+
         if scan.ai_system_id and scan.intake_id:
             system = ai_system_service.get_ai_system(db, tenant_id, scan.ai_system_id)
             intake = ClassificationService.get_intake(db, tenant_id, scan.intake_id)
-            return scan, system, intake
+        else:
+            classification = scan.classification_json or {}
+            answers = classification.get("intake_answers") or {}
+            system = ai_system_service.create_ai_system(
+                db,
+                tenant_id,
+                AiSystemCreate(
+                    name=scan.title or urlparse(scan.normalized_url).hostname or scan.normalized_url,
+                    description=f"Created from website scan of {scan.normalized_url}. {scan.summary or ''}".strip(),
+                ),
+            )
+            intake = ClassificationService.create_intake(
+                db,
+                tenant_id,
+                IntakeCreate(
+                    title=f"{system.name} website compliance scan",
+                    answers=answers,
+                ),
+            )
+            scan.ai_system_id = system.id
+            scan.intake_id = intake.id
+            db.commit()
+            db.refresh(scan)
+
+        controls = ComplianceControlService.seed_from_obligation_graph(
+            db,
+            tenant_id,
+            intake.obligation_graph_json or [],
+            intake_id=intake.id,
+            obligation_path=intake.obligation_path,
+            ai_system_id=system.id,
+        )
+        evidence_event_id = cls.ensure_conversion_evidence(db, tenant_id, scan, system, intake, controls)
+        db.refresh(scan)
+        return scan, system, intake, controls, evidence_event_id
+
+    @staticmethod
+    def ensure_conversion_evidence(
+        db: Session,
+        tenant_id: str,
+        scan: WebsiteScan,
+        system: AiSystem,
+        intake: Any,
+        controls: list[ComplianceControl],
+    ) -> str | None:
+        request_id = f"website-scan:{scan.id}"
+        trace_id = f"scan-convert:{scan.id}"
+        existing = db.query(EvidenceLog).filter(
+            EvidenceLog.tenant_id == tenant_id,
+            EvidenceLog.ai_system_id == system.id,
+            EvidenceLog.event_type == "website_scan_converted",
+            EvidenceLog.request_id == request_id,
+        ).first()
+        if existing:
+            return existing.event_id
 
         classification = scan.classification_json or {}
-        answers = classification.get("intake_answers") or {}
-        system = ai_system_service.create_ai_system(
+        signals = scan.detected_signals_json or []
+        evidence = write_evidence_log(
             db,
-            tenant_id,
-            AiSystemCreate(
-                name=scan.title or urlparse(scan.normalized_url).hostname or scan.normalized_url,
-                description=f"Created from website scan of {scan.normalized_url}. {scan.summary or ''}".strip(),
-            ),
+            {
+                "tenant_id": tenant_id,
+                "ai_system_id": system.id,
+                "evidence_domain": "website_scan",
+                "request_id": request_id,
+                "trace_id": trace_id,
+                "event_type": "website_scan_converted",
+                "decision": "allow",
+                "status": "completed",
+                "risk_level": classification.get("risk_level") or "unknown",
+                "risk_score": int(scan.confidence_score or 0),
+                "triggered_rule_results": [
+                    {
+                        "category": signal.get("category"),
+                        "label": signal.get("label"),
+                        "source_url": signal.get("source_url"),
+                    }
+                    for signal in signals[:20]
+                ],
+                "policy_context": {
+                    "system_classification": intake.system_classification,
+                    "obligation_path": intake.obligation_path,
+                    "scanner_classification": classification.get("classification"),
+                },
+                "metadata": {
+                    "scan_id": scan.id,
+                    "normalized_url": scan.normalized_url,
+                    "intake_id": intake.id,
+                    "control_ids": [control.id for control in controls],
+                    "classification": classification,
+                    "gap_findings": scan.gap_findings_json or [],
+                    "evidence_refs": scan.evidence_refs_json or [],
+                    "source_pages": scan.source_pages_json or [],
+                },
+            },
         )
-        intake = ClassificationService.create_intake(
-            db,
-            tenant_id,
-            IntakeCreate(
-                title=f"{system.name} website compliance scan",
-                answers=answers,
-            ),
-        )
-        scan.ai_system_id = system.id
-        scan.intake_id = intake.id
         db.commit()
-        db.refresh(scan)
-        return scan, system, intake
+        db.refresh(evidence)
+        return evidence.event_id
 
     async def scan(self, raw_url: str, max_pages: int) -> dict[str, Any]:
         normalized_url = self.normalize_url(raw_url)

@@ -47,9 +47,11 @@ def convert_website_scan(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="scanner:write")
-    scan, system, intake = WebsiteScannerService.convert_scan(db, auth["tenant_id"], scan_id)
+    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(db, auth["tenant_id"], scan_id)
     return {
         "scan": scan,
         "ai_system": system,
         "intake": intake,
+        "controls": controls,
+        "evidence_event_id": evidence_event_id,
     }

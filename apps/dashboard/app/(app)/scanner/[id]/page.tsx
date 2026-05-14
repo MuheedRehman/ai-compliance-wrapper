@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FileText, Layers, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CheckCircle2, ExternalLink, FileSearch, FileText, Layers, ListChecks, ShieldCheck } from 'lucide-react';
 import { api } from '@/lib/api';
 import Card from '@/components/card';
 import ErrorState from '@/components/error-state';
@@ -12,6 +12,7 @@ import StatusBadge from '@/components/status-badge';
 
 export default function ScannerDetailPage({ params }: { params: { id: string } }) {
   const [scan, setScan] = useState<any>(null);
+  const [conversionResult, setConversionResult] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
     try {
       const result = await api.convertWebsiteScan(params.id);
       setScan(result.scan);
+      setConversionResult(result);
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to convert scan');
     } finally {
@@ -63,7 +65,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
           >
             <Layers className="h-4 w-4" />
-            {scan.ai_system_id ? 'CONVERTED' : converting ? 'CONVERTING...' : 'CREATE SYSTEM + INTAKE'}
+            {scan.ai_system_id ? 'WORKSPACE READY' : converting ? 'CONVERTING...' : 'CREATE WORKSPACE'}
           </button>
         </div>
       }
@@ -104,10 +106,48 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                 <Link href={`/intake/${scan.intake_id}`} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
                   Open Intake
                 </Link>
+                <Link href={`/controls?ai_system_id=${scan.ai_system_id}`} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
+                  Open Controls
+                </Link>
+                <Link href={`/evidence?ai_system_id=${scan.ai_system_id}`} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
+                  Open Evidence
+                </Link>
               </div>
             )}
           </div>
         </Card>
+
+        {scan.ai_system_id && (
+          <Card title="Compliance Workspace Starter Pack">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <Link href={`/systems/${scan.ai_system_id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-indigo-500/40">
+                <div className="flex items-center gap-2 mb-2">
+                  <Layers className="h-4 w-4 text-indigo-400" />
+                  <span className="text-xs font-bold text-zinc-200">AI System</span>
+                </div>
+                <p className="text-[11px] font-mono text-zinc-500">{scan.ai_system_id}</p>
+              </Link>
+              <Link href={`/controls?ai_system_id=${scan.ai_system_id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-indigo-500/40">
+                <div className="flex items-center gap-2 mb-2">
+                  <ListChecks className="h-4 w-4 text-emerald-400" />
+                  <span className="text-xs font-bold text-zinc-200">Control Plan</span>
+                </div>
+                <p className="text-[11px] text-zinc-500">
+                  {conversionResult?.controls?.length ? `${conversionResult.controls.length} controls materialized` : 'System-specific controls ready'}
+                </p>
+              </Link>
+              <Link href={`/evidence?ai_system_id=${scan.ai_system_id}`} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3 hover:border-indigo-500/40">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileSearch className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs font-bold text-zinc-200">Evidence Log</span>
+                </div>
+                <p className="text-[11px] font-mono text-zinc-500">
+                  {conversionResult?.evidence_event_id ? conversionResult.evidence_event_id.slice(0, 12) : 'Scan conversion captured'}
+                </p>
+              </Link>
+            </div>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           <Card title="Detected Signals">
