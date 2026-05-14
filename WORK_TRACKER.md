@@ -14,9 +14,10 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Build Module 3: AI System Lifecycle Workspace.
-2. Keep Module 1 scanner output tightly connected to each AI system workspace.
-3. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
+1. Move into Module 5: Evidence Vault as the next product slice.
+2. Keep Module 3 AI System Lifecycle Workspace usable as the command center for each AI system.
+3. Keep Module 1 scanner output tightly connected to each AI system workspace.
+4. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
 
 Current technical baseline:
 
@@ -25,6 +26,14 @@ Current technical baseline:
 - Dashboard Next.js app exists under `backend/apps/dashboard`.
 - Tests exist for scanner, tenant admin, classification, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
+- GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
+- Latest deployed staging baseline: commit `0f54cd2` via Cloud Build `c1bd8fba-15fc-4c98-9f7b-8b18680a7f12` with status `SUCCESS`.
+- Live staging URLs:
+  - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
+  - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
+- Latest verified Cloud Run revisions:
+  - Dashboard: `ai-compliance-dashboard-00023-kbq`
+  - Backend: `ai-compliance-backend-00043-jtr`
 
 ## Module Status Board
 
@@ -53,6 +62,7 @@ Recovered from repo state:
 - Module 1 workspace starter slice completed: converting a scan now creates/links an AI system, intake, obligation-derived controls, and a signed evidence log; scanner detail links to system controls and evidence.
 - Module 1 one-click report slice completed: scanner reports now convert the scan if needed, preserve scan/intake/evidence source references, and generate a compliance readiness report from the scanner detail page.
 - Module 3 first workspace slice completed: `/v1/ai-systems/{id}/workspace` aggregates lifecycle records, and the AI system detail dashboard now presents readiness, classification, controls, evidence, scans, reports, governance records, and features in one workspace.
+- Deployment pipeline restored after UI/test wording drift: live scanner E2E now verifies the current `CREATE WORKSPACE` flow, GitHub is pushed, and GCP Cloud Build deploys backend/dashboard with live E2E passing.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -71,7 +81,9 @@ Use this as the next session checklist.
 - [x] Decide whether to finish Module 1 before further Module 2 hardening. Decision: move into Module 3 while preserving Module 1 links.
 - [x] Commit roadmap/tracker/cleanup docs inside the canonical `backend` repo.
 - [x] Clean up or archive the misleading outer duplicate shell after approval.
-- [ ] Commit a baseline so repo history starts preserving work.
+- [x] Commit and push the recovery/module baseline to GitHub.
+- [x] Deploy latest pushed baseline to GCP staging and verify live dashboard response.
+- [ ] Start Module 5 Evidence Vault first-class evidence item model and workflow.
 
 ## Tracking Rules Going Forward
 
