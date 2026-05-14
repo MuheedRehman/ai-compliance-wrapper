@@ -339,6 +339,10 @@ class WebsiteScanConvertResponse(BaseModel):
     evidence_event_id: Optional[str] = None
 
 
+class WebsiteScanReportResponse(WebsiteScanConvertResponse):
+    report: ReportResponse
+
+
 # --- Tenant / User Administration ---
 
 TenantRole = Literal["owner", "admin", "reviewer", "auditor", "viewer"]

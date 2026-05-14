@@ -68,7 +68,7 @@ class ReportService:
         
         # Assemble findings and readiness
         findings = []
-        source_refs = []
+        source_refs = list(payload.source_refs or [])
         remediation_actions = []
         evidence_refs = []
         readiness = "needs_attention"

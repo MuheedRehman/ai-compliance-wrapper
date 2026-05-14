@@ -266,6 +266,10 @@ export const api = {
     fetchApi<any>(`/v1/website-scans/${id}/convert`, {
       method: 'POST',
     }),
+  generateWebsiteScanReport: (id: string) =>
+    fetchApi<any>(`/v1/website-scans/${id}/report`, {
+      method: 'POST',
+    }),
 
   // Tenant / User Administration
   getCurrentSession: () => fetch('/api/auth/me', { cache: 'no-store' }).then((res) => {

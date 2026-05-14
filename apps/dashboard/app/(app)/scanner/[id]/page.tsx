@@ -13,8 +13,10 @@ import StatusBadge from '@/components/status-badge';
 export default function ScannerDetailPage({ params }: { params: { id: string } }) {
   const [scan, setScan] = useState<any>(null);
   const [conversionResult, setConversionResult] = useState<any>(null);
+  const [generatedReport, setGeneratedReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
@@ -42,6 +44,21 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
     }
   }
 
+  async function generateReport() {
+    setGeneratingReport(true);
+    setError(null);
+    try {
+      const result = await api.generateWebsiteScanReport(params.id);
+      setScan(result.scan);
+      setConversionResult(result);
+      setGeneratedReport(result.report);
+    } catch (err: any) {
+      setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to generate report');
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
   if (loading) return <PageShell title="Website Scan" subtitle="Loading scanner result."><Loading /></PageShell>;
   if (error || !scan) return <PageShell title="Website Scan" subtitle="Scanner result unavailable."><ErrorState message={error || 'Scan not found'} onRetry={load} /></PageShell>;
 
@@ -66,6 +83,14 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
           >
             <Layers className="h-4 w-4" />
             {scan.ai_system_id ? 'WORKSPACE READY' : converting ? 'CONVERTING...' : 'CREATE WORKSPACE'}
+          </button>
+          <button
+            disabled={generatingReport || scan.status !== 'completed'}
+            onClick={generateReport}
+            className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            <FileText className="h-4 w-4" />
+            {generatingReport ? 'GENERATING...' : 'GENERATE REPORT'}
           </button>
         </div>
       }
@@ -112,6 +137,11 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                 <Link href={`/evidence?ai_system_id=${scan.ai_system_id}`} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
                   Open Evidence
                 </Link>
+                {generatedReport && (
+                  <Link href={`/reports/${generatedReport.id}`} className="text-xs font-bold text-emerald-400 hover:text-emerald-300">
+                    Open Report
+                  </Link>
+                )}
               </div>
             )}
           </div>
@@ -145,6 +175,15 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                   {conversionResult?.evidence_event_id ? conversionResult.evidence_event_id.slice(0, 12) : 'Scan conversion captured'}
                 </p>
               </Link>
+              {generatedReport && (
+                <Link href={`/reports/${generatedReport.id}`} className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 hover:border-emerald-500/40">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-emerald-400" />
+                    <span className="text-xs font-bold text-zinc-200">Compliance Report</span>
+                  </div>
+                  <p className="text-[11px] font-mono text-emerald-300">{generatedReport.id}</p>
+                </Link>
+              )}
             </div>
           </Card>
         )}

@@ -1,7 +1,8 @@
 import pytest
 
-from app.models import ComplianceControl, EvidenceLog
+from app.models import ComplianceControl, Entitlement, EvidenceLog, ReportRecord
 from app.services.website_scanner_service import PageArtifact, WebsiteScannerService
+from tests.conftest import TENANT_ID
 
 
 @pytest.mark.asyncio
@@ -133,3 +134,92 @@ async def test_convert_website_scan_materializes_controls_and_evidence_once(
 def test_website_scan_requires_admin_scope(client, app_headers):
     response = client.get("/v1/website-scans", headers=app_headers)
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_generate_website_scan_report_converts_scan_and_links_sources(
+    client,
+    admin_headers,
+    db_session,
+    monkeypatch,
+):
+    db_session.add(Entitlement(
+        id="ent-report-generation",
+        tenant_id=TENANT_ID,
+        feature_key="report_generation",
+        is_enabled=True,
+    ))
+    db_session.commit()
+
+    async def fake_collect_pages(self, normalized_url, max_pages):
+        return [
+            PageArtifact(
+                url=normalized_url,
+                status_code=200,
+                title="Assistly AI",
+                text=(
+                    "Assistly AI is an artificial intelligence chatbot and virtual assistant. "
+                    "It discloses responsible AI practices, human oversight, audit logs, privacy policy, and GDPR."
+                ),
+                links=[],
+            )
+        ]
+
+    monkeypatch.setattr(WebsiteScannerService, "validate_public_url", lambda self, url: None)
+    monkeypatch.setattr(WebsiteScannerService, "collect_pages", fake_collect_pages)
+
+    scan = client.post(
+        "/v1/website-scans",
+        headers=admin_headers,
+        json={"url": "assistly.example"},
+    ).json()
+
+    response = client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["scan"]["ai_system_id"] == body["ai_system"]["id"]
+    assert body["scan"]["intake_id"] == body["intake"]["id"]
+    assert body["controls"]
+    assert body["evidence_event_id"]
+    assert body["report"]["report_type"] == "compliance_readiness_summary"
+    assert body["report"]["ai_system_id"] == body["ai_system"]["id"]
+    assert any(ref["type"] == "website_scan" and ref["id"] == scan["id"] for ref in body["report"]["source_refs_json"])
+    assert any(ref["type"] == "intake" and ref["id"] == body["intake"]["id"] for ref in body["report"]["source_refs_json"])
+    assert any(ref["type"] == "evidence_log" and ref["id"] == body["evidence_event_id"] for ref in body["report"]["source_refs_json"])
+
+    report = db_session.query(ReportRecord).filter(ReportRecord.id == body["report"]["id"]).first()
+    assert report is not None
+    assert report.ai_system_id == body["ai_system"]["id"]
+
+
+@pytest.mark.asyncio
+async def test_generate_website_scan_report_requires_report_entitlement(
+    client,
+    admin_headers,
+    monkeypatch,
+):
+    async def fake_collect_pages(self, normalized_url, max_pages):
+        return [
+            PageArtifact(
+                url=normalized_url,
+                status_code=200,
+                title="NoEntitlement AI",
+                text="NoEntitlement AI is an artificial intelligence chatbot with a privacy policy.",
+                links=[],
+            )
+        ]
+
+    monkeypatch.setattr(WebsiteScannerService, "validate_public_url", lambda self, url: None)
+    monkeypatch.setattr(WebsiteScannerService, "collect_pages", fake_collect_pages)
+
+    scan = client.post(
+        "/v1/website-scans",
+        headers=admin_headers,
+        json={"url": "no-entitlement.example"},
+    ).json()
+
+    response = client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
+
+    assert response.status_code == 403
+    assert "not entitled" in response.json()["error"]["message"].lower()

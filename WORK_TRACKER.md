@@ -30,7 +30,7 @@ Current technical baseline:
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
-| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, and signed conversion evidence exist. | Harden crawl/extraction quality, improve gap detection, and add one-click report generation from scan/workspace. |
+| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, and one-click compliance readiness report generation exist. | Harden crawl/extraction quality, improve gap detection, and polish report/audit pack output. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, Google login resolution, dashboard settings page exist. | Verify role mapping, lock down staging assumptions, add/confirm audit coverage for important user actions. |
 | 3. AI System Lifecycle Workspace | Partially started | AI system registry and separate pages for features, controls, evidence, incidents, FRIA, reports exist. | Build unified AI system detail workspace with tabs/sections for lifecycle records. |
 | 4. Obligation Engine 2.0 | Foundation only | Intake classification and obligation paths exist. | Add article mapping, Annex III categories, effective dates, and explainable "because X, obligations Y apply" output. |
@@ -51,6 +51,7 @@ Recovered from repo state:
 - Phase 0A: Cloud Foundation completed.
 - Module 1 started: website scanner backend, migration, tests, dashboard pages.
 - Module 1 workspace starter slice completed: converting a scan now creates/links an AI system, intake, obligation-derived controls, and a signed evidence log; scanner detail links to system controls and evidence.
+- Module 1 one-click report slice completed: scanner reports now convert the scan if needed, preserve scan/intake/evidence source references, and generate a compliance readiness report from the scanner detail page.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -65,7 +66,7 @@ Use this as the next session checklist.
 - [x] Validate Module 1 scanner happy path in API and dashboard.
 - [ ] Improve scanner extraction/gap output if results are shallow.
 - [x] Make "convert scan" create or update a useful AI system profile.
-- [ ] Connect scanner result to controls/evidence/report generation. Controls and evidence are connected; report generation remains.
+- [x] Connect scanner result to controls/evidence/report generation.
 - [ ] Decide whether to finish Module 1 before further Module 2 hardening.
 - [x] Commit roadmap/tracker/cleanup docs inside the canonical `backend` repo.
 - [x] Clean up or archive the misleading outer duplicate shell after approval.
