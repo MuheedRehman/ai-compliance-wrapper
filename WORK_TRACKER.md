@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `69fe464` via Cloud Build `af91ad0e-0e9c-4f65-9eca-c80ce793d3f8` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `a407c9e` via Cloud Build `249416d6-7b38-4110-8348-a9a249c40d1a` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00029-9sk`
-  - Backend: `ai-compliance-backend-00055-frm`
+  - Dashboard: `ai-compliance-dashboard-00030-x27`
+  - Backend: `ai-compliance-backend-00057-v22`
 
 ## Module Status Board
 
@@ -71,7 +71,7 @@ Recovered from repo state:
 - Module 4 scanner-to-obligation slice completed and deployed: website scan results now include applicable EU AI Act dimensions, legal basis, evidence requirements, mapping confidence, dimension-linked gap/action output, and scanner detail dashboard display.
 - Report detail hotfix deployed: scanner-generated reports now open without a client-side route-param crash, and report pages tolerate missing or older report JSON fields gracefully.
 - Module 4 Annex III subcategory slice completed and deployed: official high-risk category catalog, `/v1/obligations/annex-iii`, text matcher, scanner `annex_iii_matches`, intake graph propagation, scanner dashboard display, and tests now exist.
-- Module 4 penalty exposure slice completed locally: Article 99/101 fine bands now appear in obligation dimensions, scanner gaps/actions, controls, report JSON/Markdown, scanner/report dashboard pages, and `/v1/obligations/penalties`.
+- Module 4 penalty exposure slice completed and deployed: Article 99/101 fine bands now appear in obligation dimensions, scanner gaps/actions, controls, report JSON/Markdown, scanner/report dashboard pages, and `/v1/obligations/penalties`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -97,12 +97,12 @@ Use this as the next session checklist.
 - [x] Capture EU AI Act best practices as Module 4 blueprint and coverage acceptance criteria.
 - [x] Implement Module 4 structured obligation dimensions from the blueprint.
 - [x] Deploy Module 4 first obligation engine slice to GCP staging and update the deployed baseline.
-- [x] Implement scanner-to-obligation dimension mapping and dashboard display.
+  - [x] Implement scanner-to-obligation dimension mapping and dashboard display.
 - [x] Deploy scanner-to-obligation dimension mapping to GCP staging and update the deployed baseline.
 - [x] Implement Annex III subcategory catalog, matcher, scanner output, and dashboard display.
 - [x] Deploy Annex III subcategory mapping to GCP staging and update the deployed baseline.
 - [x] Implement penalty exposure mapping for missing EU AI Act obligations.
-- [ ] Deploy penalty exposure mapping to GCP staging and update the deployed baseline.
+- [x] Deploy penalty exposure mapping to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
