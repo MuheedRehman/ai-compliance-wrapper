@@ -60,6 +60,32 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
     assert dimensions["provider_high_risk_requirements"]["penalty_exposure"]["enforcement_article"] == "Article 99(4)"
     assert dimensions["transparency_notice"]["article"] == "Article 50"
     assert dimensions["transparency_notice"]["matched_public_signals"]
+    scenarios = {
+        scenario["actor_role"]: scenario
+        for scenario in body["classification_json"]["role_scenarios"]
+    }
+    assert set(scenarios) == {"Provider", "Deployer", "Importer/Distributor"}
+    assert scenarios["Provider"]["is_default"] is True
+    assert scenarios["Provider"]["obligation_path"] == "FULL_COMPLIANCE_ART_16"
+    assert any(
+        dimension["dimension_id"] == "provider_high_risk_requirements"
+        for dimension in scenarios["Provider"]["obligation_dimensions"]
+    )
+    assert scenarios["Deployer"]["obligation_path"] == "OPERATIONAL_GOVERNANCE_ART_26"
+    assert any(
+        dimension["dimension_id"] == "deployer_high_risk_operations"
+        for dimension in scenarios["Deployer"]["obligation_dimensions"]
+    )
+    assert any(
+        dimension["dimension_id"] == "fria_screening"
+        for dimension in scenarios["Deployer"]["obligation_dimensions"]
+    )
+    assert scenarios["Importer/Distributor"]["obligation_path"] == "IMPORTER_DISTRIBUTOR_REVIEW_REQUIRED"
+    assert any(
+        dimension["dimension_id"] == "importer_distributor_verification"
+        for dimension in scenarios["Importer/Distributor"]["obligation_dimensions"]
+    )
+    assert scenarios["Deployer"]["primary_penalty_exposure"]["enforcement_article"] == "Article 99(4)"
     assert body["confidence_score"] > 50
     assert any(signal["category"] == "high_risk_domain" for signal in body["detected_signals_json"])
     high_risk_gap = next(gap for gap in body["gap_findings_json"] if gap.get("dimension_id") == "high_risk_classification")

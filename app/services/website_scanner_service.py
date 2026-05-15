@@ -190,6 +190,30 @@ class WebsiteScannerService:
         "privacy_security": ["provider_high_risk_requirements"],
     }
 
+    ROLE_SCENARIOS = [
+        {
+            "actor_role": "Provider",
+            "label": "Provider / builder",
+            "description": "Use this scenario when the organisation develops or places the AI system on the market.",
+            "is_developer": True,
+            "is_deployer": False,
+        },
+        {
+            "actor_role": "Deployer",
+            "label": "Deployer / user",
+            "description": "Use this scenario when the organisation uses a third-party AI system in its own operations.",
+            "is_developer": False,
+            "is_deployer": True,
+        },
+        {
+            "actor_role": "Importer/Distributor",
+            "label": "Importer or distributor",
+            "description": "Use this scenario when the organisation makes a third-party AI system available in the EU value chain.",
+            "is_developer": False,
+            "is_deployer": False,
+        },
+    ]
+
     @classmethod
     async def create_scan(cls, db: Session, tenant_id: str, payload: WebsiteScanCreate) -> WebsiteScan:
         try:
@@ -524,6 +548,7 @@ class WebsiteScannerService:
 
         canonical = ClassificationService._run_classification_logic(answers)
         obligation_dimensions = self.map_obligation_dimensions(signals, canonical["obligation_graph"])
+        role_scenarios = self.build_role_scenarios(answers, signals, canonical["actor_role"])
 
         return {
             "classification": classification,
@@ -540,9 +565,91 @@ class WebsiteScannerService:
             "annex_iii_matches": annex_iii_matches,
             "evidence_requirements": canonical["evidence_requirements"],
             "obligation_dimensions": obligation_dimensions,
+            "role_scenarios": role_scenarios,
             "manual_review_required": self.requires_manual_review(risk_level, obligation_dimensions),
             "scanner_to_obligation_confidence": self.score_obligation_mapping_confidence(obligation_dimensions, signals),
         }
+
+    def build_role_scenarios(
+        self,
+        base_answers: dict[str, Any],
+        signals: list[dict[str, Any]],
+        default_actor_role: str,
+    ) -> list[dict[str, Any]]:
+        scenarios: list[dict[str, Any]] = []
+        for scenario in self.ROLE_SCENARIOS:
+            answers = {
+                **base_answers,
+                "is_developer": scenario["is_developer"],
+                "is_deployer": scenario["is_deployer"],
+            }
+            result = ClassificationService._run_classification_logic(answers)
+            dimensions = self.map_obligation_dimensions(signals, result["obligation_graph"])
+            penalty_exposures = self.collect_penalty_exposures(dimensions)
+            scenarios.append({
+                "actor_role": result["actor_role"],
+                "label": scenario["label"],
+                "description": scenario["description"],
+                "is_default": result["actor_role"] == default_actor_role,
+                "system_classification": result["system_classification"],
+                "obligation_path": result["obligation_path"],
+                "rationale": result["rationale"],
+                "legal_basis": result["legal_basis"],
+                "obligation_dimensions": dimensions,
+                "required_controls": self.summarize_required_controls(dimensions),
+                "evidence_requirements": result["evidence_requirements"],
+                "penalty_exposures": penalty_exposures,
+                "primary_penalty_exposure": self.primary_penalty_exposure(penalty_exposures),
+                "manual_review_required": self.requires_manual_review_for_role(result["system_classification"], dimensions),
+            })
+        return scenarios
+
+    @staticmethod
+    def summarize_required_controls(dimensions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        controls: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for dimension in dimensions:
+            for control in dimension.get("required_controls", []):
+                control_key = control.get("control_key")
+                if not control_key or control_key in seen:
+                    continue
+                seen.add(control_key)
+                controls.append({
+                    **control,
+                    "dimension_id": dimension["dimension_id"],
+                    "article": dimension["article"],
+                    "evidence_domain": dimension["evidence_domain"],
+                    "penalty_exposure": dimension.get("penalty_exposure"),
+                })
+        return controls
+
+    @staticmethod
+    def collect_penalty_exposures(dimensions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        exposures: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for dimension in dimensions:
+            penalty = dimension.get("penalty_exposure")
+            band_id = penalty.get("band_id") if penalty else None
+            if not band_id or band_id in seen:
+                continue
+            seen.add(band_id)
+            exposures.append(penalty)
+        return exposures
+
+    @staticmethod
+    def primary_penalty_exposure(exposures: list[dict[str, Any]]) -> dict[str, Any] | None:
+        if not exposures:
+            return None
+        return max(exposures, key=lambda item: item.get("max_eur") or 0)
+
+    @staticmethod
+    def requires_manual_review_for_role(system_classification: str, dimensions: list[dict[str, Any]]) -> bool:
+        if system_classification in {"High-Risk AI System", "Prohibited AI System", "General Purpose AI (GPAI)"}:
+            return True
+        return any(
+            dimension.get("status") in {"blocking", "review_required", "screening_required"}
+            for dimension in dimensions
+        )
 
     def map_obligation_dimensions(
         self,

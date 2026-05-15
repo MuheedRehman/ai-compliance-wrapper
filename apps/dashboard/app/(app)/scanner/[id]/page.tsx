@@ -66,6 +66,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
   const highRisk = ['high', 'prohibited_review'].includes(classification.risk_level);
   const obligationDimensions = classification.obligation_dimensions || [];
   const annexMatches = classification.annex_iii_matches || [];
+  const roleScenarios = classification.role_scenarios || [];
   const penaltyText = (penalty: any) => penalty?.maximum_text || penalty?.notes || '';
 
   return (
@@ -149,6 +150,63 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
             )}
           </div>
         </Card>
+
+        {roleScenarios.length > 0 && (
+          <Card title="Role-Based Obligation Scenarios">
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+              {roleScenarios.map((scenario: any) => (
+                <div
+                  key={scenario.actor_role}
+                  className={`rounded-lg border p-3 ${
+                    scenario.is_default
+                      ? 'border-indigo-500/30 bg-indigo-500/5'
+                      : 'border-zinc-800 bg-zinc-950'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] font-mono uppercase text-zinc-500">{scenario.actor_role}</p>
+                      <h3 className="mt-1 text-sm font-bold text-white">{scenario.label}</h3>
+                    </div>
+                    {scenario.is_default && (
+                      <span className="rounded bg-indigo-500/10 px-2 py-1 text-[10px] font-mono uppercase text-indigo-300 ring-1 ring-indigo-500/20">
+                        default
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs leading-relaxed text-zinc-500">{scenario.description}</p>
+                  <div className="mt-3 space-y-2 border-t border-zinc-900 pt-3">
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-zinc-500">Classification</span>
+                      <span className="text-right font-bold text-zinc-200">{scenario.system_classification}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-zinc-500">Dimensions</span>
+                      <span className="font-mono text-zinc-300">{scenario.obligation_dimensions?.length || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="text-zinc-500">Controls</span>
+                      <span className="font-mono text-zinc-300">{scenario.required_controls?.length || 0}</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(scenario.obligation_dimensions || []).slice(0, 4).map((dimension: any) => (
+                      <span key={dimension.dimension_id} className="rounded bg-zinc-900 px-2 py-1 text-[10px] font-mono uppercase text-zinc-400 ring-1 ring-zinc-800">
+                        {dimension.article}
+                      </span>
+                    ))}
+                  </div>
+                  {scenario.primary_penalty_exposure && (
+                    <div className="mt-3 rounded border border-red-500/20 bg-red-500/5 p-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Top Fine Exposure</p>
+                      <p className="mt-1 text-xs text-zinc-500">{penaltyText(scenario.primary_penalty_exposure)}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         {annexMatches.length > 0 && (
           <Card title="Matched Annex III Categories">
