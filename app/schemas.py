@@ -588,6 +588,24 @@ class TenantLoginAuditResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TenantActionAuditResponse(BaseModel):
+    id: str
+    tenant_id: str
+    actor_user_id: Optional[str] = None
+    actor_email: Optional[str] = None
+    actor_role: Optional[str] = None
+    action: str
+    target_type: str
+    target_id: Optional[str] = None
+    target_email: Optional[str] = None
+    before_json: Optional[Dict[str, Any]] = None
+    after_json: Optional[Dict[str, Any]] = None
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TenantLoginResolveRequest(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     name: Optional[str] = None
@@ -609,3 +627,4 @@ class TenantAdminSummaryResponse(BaseModel):
     invitations: List[TenantInvitationResponse] = Field(default_factory=list)
     auth_policy: TenantAuthPolicyResponse
     login_events: List[TenantLoginAuditResponse] = Field(default_factory=list)
+    action_events: List[TenantActionAuditResponse] = Field(default_factory=list)

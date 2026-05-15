@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
     TenantAdminSummaryResponse,
+    TenantActionAuditResponse,
     TenantAuthPolicyResponse,
     TenantAuthPolicyUpdate,
     TenantInvitationCreate,
@@ -72,6 +73,38 @@ def require_dashboard_admin(db: Session, auth: dict, session: DashboardSessionHe
     return dashboard_user
 
 
+def record_tenant_action(
+    db: Session,
+    auth: dict,
+    dashboard_user,
+    action: str,
+    target_type: str,
+    target_id: str | None = None,
+    target_email: str | None = None,
+    before: dict | None = None,
+    after: dict | None = None,
+    metadata: dict | None = None,
+):
+    return tenant_admin_service.record_action_event(
+        db,
+        tenant_id=auth["tenant_id"],
+        actor_user=dashboard_user,
+        actor_email=None if dashboard_user else auth.get("key_name"),
+        actor_role=None if dashboard_user else auth.get("role"),
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        target_email=target_email,
+        before=before,
+        after=after,
+        metadata={
+            "key_id": auth.get("key_id"),
+            "key_name": auth.get("key_name"),
+            **(metadata or {}),
+        },
+    )
+
+
 @router.get("/summary", response_model=TenantAdminSummaryResponse)
 def get_tenant_admin_summary(
     x_api_key: str | None = Header(default=None),
@@ -84,12 +117,14 @@ def get_tenant_admin_summary(
     users = tenant_admin_service.list_users(db, auth["tenant_id"])
     invitations = tenant_admin_service.list_invitations(db, auth["tenant_id"])
     events = tenant_admin_service.list_login_events(db, auth["tenant_id"], limit=25)
+    action_events = tenant_admin_service.list_action_events(db, auth["tenant_id"], limit=25)
     db.commit()
     return {
         "users": users,
         "invitations": invitations,
         "auth_policy": tenant_admin_service.serialize_auth_policy(policy),
         "login_events": events,
+        "action_events": action_events,
     }
 
 
@@ -112,8 +147,18 @@ def create_tenant_user(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="tenant:admin")
-    require_dashboard_admin(db, auth, dashboard_session)
+    dashboard_user = require_dashboard_admin(db, auth, dashboard_session)
     user = tenant_admin_service.create_user(db, auth["tenant_id"], payload.email, payload.role, payload.status, payload.name)
+    record_tenant_action(
+        db,
+        auth,
+        dashboard_user,
+        action="tenant_user_created",
+        target_type="tenant_user",
+        target_id=user.id,
+        target_email=user.email,
+        after=tenant_admin_service.serialize_user(user),
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -128,8 +173,21 @@ def update_tenant_user(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="tenant:admin")
-    require_dashboard_admin(db, auth, dashboard_session)
+    dashboard_user = require_dashboard_admin(db, auth, dashboard_session)
+    existing_user = tenant_admin_service.get_user(db, auth["tenant_id"], user_id)
+    before = tenant_admin_service.serialize_user(existing_user)
     user = tenant_admin_service.update_user(db, auth["tenant_id"], user_id, payload.model_dump(exclude_unset=True))
+    record_tenant_action(
+        db,
+        auth,
+        dashboard_user,
+        action="tenant_user_updated",
+        target_type="tenant_user",
+        target_id=user.id,
+        target_email=user.email,
+        before=before,
+        after=tenant_admin_service.serialize_user(user),
+    )
     db.commit()
     db.refresh(user)
     return user
@@ -162,6 +220,16 @@ def invite_tenant_user(
         payload.role,
         invited_by_email=dashboard_user.email if dashboard_user else None,
     )
+    record_tenant_action(
+        db,
+        auth,
+        dashboard_user,
+        action="tenant_invitation_created",
+        target_type="tenant_invitation",
+        target_id=invitation.id,
+        target_email=invitation.email,
+        after=tenant_admin_service.serialize_invitation(invitation),
+    )
     db.commit()
     db.refresh(invitation)
     return invitation
@@ -175,8 +243,21 @@ def revoke_tenant_invitation(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="tenant:admin")
-    require_dashboard_admin(db, auth, dashboard_session)
+    dashboard_user = require_dashboard_admin(db, auth, dashboard_session)
+    existing_invitation = tenant_admin_service.get_invitation(db, auth["tenant_id"], invitation_id)
+    before = tenant_admin_service.serialize_invitation(existing_invitation)
     invitation = tenant_admin_service.revoke_invitation(db, auth["tenant_id"], invitation_id)
+    record_tenant_action(
+        db,
+        auth,
+        dashboard_user,
+        action="tenant_invitation_revoked",
+        target_type="tenant_invitation",
+        target_id=invitation.id,
+        target_email=invitation.email,
+        before=before,
+        after=tenant_admin_service.serialize_invitation(invitation),
+    )
     db.commit()
     db.refresh(invitation)
     return invitation
@@ -203,8 +284,20 @@ def update_auth_policy(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="tenant:admin")
-    require_dashboard_admin(db, auth, dashboard_session)
+    dashboard_user = require_dashboard_admin(db, auth, dashboard_session)
+    existing_policy = tenant_admin_service.get_or_create_auth_policy(db, auth["tenant_id"])
+    before = tenant_admin_service.serialize_auth_policy(existing_policy)
     policy = tenant_admin_service.update_auth_policy(db, auth["tenant_id"], payload.model_dump(exclude_unset=True))
+    record_tenant_action(
+        db,
+        auth,
+        dashboard_user,
+        action="tenant_auth_policy_updated",
+        target_type="tenant_auth_policy",
+        target_id=policy.tenant_id,
+        before=before,
+        after=tenant_admin_service.serialize_auth_policy(policy),
+    )
     db.commit()
     db.refresh(policy)
     return tenant_admin_service.serialize_auth_policy(policy)
@@ -220,6 +313,18 @@ def list_login_audit(
     auth = authenticate_api_key(db, x_api_key, required_scope="tenant:read")
     require_dashboard_reader(db, auth, dashboard_session)
     return tenant_admin_service.list_login_events(db, auth["tenant_id"], limit=limit)
+
+
+@router.get("/action-audit", response_model=List[TenantActionAuditResponse])
+def list_action_audit(
+    limit: int = 50,
+    x_api_key: str | None = Header(default=None),
+    dashboard_session: DashboardSessionHeaders = Depends(get_dashboard_session_headers),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="tenant:read")
+    require_dashboard_reader(db, auth, dashboard_session)
+    return tenant_admin_service.list_action_events(db, auth["tenant_id"], limit=limit)
 
 
 @router.post("/login/resolve", response_model=TenantLoginResolveResponse)

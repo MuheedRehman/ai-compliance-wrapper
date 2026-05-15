@@ -4,9 +4,10 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
-from app.models import TenantAuthPolicy, TenantInvitation, TenantLoginAudit, TenantUser
+from app.models import TenantActionAudit, TenantAuthPolicy, TenantInvitation, TenantLoginAudit, TenantUser
 
 
 TENANT_ROLES = {"owner", "admin", "reviewer", "auditor", "viewer"}
@@ -131,6 +132,32 @@ def serialize_auth_policy(policy: TenantAuthPolicy) -> dict:
     }
 
 
+def serialize_user(user: TenantUser) -> dict:
+    return {
+        "id": user.id,
+        "tenant_id": user.tenant_id,
+        "email": user.email,
+        "name": user.name,
+        "role": user.role,
+        "status": user.status,
+        "auth_provider": user.auth_provider,
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+    }
+
+
+def serialize_invitation(invitation: TenantInvitation) -> dict:
+    return {
+        "id": invitation.id,
+        "tenant_id": invitation.tenant_id,
+        "email": invitation.email,
+        "role": invitation.role,
+        "status": invitation.status,
+        "invited_by_email": invitation.invited_by_email,
+        "accepted_at": invitation.accepted_at.isoformat() if invitation.accepted_at else None,
+        "expires_at": invitation.expires_at.isoformat() if invitation.expires_at else None,
+    }
+
+
 def list_users(db: Session, tenant_id: str) -> list[TenantUser]:
     return (
         db.query(TenantUser)
@@ -158,6 +185,35 @@ def list_login_events(db: Session, tenant_id: str, limit: int = 50) -> list[Tena
         .limit(safe_limit)
         .all()
     )
+
+
+def list_action_events(db: Session, tenant_id: str, limit: int = 50) -> list[TenantActionAudit]:
+    safe_limit = min(max(limit, 1), 200)
+    return (
+        db.query(TenantActionAudit)
+        .filter(TenantActionAudit.tenant_id == tenant_id)
+        .order_by(TenantActionAudit.created_at.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+
+def get_user(db: Session, tenant_id: str, user_id: str) -> TenantUser:
+    user = db.query(TenantUser).filter(TenantUser.tenant_id == tenant_id, TenantUser.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Tenant user not found")
+    return user
+
+
+def get_invitation(db: Session, tenant_id: str, invitation_id: str) -> TenantInvitation:
+    invitation = (
+        db.query(TenantInvitation)
+        .filter(TenantInvitation.tenant_id == tenant_id, TenantInvitation.id == invitation_id)
+        .first()
+    )
+    if not invitation:
+        raise HTTPException(status_code=404, detail="Tenant invitation not found")
+    return invitation
 
 
 def _find_pending_invitation(db: Session, tenant_id: str, email: str) -> TenantInvitation | None:
@@ -329,6 +385,39 @@ def record_login_event(
         reason=reason,
         ip_address=ip_address,
         user_agent=user_agent,
+    )
+    db.add(event)
+    db.flush()
+    return event
+
+
+def record_action_event(
+    db: Session,
+    tenant_id: str,
+    action: str,
+    target_type: str,
+    target_id: str | None = None,
+    target_email: str | None = None,
+    actor_user: TenantUser | None = None,
+    actor_email: str | None = None,
+    actor_role: str | None = None,
+    before: dict | None = None,
+    after: dict | None = None,
+    metadata: dict | None = None,
+) -> TenantActionAudit:
+    event = TenantActionAudit(
+        id=f"act_{uuid4().hex}",
+        tenant_id=tenant_id,
+        actor_user_id=actor_user.id if actor_user else None,
+        actor_email=actor_user.email if actor_user else actor_email,
+        actor_role=actor_user.role if actor_user else actor_role,
+        action=action,
+        target_type=target_type,
+        target_id=target_id,
+        target_email=target_email,
+        before_json=jsonable_encoder(before) if before is not None else None,
+        after_json=jsonable_encoder(after) if after is not None else None,
+        metadata_json=jsonable_encoder(metadata or {}),
     )
     db.add(event)
     db.flush()

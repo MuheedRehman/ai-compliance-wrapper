@@ -66,11 +66,28 @@ export type TenantLoginAudit = {
   created_at: string;
 };
 
+export type TenantActionAudit = {
+  id: string;
+  tenant_id: string;
+  actor_user_id?: string | null;
+  actor_email?: string | null;
+  actor_role?: string | null;
+  action: string;
+  target_type: string;
+  target_id?: string | null;
+  target_email?: string | null;
+  before_json?: Record<string, any> | null;
+  after_json?: Record<string, any> | null;
+  metadata_json: Record<string, any>;
+  created_at: string;
+};
+
 export type TenantAdminSummary = {
   users: TenantUser[];
   invitations: TenantInvitation[];
   auth_policy: TenantAuthPolicy;
   login_events: TenantLoginAudit[];
+  action_events: TenantActionAudit[];
 };
 
 export type CurrentSession = {
@@ -301,6 +318,7 @@ export const api = {
     return res.json() as Promise<CurrentSession>;
   }),
   getTenantAdminSummary: () => fetchApi<TenantAdminSummary>('/v1/tenant-admin/summary'),
+  listTenantActionAudit: () => fetchApi<TenantActionAudit[]>('/v1/tenant-admin/action-audit'),
   listTenantUsers: () => fetchApi<TenantUser[]>('/v1/tenant-admin/users'),
   createTenantUser: (body: { email: string; name?: string; role: TenantRole; status: TenantUserStatus }) =>
     fetchApi<TenantUser>('/v1/tenant-admin/users', {

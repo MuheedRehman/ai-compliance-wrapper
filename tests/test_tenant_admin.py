@@ -69,6 +69,23 @@ def test_owner_session_can_manage_users_policy_and_invitations(client, admin_hea
     assert invitation["status"] == "pending"
     assert invitation["invited_by_email"] == "owner@example.com"
 
+    audit_response = client.get("/v1/tenant-admin/action-audit", headers=owner_headers)
+    assert audit_response.status_code == 200
+    actions = audit_response.json()
+    action_names = [event["action"] for event in actions]
+    assert "tenant_user_created" in action_names
+    assert "tenant_user_updated" in action_names
+    assert "tenant_auth_policy_updated" in action_names
+    assert "tenant_invitation_created" in action_names
+    update_event = next(event for event in actions if event["action"] == "tenant_user_updated")
+    assert update_event["before_json"]["role"] == "reviewer"
+    assert update_event["after_json"]["role"] == "auditor"
+    assert update_event["actor_email"] == "owner@example.com"
+
+    summary_response = client.get("/v1/tenant-admin/summary", headers=owner_headers)
+    assert summary_response.status_code == 200
+    assert summary_response.json()["action_events"]
+
 
 def test_viewer_session_cannot_write_tenant_admin_data(client, admin_headers):
     owner_headers = owner_session_headers(client, admin_headers)
@@ -198,3 +215,27 @@ def test_pending_invitation_is_accepted_on_matching_google_login(client, admin_h
     invitations_response = client.get("/v1/tenant-admin/invitations", headers=admin_headers)
     assert invitations_response.status_code == 200
     assert invitations_response.json()[0]["status"] == "accepted"
+
+
+def test_revoke_invitation_is_action_audited(client, admin_headers):
+    owner_headers = owner_session_headers(client, admin_headers)
+    invite_response = client.post(
+        "/v1/tenant-admin/invitations",
+        headers=owner_headers,
+        json={"email": "temporary@example.com", "role": "viewer"},
+    )
+    assert invite_response.status_code == 200
+    invitation = invite_response.json()
+
+    revoke_response = client.post(
+        f"/v1/tenant-admin/invitations/{invitation['id']}/revoke",
+        headers=owner_headers,
+    )
+    assert revoke_response.status_code == 200
+
+    audit_response = client.get("/v1/tenant-admin/action-audit", headers=owner_headers)
+    assert audit_response.status_code == 200
+    revoke_event = next(event for event in audit_response.json() if event["action"] == "tenant_invitation_revoked")
+    assert revoke_event["target_email"] == "temporary@example.com"
+    assert revoke_event["before_json"]["status"] == "pending"
+    assert revoke_event["after_json"]["status"] == "revoked"

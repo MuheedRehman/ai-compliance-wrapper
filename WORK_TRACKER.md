@@ -23,7 +23,7 @@ Current product focus:
 Current technical baseline:
 
 - Backend FastAPI app exists.
-- Alembic migrations exist through `0009_evidence_vault_items.py`.
+- Alembic migrations exist through `0010_tenant_action_audit.py`.
 - Dashboard Next.js app exists under `backend/apps/dashboard`.
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
@@ -41,7 +41,7 @@ Current technical baseline:
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, and persisted role selection for conversion/report generation exist. | Harden crawl/extraction quality, add deeper public-page evidence extraction, and polish report/audit pack output. |
-| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Add richer audit coverage for important tenant/user actions and continue replacing staging bootstrap assumptions with first-class sessions. |
+| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
@@ -76,6 +76,7 @@ Recovered from repo state:
 - Module 4 role-selection slice completed and deployed: scanner users can choose Provider, Deployer, or Importer/Distributor before creating a workspace/report, and that chosen role now drives the created intake, controls, evidence scope, and persisted scan state.
 - Backend hardening slice completed and deployed: scanner workspace/report creation now runs atomically with rollback coverage, shared creation services support caller-owned transactions, and production config rejects SQLite, weak evidence secrets, wildcard frontend CORS, demo AI mode, mock Stripe defaults, and missing live OpenAI credentials.
 - Module 2 RBAC hardening slice completed and deployed: tenant-admin dashboard role headers must now match an active tenant user, tenant headers must match the API-key tenant, password login resolves through the backend before issuing a session cookie, and staging seed creates the password owner user.
+- Module 2 action audit slice completed locally: tenant/user creation, role/status updates, invitation creation/revocation, and auth policy changes now create before/after admin audit events exposed through `/v1/tenant-admin/action-audit`, tenant summary, and the dashboard Users & Access page.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -86,7 +87,7 @@ Recovered from repo state:
 Use this as the next session checklist.
 
 - [x] Run backend test suite from `backend`.
-- [x] Confirm Alembic head is `0009_evidence_vault_items.py`.
+- [x] Confirm Alembic head is `0010_tenant_action_audit.py`.
 - [x] Validate Module 1 scanner happy path in API and dashboard.
 - [ ] Improve scanner extraction/gap output if results are shallow.
 - [x] Make "convert scan" create or update a useful AI system profile.
@@ -115,6 +116,8 @@ Use this as the next session checklist.
 - [x] Deploy backend hardening slice to GCP staging and update the deployed baseline.
 - [x] Implement Module 2 active-user-bound dashboard RBAC headers for tenant admin.
 - [x] Deploy Module 2 RBAC hardening slice to GCP staging and update the deployed baseline.
+- [x] Implement Module 2 admin action audit trail for tenant/user changes.
+- [ ] Deploy Module 2 admin action audit trail to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

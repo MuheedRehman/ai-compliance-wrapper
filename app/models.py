@@ -107,6 +107,25 @@ class TenantLoginAudit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
+class TenantActionAudit(Base):
+    __tablename__ = "tenant_action_audit"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    actor_user_id = Column(String, nullable=True, index=True)
+    actor_email = Column(String, nullable=True, index=True)
+    actor_role = Column(String, nullable=True)
+    action = Column(String, nullable=False, index=True)
+    target_type = Column(String, nullable=False, index=True)
+    target_id = Column(String, nullable=True, index=True)
+    target_email = Column(String, nullable=True, index=True)
+    before_json = Column(JSON, nullable=True)
+    after_json = Column(JSON, nullable=True)
+    metadata_json = Column(JSON, nullable=False, default=dict)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class AiSystem(Base):
     __tablename__ = "ai_systems"
 

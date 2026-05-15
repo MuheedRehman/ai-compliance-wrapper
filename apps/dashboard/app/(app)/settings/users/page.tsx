@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { KeyRound, RefreshCw, Save, ShieldCheck, UserPlus, Users } from 'lucide-react';
+import { Activity, KeyRound, RefreshCw, Save, ShieldCheck, UserPlus, Users } from 'lucide-react';
 import { api, CurrentSession, TenantAdminSummary, TenantRole, TenantUser } from '@/lib/api';
 import Card from '@/components/card';
 import ErrorState from '@/components/error-state';
@@ -69,11 +69,13 @@ export default function TenantUsersPage() {
     const users = summary?.users || [];
     const invitations = summary?.invitations || [];
     const events = summary?.login_events || [];
+    const actionEvents = summary?.action_events || [];
     return {
       activeUsers: users.filter((user) => user.status === 'active').length,
       pendingInvites: invitations.filter((invite) => invite.status === 'pending').length,
       allowedRules: (summary?.auth_policy.allowed_domains.length || 0) + (summary?.auth_policy.allowed_emails.length || 0),
       failedLogins: events.filter((event) => event.outcome === 'failure').length,
+      actionEvents: actionEvents.length,
     };
   }, [summary]);
 
@@ -93,6 +95,7 @@ export default function TenantUsersPage() {
         default_role: defaultRole,
       });
       setSummary((current) => current ? { ...current, auth_policy: policy } : current);
+      load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to update authentication policy');
     } finally {
@@ -113,6 +116,7 @@ export default function TenantUsersPage() {
       } : current);
       setInviteEmail('');
       setInviteRole('viewer');
+      load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to invite user');
     } finally {
@@ -129,6 +133,7 @@ export default function TenantUsersPage() {
         ...current,
         users: current.users.map((item) => item.id === updated.id ? updated : item),
       } : current);
+      load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to update user');
     } finally {
@@ -144,6 +149,7 @@ export default function TenantUsersPage() {
         ...current,
         invitations: current.invitations.map((item) => item.id === invitation.id ? invitation : item),
       } : current);
+      load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to revoke invitation');
     }
@@ -198,6 +204,12 @@ export default function TenantUsersPage() {
             <div className="flex items-center gap-3">
               <KeyRound className="h-6 w-6 text-red-400" />
               <span className="text-3xl font-bold">{stats.failedLogins}</span>
+            </div>
+          </Card>
+          <Card title="Admin Actions" variant="stat">
+            <div className="flex items-center gap-3">
+              <Activity className="h-6 w-6 text-cyan-400" />
+              <span className="text-3xl font-bold">{stats.actionEvents}</span>
             </div>
           </Card>
         </div>
@@ -427,6 +439,33 @@ export default function TenantUsersPage() {
             </div>
           </Card>
         </div>
+
+        <Card title="Admin Action Audit">
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Target</th>
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(summary.action_events || []).map((event) => (
+                  <tr key={event.id}>
+                    <td className="text-[11px] text-zinc-500">{formatDate(event.created_at)}</td>
+                    <td className="font-semibold text-zinc-300">{event.actor_email || 'API key'}</td>
+                    <td><StatusBadge value={event.action} /></td>
+                    <td className="text-[11px] text-zinc-500">{event.target_email || event.target_id || event.target_type}</td>
+                    <td>{event.actor_role ? <StatusBadge value={event.actor_role} /> : <span className="text-[11px] text-zinc-600">None</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       </div>
     </PageShell>
   );
