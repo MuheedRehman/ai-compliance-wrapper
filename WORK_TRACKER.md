@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `18a0eb2` via Cloud Build `6d225e65-389b-451f-9fbe-0c150bb89818` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `69fe464` via Cloud Build `af91ad0e-0e9c-4f65-9eca-c80ce793d3f8` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00028-l79`
-  - Backend: `ai-compliance-backend-00053-kws`
+  - Dashboard: `ai-compliance-dashboard-00029-9sk`
+  - Backend: `ai-compliance-backend-00055-frm`
 
 ## Module Status Board
 
@@ -70,7 +70,7 @@ Recovered from repo state:
 - Module 4 first obligation engine slice completed and deployed: structured EU AI Act dimensions now drive enriched intake obligation graphs, explanation output, controls/evidence requirements, and intake detail dashboard display.
 - Module 4 scanner-to-obligation slice completed and deployed: website scan results now include applicable EU AI Act dimensions, legal basis, evidence requirements, mapping confidence, dimension-linked gap/action output, and scanner detail dashboard display.
 - Report detail hotfix deployed: scanner-generated reports now open without a client-side route-param crash, and report pages tolerate missing or older report JSON fields gracefully.
-- Module 4 Annex III subcategory slice completed locally: official high-risk category catalog, `/v1/obligations/annex-iii`, text matcher, scanner `annex_iii_matches`, intake graph propagation, scanner dashboard display, and tests now exist.
+- Module 4 Annex III subcategory slice completed and deployed: official high-risk category catalog, `/v1/obligations/annex-iii`, text matcher, scanner `annex_iii_matches`, intake graph propagation, scanner dashboard display, and tests now exist.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -99,7 +99,7 @@ Use this as the next session checklist.
 - [x] Implement scanner-to-obligation dimension mapping and dashboard display.
 - [x] Deploy scanner-to-obligation dimension mapping to GCP staging and update the deployed baseline.
 - [x] Implement Annex III subcategory catalog, matcher, scanner output, and dashboard display.
-- [ ] Deploy Annex III subcategory mapping to GCP staging and update the deployed baseline.
+- [x] Deploy Annex III subcategory mapping to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
