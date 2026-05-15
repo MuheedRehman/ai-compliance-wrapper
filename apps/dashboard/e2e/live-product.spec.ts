@@ -32,6 +32,7 @@ const apiChecks = [
   '/v1/website-scans',
   '/v1/obligations/dimensions',
   '/v1/obligations/annex-iii',
+  '/v1/obligations/penalties',
   '/v1/obligations/fria',
   '/v1/obligations/oversight',
   '/v1/obligations/incidents',

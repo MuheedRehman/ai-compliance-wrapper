@@ -55,13 +55,17 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
     }
     assert dimensions["high_risk_classification"]["article"] == "Article 6 and Annex III"
     assert dimensions["high_risk_classification"]["annex_iii_matches"]
+    assert dimensions["high_risk_classification"]["penalty_exposure"]["max_eur"] == 15_000_000
     assert dimensions["provider_high_risk_requirements"]["required_controls"]
+    assert dimensions["provider_high_risk_requirements"]["penalty_exposure"]["enforcement_article"] == "Article 99(4)"
     assert dimensions["transparency_notice"]["article"] == "Article 50"
     assert dimensions["transparency_notice"]["matched_public_signals"]
     assert body["confidence_score"] > 50
     assert any(signal["category"] == "high_risk_domain" for signal in body["detected_signals_json"])
-    assert any(gap.get("dimension_id") == "high_risk_classification" for gap in body["gap_findings_json"])
-    assert any(action.get("dimension_id") == "provider_high_risk_requirements" for action in body["suggested_actions_json"])
+    high_risk_gap = next(gap for gap in body["gap_findings_json"] if gap.get("dimension_id") == "high_risk_classification")
+    assert high_risk_gap["penalty_exposure"]["enforcement_article"] == "Article 99(4)"
+    provider_action = next(action for action in body["suggested_actions_json"] if action.get("dimension_id") == "provider_high_risk_requirements")
+    assert provider_action["penalty_exposure"]["max_eur"] == 15_000_000
 
 
 @pytest.mark.asyncio

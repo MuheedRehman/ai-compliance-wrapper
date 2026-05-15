@@ -167,6 +167,7 @@ class ComplianceDimensionResponse(BaseModel):
     status: str
     evidence_domain: str
     summary: str
+    penalty_exposure: Dict[str, Any] = Field(default_factory=dict)
 
 
 class AnnexIIICategoryResponse(BaseModel):
@@ -181,6 +182,21 @@ class AnnexIIICategoryResponse(BaseModel):
     source_url: str
     summary: str
     scanner_terms: List[str] = Field(default_factory=list)
+
+
+class PenaltyExposureResponse(BaseModel):
+    band_id: str
+    title: str
+    enforcement_article: str
+    max_eur: Optional[int] = None
+    turnover_percent: Optional[float] = None
+    comparison_rule: str
+    maximum_text: str
+    applies_to: List[str] = Field(default_factory=list)
+    source: str
+    source_url: str
+    sme_rule: Optional[str] = None
+    notes: str
 
 
 class ObligationExplanationResponse(BaseModel):

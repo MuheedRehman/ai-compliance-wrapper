@@ -1,6 +1,12 @@
 from app.models import IntakeAssessment
 from app.services.classification_service import ClassificationService
-from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions, match_annex_iii_categories
+from app.services.regulatory_knowledge import (
+    list_annex_iii_categories,
+    list_compliance_dimensions,
+    list_penalty_exposures,
+    match_annex_iii_categories,
+    penalty_exposure_for_dimension,
+)
 
 
 def test_obligation_dimension_catalog_is_structured():
@@ -18,7 +24,21 @@ def test_obligation_dimension_catalog_is_structured():
     assert provider["required_evidence"]
     assert provider["scanner_signals"]
     assert provider["effective_dates"]
+    assert provider["penalty_exposure"]["enforcement_article"] == "Article 99(4)"
     assert "applies_when" not in provider
+
+
+def test_penalty_catalog_maps_articles_to_fine_bands():
+    penalties = {item["band_id"]: item for item in list_penalty_exposures()}
+
+    assert penalties["prohibited_practices"]["max_eur"] == 35_000_000
+    assert penalties["prohibited_practices"]["turnover_percent"] == 7
+    assert penalties["operator_obligations"]["max_eur"] == 15_000_000
+    assert penalties["incorrect_information"]["max_eur"] == 7_500_000
+
+    transparency = penalty_exposure_for_dimension("transparency_notice", "Article 50")
+    assert transparency["enforcement_article"] == "Article 99(4)"
+    assert "EUR 15,000,000" in transparency["maximum_text"]
 
 
 def test_annex_iii_catalog_and_matcher_map_high_risk_subcategories():
@@ -54,6 +74,7 @@ def test_classification_returns_enriched_obligation_graph():
 
     dimensions = {item["dimension_id"]: item for item in result["obligation_graph"]}
     assert dimensions["deployer_high_risk_operations"]["article"] == "Article 26"
+    assert dimensions["deployer_high_risk_operations"]["penalty_exposure"]["max_eur"] == 15_000_000
     assert dimensions["fria_screening"]["status"] == "required"
     assert dimensions["transparency_notice"]["article"] == "Article 50"
     assert dimensions["high_risk_classification"]["annex_iii_matches"]
@@ -73,6 +94,10 @@ def test_obligation_dimensions_endpoint_requires_compliance_scope(client, admin_
     annex = client.get("/v1/obligations/annex-iii", headers=admin_headers)
     assert annex.status_code == 200
     assert any(item["subcategory_id"] == "employment_recruitment_selection" for item in annex.json())
+
+    penalties = client.get("/v1/obligations/penalties", headers=admin_headers)
+    assert penalties.status_code == 200
+    assert any(item["band_id"] == "prohibited_practices" for item in penalties.json())
 
 
 def test_explain_intake_obligations_endpoint(client, admin_headers):

@@ -56,6 +56,7 @@ def test_report_generation(client: TestClient, admin_headers, seeded_context, db
     data = res.json()
     assert data["title"] == "Monthly Readiness Report"
     assert data["report_json"]["readiness_summary"]["status"] == "ready"
+    assert any(item["enforcement_article"] == "Article 99(4)" for item in data["report_json"]["penalty_exposures"])
     assert len(data["source_refs_json"]) >= 3 # System, FRIA, Oversight
     assert any(ref["type"] == "compliance_control" for ref in data["source_refs_json"])
 

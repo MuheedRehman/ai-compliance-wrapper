@@ -18,7 +18,7 @@ from app.models import (
 from app.schemas import ReportCreate
 from app.services.entitlement_service import check_entitlement
 from app.services.hashing import hash_object
-from app.services.regulatory_knowledge import article_refs
+from app.services.regulatory_knowledge import article_refs, penalty_exposure_for_article
 
 class ReportService:
     @staticmethod
@@ -71,6 +71,7 @@ class ReportService:
         source_refs = list(payload.source_refs or [])
         remediation_actions = []
         evidence_refs = []
+        penalty_exposures = []
         readiness = "needs_attention"
         
         # System-level context
@@ -123,15 +124,19 @@ class ReportService:
             incomplete_controls = [c for c in control_list if c.status not in completed_statuses]
 
             if not control_list:
+                control_register_penalty = penalty_exposure_for_article("EU AI Act")
                 findings.append({
                     "title": "Control Register Not Initialized",
                     "severity": "medium",
-                    "description": "No compliance controls exist for this scope. Seed baseline controls before relying on readiness reporting."
+                    "description": "No compliance controls exist for this scope. Seed baseline controls before relying on readiness reporting.",
+                    "penalty_exposure": control_register_penalty,
                 })
                 remediation_actions.append({
                     "title": "Seed EU AI Act Baseline Controls",
-                    "description": "Create baseline controls for AI literacy, log retention, DPIA linkage, FRIA screening, post-market monitoring, and incident reporting."
+                    "description": "Create baseline controls for AI literacy, log retention, DPIA linkage, FRIA screening, post-market monitoring, and incident reporting.",
+                    "penalty_exposure": control_register_penalty,
                 })
+                penalty_exposures.append(control_register_penalty)
             else:
                 control_score = round((len(completed_controls) / len(control_list)) * 100)
                 findings.append({
@@ -140,11 +145,23 @@ class ReportService:
                     "description": f"{len(completed_controls)} of {len(control_list)} controls are completed or signed off."
                 })
                 for control in control_list:
-                    source_refs.append({"type": "compliance_control", "id": control.id, "article": control.article, "key": control.control_key})
+                    penalty = ReportService._penalty_for_control(control)
+                    penalty_exposures.append(penalty)
+                    source_refs.append({
+                        "type": "compliance_control",
+                        "id": control.id,
+                        "article": control.article,
+                        "key": control.control_key,
+                        "penalty_exposure": penalty,
+                    })
                 for control in incomplete_controls[:5]:
+                    penalty = ReportService._penalty_for_control(control)
                     remediation_actions.append({
                         "title": f"Complete {control.article}: {control.title}",
-                        "description": f"Assign owner and evidence for control `{control.control_key}`."
+                        "description": f"Assign owner and evidence for control `{control.control_key}`.",
+                        "article": control.article,
+                        "control_key": control.control_key,
+                        "penalty_exposure": penalty,
                     })
 
             # Determine Readiness
@@ -195,6 +212,7 @@ class ReportService:
             "remediation_actions": remediation_actions,
             "evidence_references": evidence_refs,
             "legal_basis": legal_basis,
+            "penalty_exposures": ReportService._dedupe_penalty_exposures(penalty_exposures),
             "readiness_summary": {
                 "status": readiness,
                 "rationale": "Generated based on available control, FRIA, oversight, incident, and evidence records."
@@ -269,6 +287,12 @@ class ReportService:
             for ref in data["legal_basis"]:
                 md += f"- **{ref['article']}**: {ref['title']}\n"
             md += "\n"
+
+        if data.get("penalty_exposures"):
+            md += "## Penalty Exposure\n"
+            for penalty in data["penalty_exposures"]:
+                md += f"- **{penalty['enforcement_article']}**: {penalty['maximum_text']} {penalty['notes']}\n"
+            md += "\n"
         
         md += "## Evidence Traceability\n"
         for e in data['evidence_references']:
@@ -276,3 +300,23 @@ class ReportService:
             
         md += "\n---\n*This report is generated automatically by the EU AI Act Compliance Platform. It does not constitute legal advice.*"
         return md
+
+    @staticmethod
+    def _penalty_for_control(control: ComplianceControl) -> dict[str, Any]:
+        details = control.details_json or {}
+        penalty = details.get("penalty_exposure")
+        if penalty:
+            return penalty
+        return penalty_exposure_for_article(control.article)
+
+    @staticmethod
+    def _dedupe_penalty_exposures(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        seen: set[str] = set()
+        deduped: list[dict[str, Any]] = []
+        for item in items:
+            band_id = item.get("band_id")
+            if not band_id or band_id in seen:
+                continue
+            seen.add(band_id)
+            deduped.append(item)
+        return deduped

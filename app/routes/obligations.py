@@ -8,11 +8,12 @@ from app.schemas import (
     OversightCreate, OversightUpdate, OversightResponse,
     IncidentCreate, IncidentUpdate, IncidentResponse,
     ObligationExplanationResponse,
+    PenaltyExposureResponse,
 )
 from app.services.auth_service import authenticate_api_key
 from app.services.classification_service import ClassificationService
 from app.services.obligation_service import ObligationService
-from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions
+from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions, list_penalty_exposures
 from typing import List
 
 router = APIRouter(prefix="/v1/obligations", tags=["Obligation Workflows"])
@@ -29,6 +30,12 @@ def list_dimensions(x_api_key: str | None = Header(default=None), db: Session = 
 def list_annex_iii(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     authenticate_api_key(db, x_api_key, required_scope="compliance:read")
     return list_annex_iii_categories()
+
+
+@router.get("/penalties", response_model=List[PenaltyExposureResponse])
+def list_penalties(x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    return list_penalty_exposures()
 
 
 @router.get("/explain/intake/{intake_id}", response_model=ObligationExplanationResponse)

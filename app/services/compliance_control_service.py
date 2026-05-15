@@ -182,6 +182,7 @@ class ComplianceControlService:
                     "obligation_path": obligation_path,
                     "owner_role": item.get("owner_role"),
                     "summary": item.get("summary"),
+                    "penalty_exposure": item.get("penalty_exposure"),
                 },
             )
             db.add(control)

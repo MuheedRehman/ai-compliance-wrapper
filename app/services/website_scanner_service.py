@@ -18,7 +18,7 @@ from app.services import ai_system_service
 from app.services.classification_service import ClassificationService
 from app.services.compliance_control_service import ComplianceControlService
 from app.services.evidence_service import write_evidence_log
-from app.services.regulatory_knowledge import match_annex_iii_categories
+from app.services.regulatory_knowledge import match_annex_iii_categories, penalty_exposure_for_article, penalty_exposure_for_dimension
 
 
 class WebsiteScannerError(Exception):
@@ -583,6 +583,7 @@ class WebsiteScannerService:
                 "required_controls": dimension.get("required_controls", []),
                 "required_evidence": dimension.get("required_evidence", []),
                 "annex_iii_matches": dimension.get("annex_iii_matches", []),
+                "penalty_exposure": dimension.get("penalty_exposure") or penalty_exposure_for_dimension(dimension_id, dimension["article"]),
                 "scanner_signals": dimension.get("scanner_signals", []),
                 "matched_public_signals": matched_public_signals,
                 "signal_support": signal_support,
@@ -631,15 +632,19 @@ class WebsiteScannerService:
                 "dimension_id": "ai_literacy",
                 "article": "Article 4",
                 "evidence_domain": "ai_literacy",
+                "penalty_exposure": penalty_exposure_for_dimension("ai_literacy", "Article 4"),
             })
         if classification["risk_level"] in {"high", "prohibited_review"}:
+            dimension_id = "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification"
+            article = "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III"
             gaps.append({
                 "severity": "high",
                 "title": "High-risk language requires manual legal validation",
                 "detail": "Public pages contain terms associated with Annex III or prohibited-risk review. Confirm the intended purpose and actual deployment context before relying on this classification.",
-                "dimension_id": "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification",
-                "article": "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III",
+                "dimension_id": dimension_id,
+                "article": article,
                 "evidence_domain": "classification",
+                "penalty_exposure": penalty_exposure_for_dimension(dimension_id, article),
             })
         if "human_interaction" in categories and "ai" not in page_urls and "responsible-ai" not in page_urls:
             gaps.append({
@@ -649,6 +654,7 @@ class WebsiteScannerService:
                 "dimension_id": "transparency_notice",
                 "article": "Article 50",
                 "evidence_domain": "transparency",
+                "penalty_exposure": penalty_exposure_for_dimension("transparency_notice", "Article 50"),
             })
         if "privacy_security" not in categories:
             gaps.append({
@@ -658,6 +664,7 @@ class WebsiteScannerService:
                 "dimension_id": "provider_high_risk_requirements",
                 "article": "Articles 8-16",
                 "evidence_domain": "provider_controls",
+                "penalty_exposure": penalty_exposure_for_dimension("provider_high_risk_requirements", "Articles 8-16"),
             })
         if not gaps:
             gaps.append({
@@ -667,6 +674,7 @@ class WebsiteScannerService:
                 "dimension_id": "ai_literacy",
                 "article": "Article 4",
                 "evidence_domain": "ai_literacy",
+                "penalty_exposure": penalty_exposure_for_dimension("ai_literacy", "Article 4"),
             })
 
         return gaps
@@ -679,20 +687,29 @@ class WebsiteScannerService:
                 "detail": "Validate whether the organization is acting as provider, deployer, importer, or distributor, and document the intended purpose.",
                 "dimension_id": "high_risk_classification" if classification["risk_level"] == "high" else None,
                 "article": "Article 6 and Annex III" if classification["risk_level"] == "high" else None,
+                "penalty_exposure": (
+                    penalty_exposure_for_dimension("high_risk_classification", "Article 6 and Annex III")
+                    if classification["risk_level"] == "high"
+                    else penalty_exposure_for_article("EU AI Act")
+                ),
             },
             {
                 "priority": "medium",
                 "title": "Convert scan into an intake record",
                 "detail": "Use the generated intake answers as a draft and complete the classification with internal context.",
+                "penalty_exposure": penalty_exposure_for_article("EU AI Act"),
             },
         ]
         if any(gap["severity"] == "high" for gap in gaps):
+            dimension_id = "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification"
+            article = "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III"
             actions.append({
                 "priority": "high",
                 "title": "Run counsel/compliance review",
                 "detail": "Escalate high-risk or prohibited-risk indicators before using this result in customer-facing claims.",
-                "dimension_id": "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification",
-                "article": "Article 5" if classification["risk_level"] == "prohibited_review" else "Article 6 and Annex III",
+                "dimension_id": dimension_id,
+                "article": article,
+                "penalty_exposure": penalty_exposure_for_dimension(dimension_id, article),
             })
         for dimension in classification.get("obligation_dimensions", [])[:5]:
             if dimension["dimension_id"] == "ai_literacy" and len(classification.get("obligation_dimensions", [])) > 1:
@@ -704,6 +721,7 @@ class WebsiteScannerService:
                 "dimension_id": dimension["dimension_id"],
                 "article": dimension["article"],
                 "evidence_domain": dimension["evidence_domain"],
+                "penalty_exposure": dimension.get("penalty_exposure") or penalty_exposure_for_dimension(dimension["dimension_id"], dimension["article"]),
             })
         return actions
 

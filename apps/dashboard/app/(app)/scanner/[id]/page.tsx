@@ -66,6 +66,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
   const highRisk = ['high', 'prohibited_review'].includes(classification.risk_level);
   const obligationDimensions = classification.obligation_dimensions || [];
   const annexMatches = classification.annex_iii_matches || [];
+  const penaltyText = (penalty: any) => penalty?.maximum_text || penalty?.notes || '';
 
   return (
     <PageShell
@@ -234,6 +235,15 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                         </p>
                       </div>
                     </div>
+                    {dimension.penalty_exposure && (
+                      <div className="mt-3 rounded border border-red-500/20 bg-red-500/5 p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Possible Fine Exposure</p>
+                        <p className="mt-1 text-xs text-zinc-400">{penaltyText(dimension.penalty_exposure)}</p>
+                        <p className="mt-1 text-[10px] font-mono uppercase text-zinc-600">
+                          {dimension.penalty_exposure.enforcement_article} | {dimension.penalty_exposure.band_id}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -314,6 +324,12 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                       {gap.article} | {gap.dimension_id}
                     </p>
                   )}
+                  {gap.penalty_exposure && (
+                    <div className="mt-3 rounded border border-red-500/20 bg-red-500/5 p-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Possible Fine Exposure</p>
+                      <p className="mt-1 text-xs text-zinc-500">{penaltyText(gap.penalty_exposure)}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -333,6 +349,12 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                   <p className="mt-2 text-[10px] font-mono uppercase text-zinc-600">
                     {action.article} | {action.dimension_id}
                   </p>
+                )}
+                {action.penalty_exposure && (
+                  <div className="mt-3 rounded border border-red-500/20 bg-red-500/5 p-2">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Possible Fine Exposure</p>
+                    <p className="mt-1 text-xs text-zinc-500">{penaltyText(action.penalty_exposure)}</p>
+                  </div>
                 )}
               </div>
             ))}

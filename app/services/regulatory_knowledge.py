@@ -9,6 +9,8 @@ from typing import Any
 AI_ACT_SOURCE = "Regulation (EU) 2024/1689"
 AI_ACT_SERVICE_DESK_BASE = "https://ai-act-service-desk.ec.europa.eu/en/ai-act"
 ANNEX_III_SOURCE_URL = f"{AI_ACT_SERVICE_DESK_BASE}/annex-3"
+PENALTIES_SOURCE_URL = f"{AI_ACT_SERVICE_DESK_BASE}/article-99"
+GPAI_PENALTIES_SOURCE_URL = f"{AI_ACT_SERVICE_DESK_BASE}/article-101"
 
 
 REGULATORY_ARTICLES: dict[str, dict[str, str]] = {
@@ -82,6 +84,114 @@ REGULATORY_ARTICLES: dict[str, dict[str, str]] = {
 
 def article_refs(*keys: str) -> list[dict[str, str]]:
     return [{"source": AI_ACT_SOURCE, **REGULATORY_ARTICLES[key]} for key in keys]
+
+
+def _penalty_exposure(
+    *,
+    band_id: str,
+    title: str,
+    enforcement_article: str,
+    max_eur: int | None,
+    turnover_percent: float | None,
+    comparison_rule: str,
+    applies_to: list[str],
+    source_url: str,
+    notes: str,
+    applies_to_smes: str | None = None,
+) -> dict[str, Any]:
+    if max_eur is None or turnover_percent is None:
+        maximum_text = "No specific harmonised EU maximum fine amount identified for this article."
+    else:
+        turnover_label = f"{turnover_percent:g}%"
+        maximum_text = f"Up to EUR {max_eur:,} or {turnover_label} of total worldwide annual turnover, {comparison_rule}."
+    return {
+        "band_id": band_id,
+        "title": title,
+        "enforcement_article": enforcement_article,
+        "max_eur": max_eur,
+        "turnover_percent": turnover_percent,
+        "comparison_rule": comparison_rule,
+        "maximum_text": maximum_text,
+        "applies_to": applies_to,
+        "source": AI_ACT_SOURCE,
+        "source_url": source_url,
+        "sme_rule": applies_to_smes,
+        "notes": notes,
+    }
+
+
+PENALTY_EXPOSURES: dict[str, dict[str, Any]] = {
+    "prohibited_practices": _penalty_exposure(
+        band_id="prohibited_practices",
+        title="Prohibited AI practices",
+        enforcement_article="Article 99(3)",
+        max_eur=35_000_000,
+        turnover_percent=7,
+        comparison_rule="whichever is higher",
+        applies_to=["Article 5"],
+        source_url=PENALTIES_SOURCE_URL,
+        applies_to_smes="For SMEs, including start-ups, the fine is capped at whichever is lower.",
+        notes="Applies to non-compliance with the prohibition of AI practices referred to in Article 5.",
+    ),
+    "operator_obligations": _penalty_exposure(
+        band_id="operator_obligations",
+        title="Operator, notified-body, and transparency obligations",
+        enforcement_article="Article 99(4)",
+        max_eur=15_000_000,
+        turnover_percent=3,
+        comparison_rule="whichever is higher",
+        applies_to=["Article 16", "Article 22", "Article 23", "Article 24", "Article 26", "Article 31", "Article 33", "Article 34", "Article 50"],
+        source_url=PENALTIES_SOURCE_URL,
+        applies_to_smes="For SMEs, including start-ups, the fine is capped at whichever is lower.",
+        notes="Applies to the listed provider, authorised representative, importer, distributor, deployer, notified-body, and Article 50 transparency duties.",
+    ),
+    "incorrect_information": _penalty_exposure(
+        band_id="incorrect_information",
+        title="Incorrect, incomplete, or misleading information",
+        enforcement_article="Article 99(5)",
+        max_eur=7_500_000,
+        turnover_percent=1,
+        comparison_rule="whichever is higher",
+        applies_to=["Information requests to notified bodies or national competent authorities"],
+        source_url=PENALTIES_SOURCE_URL,
+        applies_to_smes="For SMEs, including start-ups, the fine is capped at whichever is lower.",
+        notes="Applies when incorrect, incomplete, or misleading information is supplied in reply to a request.",
+    ),
+    "gpai_provider": _penalty_exposure(
+        band_id="gpai_provider",
+        title="GPAI provider fines",
+        enforcement_article="Article 101",
+        max_eur=15_000_000,
+        turnover_percent=3,
+        comparison_rule="whichever is higher",
+        applies_to=["Article 53", "Article 55", "Article 91", "Article 92", "Article 93"],
+        source_url=GPAI_PENALTIES_SOURCE_URL,
+        notes="Commission fines for providers of general-purpose AI models that intentionally or negligently infringe relevant provisions, fail to provide requested information or access, or fail to comply with measures.",
+    ),
+    "member_state_general": _penalty_exposure(
+        band_id="member_state_general",
+        title="Member State penalty rules",
+        enforcement_article="Article 99(1)",
+        max_eur=None,
+        turnover_percent=None,
+        comparison_rule="set by Member State law",
+        applies_to=["AI Act infringements outside the specific Article 99(3)-(5) bands"],
+        source_url=PENALTIES_SOURCE_URL,
+        notes="Member States must lay down effective, proportionate, and dissuasive penalties and enforcement measures. Article 99(3)-(5) only sets upper limits for certain infringements.",
+    ),
+    "classification_downstream": _penalty_exposure(
+        band_id="classification_downstream",
+        title="High-risk classification downstream exposure",
+        enforcement_article="Article 99(4)",
+        max_eur=15_000_000,
+        turnover_percent=3,
+        comparison_rule="whichever is higher",
+        applies_to=["Article 6 and Annex III when missed classification leads to Article 16, 23, 24, 26, or 50 non-compliance"],
+        source_url=PENALTIES_SOURCE_URL,
+        applies_to_smes="For SMEs, including start-ups, the fine is capped at whichever is lower.",
+        notes="Article 6 classification itself is not listed as a standalone Article 99(4) fine band, but misclassification can expose provider/deployer/importer/distributor/transparency duties in the listed Article 99(4) band.",
+    ),
+}
 
 
 def _annex_iii_item(
@@ -661,6 +771,50 @@ def list_annex_iii_categories() -> list[dict[str, Any]]:
     return [deepcopy(category) for category in ANNEX_III_CATEGORIES]
 
 
+def list_penalty_exposures() -> list[dict[str, Any]]:
+    return [deepcopy(exposure) for exposure in PENALTY_EXPOSURES.values()]
+
+
+def penalty_exposure_for_dimension(dimension_id: str, article: str | None = None) -> dict[str, Any]:
+    dimension_map = {
+        "prohibited_practice_review": "prohibited_practices",
+        "high_risk_classification": "classification_downstream",
+        "provider_high_risk_requirements": "operator_obligations",
+        "deployer_high_risk_operations": "operator_obligations",
+        "importer_distributor_verification": "operator_obligations",
+        "transparency_notice": "operator_obligations",
+        "gpai_provider_obligations": "gpai_provider",
+        "gpai_systemic_risk": "gpai_provider",
+    }
+    if dimension_id in dimension_map:
+        return deepcopy(PENALTY_EXPOSURES[dimension_map[dimension_id]])
+    return penalty_exposure_for_article(article or "")
+
+
+def penalty_exposure_for_article(article: str) -> dict[str, Any]:
+    value = article.lower()
+    if "article 5" in value:
+        return deepcopy(PENALTY_EXPOSURES["prohibited_practices"])
+    if any(token in value for token in ["article 53", "article 55"]):
+        return deepcopy(PENALTY_EXPOSURES["gpai_provider"])
+    if "article 6" in value or "annex iii" in value:
+        return deepcopy(PENALTY_EXPOSURES["classification_downstream"])
+    if any(token in value for token in [
+        "article 16",
+        "articles 8-15",
+        "articles 8-16",
+        "article 23",
+        "article 24",
+        "articles 23-24",
+        "article 26",
+        "article 50",
+    ]):
+        return deepcopy(PENALTY_EXPOSURES["operator_obligations"])
+    if "incorrect" in value or "misleading" in value or "information" in value:
+        return deepcopy(PENALTY_EXPOSURES["incorrect_information"])
+    return deepcopy(PENALTY_EXPOSURES["member_state_general"])
+
+
 def match_annex_iii_categories(text: str) -> list[dict[str, Any]]:
     value = f" {text.lower()} "
     matches: list[dict[str, Any]] = []
@@ -726,6 +880,7 @@ def build_obligation_graph(actor_role: str, classification: str, answers: dict[s
             "evidence_domain": dimension["evidence_domain"],
             "summary": dimension["summary"],
             "explanation": _render_explanation(dimension, actor_role, classification, answers),
+            "penalty_exposure": penalty_exposure_for_dimension(dimension["dimension_id"], dimension["article"]),
         }
         if dimension["dimension_id"] == "high_risk_classification":
             obligation["annex_iii_matches"] = answers.get("annex_iii_matches", [])
@@ -761,6 +916,7 @@ def explain_obligations(
                 "dimension_id": item["dimension_id"],
                 "article": item["article"],
                 "evidence_domain": item["evidence_domain"],
+                "penalty_exposure": item.get("penalty_exposure"),
             }
             for control in item.get("required_controls", [])
         ])
@@ -873,6 +1029,7 @@ def _public_dimension(dimension: dict[str, Any]) -> dict[str, Any]:
     item.pop("applies_when", None)
     item.pop("explanation_template", None)
     item["status"] = item.pop("obligation_status")
+    item["penalty_exposure"] = penalty_exposure_for_dimension(item["dimension_id"], item["article"])
     return item
 
 

@@ -82,11 +82,13 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
   const findings = Array.isArray(data.findings) ? data.findings : [];
   const remediationActions = Array.isArray(data.remediation_actions) ? data.remediation_actions : [];
   const evidenceReferences = Array.isArray(data.evidence_references) ? data.evidence_references : [];
+  const penaltyExposures = Array.isArray(data.penalty_exposures) ? data.penalty_exposures : [];
   const readinessSummary = data.readiness_summary || {};
   const readinessStatus = readinessSummary.status || report.status || 'unknown';
   const reportTypeLabel = String(report.report_type || 'report').replace(/_/g, ' ');
   const executiveSummary = data.executive_summary || 'This report was generated, but no executive summary was recorded.';
   const readinessRationale = readinessSummary.rationale || 'No generation rationale was recorded for this report.';
+  const penaltyText = (penalty: any) => penalty?.maximum_text || penalty?.notes || '';
 
   return (
     <div className="max-w-[1000px] mx-auto space-y-8 pb-24">
@@ -171,6 +173,12 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
                     </span>
                   </div>
                   <p className="text-zinc-400 text-sm leading-relaxed">{f.description}</p>
+                  {f.penalty_exposure && (
+                    <div className="mt-3 rounded border border-red-500/20 bg-red-500/5 p-3">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Possible Fine Exposure</p>
+                      <p className="mt-1 text-xs text-zinc-400">{penaltyText(f.penalty_exposure)}</p>
+                    </div>
+                  )}
                 </div>
               ))}
               {findings.length === 0 && (
@@ -191,6 +199,11 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
                   <div>
                     <h4 className="text-white font-bold text-sm mb-1">{a.title}</h4>
                     <p className="text-zinc-400 text-[13px] leading-relaxed">{a.description}</p>
+                    {a.penalty_exposure && (
+                      <p className="mt-2 text-[11px] leading-relaxed text-red-300">
+                        Possible fine exposure: {penaltyText(a.penalty_exposure)}
+                      </p>
+                    )}
                   </div>
                 </div>
               ))}
@@ -206,6 +219,24 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
 
         {/* Sidebar Context */}
         <div className="space-y-8">
+          <section className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6">
+            <h3 className="text-[13px] font-bold text-red-300 uppercase tracking-widest mb-6 flex items-center gap-2">
+              <AlertCircle className="h-3.5 w-3.5" /> Fine Exposure
+            </h3>
+            <div className="space-y-4">
+              {penaltyExposures.map((penalty: any) => (
+                <div key={penalty.band_id} className="rounded-xl border border-red-500/10 bg-black/20 p-3">
+                  <div className="text-[10px] font-bold text-red-300 uppercase tracking-tight">{penalty.enforcement_article}</div>
+                  <div className="mt-1 text-[13px] font-bold text-zinc-200">{penalty.title}</div>
+                  <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">{penaltyText(penalty)}</p>
+                </div>
+              ))}
+              {penaltyExposures.length === 0 && (
+                <div className="text-zinc-600 text-[12px] italic">No fine exposure band recorded.</div>
+              )}
+            </div>
+          </section>
+
           {/* Source Linkage */}
           <section className="bg-zinc-900/60 border border-zinc-800/60 rounded-2xl p-6">
             <h3 className="text-[13px] font-bold text-zinc-500 uppercase tracking-widest mb-6 flex items-center gap-2">
