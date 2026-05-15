@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `a407c9e` via Cloud Build `249416d6-7b38-4110-8348-a9a249c40d1a` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `4cb25d3` via Cloud Build `dbd5ab6f-1150-492f-b752-01cbe815e7b5` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00030-x27`
-  - Backend: `ai-compliance-backend-00057-v22`
+  - Dashboard: `ai-compliance-dashboard-00031-hck`
+  - Backend: `ai-compliance-backend-00059-855`
 
 ## Module Status Board
 
@@ -72,7 +72,7 @@ Recovered from repo state:
 - Report detail hotfix deployed: scanner-generated reports now open without a client-side route-param crash, and report pages tolerate missing or older report JSON fields gracefully.
 - Module 4 Annex III subcategory slice completed and deployed: official high-risk category catalog, `/v1/obligations/annex-iii`, text matcher, scanner `annex_iii_matches`, intake graph propagation, scanner dashboard display, and tests now exist.
 - Module 4 penalty exposure slice completed and deployed: Article 99/101 fine bands now appear in obligation dimensions, scanner gaps/actions, controls, report JSON/Markdown, scanner/report dashboard pages, and `/v1/obligations/penalties`.
-- Module 4 role-branching slice completed locally: each scanner result now includes Provider, Deployer, and Importer/Distributor obligation scenarios with role-specific dimensions, controls, evidence requirements, manual-review flags, and fine exposure.
+- Module 4 role-branching slice completed and deployed: each scanner result now includes Provider, Deployer, and Importer/Distributor obligation scenarios with role-specific dimensions, controls, evidence requirements, manual-review flags, and fine exposure.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -105,7 +105,7 @@ Use this as the next session checklist.
 - [x] Implement penalty exposure mapping for missing EU AI Act obligations.
 - [x] Deploy penalty exposure mapping to GCP staging and update the deployed baseline.
 - [x] Implement scanner provider/deployer/importer role scenario branching.
-- [ ] Deploy scanner role scenario branching to GCP staging and update the deployed baseline.
+- [x] Deploy scanner role scenario branching to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
