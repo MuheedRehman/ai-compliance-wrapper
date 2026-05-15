@@ -82,26 +82,39 @@ def generate_website_scan_report(
     auth = authenticate_api_key(db, x_api_key, required_scope="reports:write")
     if not check_entitlement(db, auth["tenant_id"], "report_generation"):
         raise HTTPException(status_code=403, detail="Report generation not entitled for this tenant")
-    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(
-        db,
-        auth["tenant_id"],
-        scan_id,
-        actor_role=payload.actor_role if payload else None,
-    )
-    report = ReportService.generate_report(
-        db,
-        auth["tenant_id"],
-        ReportCreate(
-            report_type="compliance_readiness_summary",
-            title=f"{system.name} Website Compliance Readiness Report",
-            ai_system_id=system.id,
-            source_refs=[
-                {"type": "website_scan", "id": scan.id, "url": scan.normalized_url},
-                {"type": "intake", "id": intake.id, "classification": intake.system_classification},
-                {"type": "evidence_log", "id": evidence_event_id, "domain": "website_scan"},
-            ],
-        ),
-    )
+    try:
+        scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(
+            db,
+            auth["tenant_id"],
+            scan_id,
+            actor_role=payload.actor_role if payload else None,
+            commit=False,
+        )
+        report = ReportService.generate_report(
+            db,
+            auth["tenant_id"],
+            ReportCreate(
+                report_type="compliance_readiness_summary",
+                title=f"{system.name} Website Compliance Readiness Report",
+                ai_system_id=system.id,
+                source_refs=[
+                    {"type": "website_scan", "id": scan.id, "url": scan.normalized_url},
+                    {"type": "intake", "id": intake.id, "classification": intake.system_classification},
+                    {"type": "evidence_log", "id": evidence_event_id, "domain": "website_scan"},
+                ],
+            ),
+            commit=False,
+        )
+        db.commit()
+        db.refresh(scan)
+        db.refresh(system)
+        db.refresh(intake)
+        db.refresh(report)
+        for control in controls:
+            db.refresh(control)
+    except Exception:
+        db.rollback()
+        raise
     return {
         "scan": scan,
         "ai_system": system,

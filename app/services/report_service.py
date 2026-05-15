@@ -54,7 +54,7 @@ class ReportService:
         return report
 
     @staticmethod
-    def generate_report(db: Session, tenant_id: str, payload: ReportCreate) -> ReportRecord:
+    def generate_report(db: Session, tenant_id: str, payload: ReportCreate, *, commit: bool = True) -> ReportRecord:
         # Check entitlements (premium feature)
         if not check_entitlement(db, tenant_id, "report_generation"):
             raise HTTPException(status_code=403, detail="Report generation not entitled for this tenant")
@@ -244,8 +244,10 @@ class ReportService:
             feature_id=feature_id
         )
         db.add(report)
-        db.commit()
-        db.refresh(report)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(report)
         return report
 
     @staticmethod

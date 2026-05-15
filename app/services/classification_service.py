@@ -96,7 +96,7 @@ class ClassificationService:
         }
 
     @classmethod
-    def create_intake(cls, db: Session, tenant_id: str, payload: IntakeCreate) -> IntakeAssessment:
+    def create_intake(cls, db: Session, tenant_id: str, payload: IntakeCreate, *, commit: bool = True) -> IntakeAssessment:
         results = cls._run_classification_logic(payload.answers)
         
         intake = IntakeAssessment(
@@ -114,8 +114,10 @@ class ClassificationService:
         )
         
         db.add(intake)
-        db.commit()
-        db.refresh(intake)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(intake)
         return intake
 
     @staticmethod

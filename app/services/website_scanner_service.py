@@ -274,56 +274,79 @@ class WebsiteScannerService:
         tenant_id: str,
         scan_id: str,
         actor_role: str | None = None,
+        commit: bool = True,
     ) -> tuple[WebsiteScan, AiSystem, Any, list[ComplianceControl], str | None]:
-        scan = cls.get_scan(db, tenant_id, scan_id)
-        if scan.status != "completed":
-            raise HTTPException(status_code=400, detail="Only completed scans can be converted")
+        try:
+            scan = cls.get_scan(db, tenant_id, scan_id)
+            if scan.status != "completed":
+                raise HTTPException(status_code=400, detail="Only completed scans can be converted")
 
-        if scan.ai_system_id and scan.intake_id:
-            system = ai_system_service.get_ai_system(db, tenant_id, scan.ai_system_id)
-            intake = ClassificationService.get_intake(db, tenant_id, scan.intake_id)
-            if actor_role and intake.actor_role != actor_role:
-                raise HTTPException(
-                    status_code=409,
-                    detail=f"Scan is already converted as {intake.actor_role}. Create a new scan to convert as {actor_role}.",
+            if scan.ai_system_id and scan.intake_id:
+                system = ai_system_service.get_ai_system(db, tenant_id, scan.ai_system_id)
+                intake = ClassificationService.get_intake(db, tenant_id, scan.intake_id)
+                if actor_role and intake.actor_role != actor_role:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Scan is already converted as {intake.actor_role}. Create a new scan to convert as {actor_role}.",
+                    )
+            else:
+                classification = dict(scan.classification_json or {})
+                answers = cls.answers_for_actor_role(classification.get("intake_answers") or {}, actor_role)
+                system = ai_system_service.create_ai_system(
+                    db,
+                    tenant_id,
+                    AiSystemCreate(
+                        name=scan.title or urlparse(scan.normalized_url).hostname or scan.normalized_url,
+                        description=f"Created from website scan of {scan.normalized_url}. {scan.summary or ''}".strip(),
+                    ),
+                    commit=False,
                 )
-        else:
-            classification = dict(scan.classification_json or {})
-            answers = cls.answers_for_actor_role(classification.get("intake_answers") or {}, actor_role)
-            system = ai_system_service.create_ai_system(
-                db,
-                tenant_id,
-                AiSystemCreate(
-                    name=scan.title or urlparse(scan.normalized_url).hostname or scan.normalized_url,
-                    description=f"Created from website scan of {scan.normalized_url}. {scan.summary or ''}".strip(),
-                ),
-            )
-            intake = ClassificationService.create_intake(
-                db,
-                tenant_id,
-                IntakeCreate(
-                    title=f"{system.name} website compliance scan",
-                    answers=answers,
-                ),
-            )
-            scan.ai_system_id = system.id
-            scan.intake_id = intake.id
-            classification["selected_actor_role"] = intake.actor_role
-            scan.classification_json = classification
-            db.commit()
-            db.refresh(scan)
+                intake = ClassificationService.create_intake(
+                    db,
+                    tenant_id,
+                    IntakeCreate(
+                        title=f"{system.name} website compliance scan",
+                        answers=answers,
+                    ),
+                    commit=False,
+                )
+                scan.ai_system_id = system.id
+                scan.intake_id = intake.id
+                classification["selected_actor_role"] = intake.actor_role
+                scan.classification_json = classification
+                db.flush()
 
-        controls = ComplianceControlService.seed_from_obligation_graph(
-            db,
-            tenant_id,
-            intake.obligation_graph_json or [],
-            intake_id=intake.id,
-            obligation_path=intake.obligation_path,
-            ai_system_id=system.id,
-        )
-        evidence_event_id = cls.ensure_conversion_evidence(db, tenant_id, scan, system, intake, controls)
-        db.refresh(scan)
-        return scan, system, intake, controls, evidence_event_id
+            controls = ComplianceControlService.seed_from_obligation_graph(
+                db,
+                tenant_id,
+                intake.obligation_graph_json or [],
+                intake_id=intake.id,
+                obligation_path=intake.obligation_path,
+                ai_system_id=system.id,
+                commit=False,
+            )
+            evidence_event_id = cls.ensure_conversion_evidence(
+                db,
+                tenant_id,
+                scan,
+                system,
+                intake,
+                controls,
+                commit=False,
+            )
+            db.flush()
+            if commit:
+                db.commit()
+                db.refresh(scan)
+                db.refresh(system)
+                db.refresh(intake)
+                for control in controls:
+                    db.refresh(control)
+            return scan, system, intake, controls, evidence_event_id
+        except Exception:
+            if commit:
+                db.rollback()
+            raise
 
     @staticmethod
     def answers_for_actor_role(answers: dict[str, Any], actor_role: str | None) -> dict[str, Any]:
@@ -345,6 +368,7 @@ class WebsiteScannerService:
         system: AiSystem,
         intake: Any,
         controls: list[ComplianceControl],
+        commit: bool = True,
     ) -> str | None:
         request_id = f"website-scan:{scan.id}"
         trace_id = f"scan-convert:{scan.id}"
@@ -397,8 +421,10 @@ class WebsiteScannerService:
                 },
             },
         )
-        db.commit()
-        db.refresh(evidence)
+        db.flush()
+        if commit:
+            db.commit()
+            db.refresh(evidence)
         return evidence.event_id
 
     async def scan(self, raw_url: str, max_pages: int) -> dict[str, Any]:

@@ -1,6 +1,6 @@
 import pytest
 
-from app.models import ComplianceControl, Entitlement, EvidenceLog, ReportRecord
+from app.models import AiSystem, ComplianceControl, Entitlement, EvidenceLog, IntakeAssessment, ReportRecord, WebsiteScan
 from app.services.website_scanner_service import PageArtifact, WebsiteScannerService
 from tests.conftest import TENANT_ID
 
@@ -338,3 +338,57 @@ async def test_generate_website_scan_report_requires_report_entitlement(
 
     assert response.status_code == 403
     assert "not entitled" in response.json()["error"]["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_generate_website_scan_report_rolls_back_conversion_on_report_failure(
+    client,
+    admin_headers,
+    db_session,
+    monkeypatch,
+):
+    db_session.add(Entitlement(
+        id="ent-report-rollback",
+        tenant_id=TENANT_ID,
+        feature_key="report_generation",
+        is_enabled=True,
+    ))
+    db_session.commit()
+
+    async def fake_collect_pages(self, normalized_url, max_pages):
+        return [
+            PageArtifact(
+                url=normalized_url,
+                status_code=200,
+                title="Rollback AI",
+                text="Rollback AI is an artificial intelligence chatbot with human oversight, audit logs, and privacy policy.",
+                links=[],
+            )
+        ]
+
+    def fail_report(*args, **kwargs):
+        raise RuntimeError("simulated report failure")
+
+    monkeypatch.setattr(WebsiteScannerService, "validate_public_url", lambda self, url: None)
+    monkeypatch.setattr(WebsiteScannerService, "collect_pages", fake_collect_pages)
+    monkeypatch.setattr("app.routes.website_scans.ReportService.generate_report", fail_report)
+
+    scan = client.post(
+        "/v1/website-scans",
+        headers=admin_headers,
+        json={"url": "rollback.example"},
+    ).json()
+
+    with pytest.raises(RuntimeError, match="simulated report failure"):
+        client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
+
+    db_session.expire_all()
+    persisted_scan = db_session.query(WebsiteScan).filter(WebsiteScan.id == scan["id"]).first()
+    assert persisted_scan is not None
+    assert persisted_scan.ai_system_id is None
+    assert persisted_scan.intake_id is None
+    assert db_session.query(AiSystem).filter(AiSystem.name == "Rollback AI").count() == 0
+    assert db_session.query(IntakeAssessment).count() == 0
+    assert db_session.query(ComplianceControl).count() == 0
+    assert db_session.query(EvidenceLog).filter(EvidenceLog.event_type == "website_scan_converted").count() == 0
+    assert db_session.query(ReportRecord).count() == 0

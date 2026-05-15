@@ -16,7 +16,7 @@ OPENAI_API_KEY = get_secret("OPENAI_API_KEY")
 AI_PROVIDER_MODE = get_secret("AI_PROVIDER_MODE", "live").lower()
 DEFAULT_MODEL = get_secret("DEFAULT_MODEL", "gpt-4.1-nano")
 DATABASE_URL = get_secret("DATABASE_URL", "sqlite:///./app/data/app.db")
-APP_ENV = get_secret("APP_ENV", "development")
+APP_ENV = (get_secret("APP_ENV", "development") or "development").strip().lower()
 FEATURE_ID_ENFORCEMENT = get_secret("FEATURE_ID_ENFORCEMENT", "warn").lower()
 CANDIDATE_VERSION_POLICY = get_secret("CANDIDATE_VERSION_POLICY", "allow_with_warning").lower()
 EVIDENCE_CHAIN_MODE = get_secret("EVIDENCE_CHAIN_MODE", "best_effort_tenant_chain")
@@ -48,6 +48,7 @@ except ValueError:
 VALID_FEATURE_ENFORCEMENT_MODES = {"warn", "quarantine", "block"}
 VALID_CANDIDATE_VERSION_POLICIES = {"allow_with_warning", "quarantine", "block"}
 VALID_AI_PROVIDER_MODES = {"live", "demo"}
+PRODUCTION_ENVS = {"production", "prod"}
 
 if FEATURE_ID_ENFORCEMENT not in VALID_FEATURE_ENFORCEMENT_MODES:
     raise RuntimeError(f"Invalid FEATURE_ID_ENFORCEMENT={FEATURE_ID_ENFORCEMENT}")
@@ -58,5 +59,27 @@ if CANDIDATE_VERSION_POLICY not in VALID_CANDIDATE_VERSION_POLICIES:
 if AI_PROVIDER_MODE not in VALID_AI_PROVIDER_MODES:
     raise RuntimeError(f"Invalid AI_PROVIDER_MODE={AI_PROVIDER_MODE}")
 
-if not EVIDENCE_HMAC_SECRET:
-    raise RuntimeError("EVIDENCE_HMAC_SECRET is missing. Add it to .env.")
+def validate_runtime_config() -> None:
+    if not EVIDENCE_HMAC_SECRET:
+        raise RuntimeError("EVIDENCE_HMAC_SECRET is missing. Add it to .env.")
+
+    if APP_ENV not in PRODUCTION_ENVS:
+        return
+
+    if DATABASE_URL.startswith("sqlite"):
+        raise RuntimeError("Production APP_ENV cannot use a SQLite DATABASE_URL.")
+    if len(EVIDENCE_HMAC_SECRET) < 32:
+        raise RuntimeError("Production EVIDENCE_HMAC_SECRET must be at least 32 characters.")
+    if STRIPE_API_KEY == "sk_test_mock":
+        raise RuntimeError("Production STRIPE_API_KEY cannot use the mock default.")
+    if STRIPE_WEBHOOK_SECRET == "whsec_mock":
+        raise RuntimeError("Production STRIPE_WEBHOOK_SECRET cannot use the mock default.")
+    if FRONTEND_URL.strip() == "*":
+        raise RuntimeError("Production FRONTEND_URL cannot be '*'.")
+    if AI_PROVIDER_MODE == "demo":
+        raise RuntimeError("Production AI_PROVIDER_MODE cannot be demo.")
+    if AI_PROVIDER_MODE == "live" and not OPENAI_API_KEY:
+        raise RuntimeError("Production live AI_PROVIDER_MODE requires OPENAI_API_KEY.")
+
+
+validate_runtime_config()

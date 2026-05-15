@@ -29,6 +29,32 @@ def test_missing_hmac_secret_raises():
     importlib.reload(app.config)
 
 
+def test_production_config_rejects_mock_and_weak_defaults(monkeypatch):
+    monkeypatch.setattr(app.config, "APP_ENV", "production")
+    monkeypatch.setattr(app.config, "DATABASE_URL", "sqlite:///./app/data/app.db")
+    monkeypatch.setattr(app.config, "EVIDENCE_HMAC_SECRET", "short-secret")
+    monkeypatch.setattr(app.config, "STRIPE_API_KEY", "sk_test_mock")
+    monkeypatch.setattr(app.config, "STRIPE_WEBHOOK_SECRET", "whsec_mock")
+    monkeypatch.setattr(app.config, "FRONTEND_URL", "*")
+    monkeypatch.setattr(app.config, "AI_PROVIDER_MODE", "demo")
+
+    with pytest.raises(RuntimeError, match="Production APP_ENV cannot use a SQLite DATABASE_URL"):
+        app.config.validate_runtime_config()
+
+
+def test_production_config_accepts_strong_runtime_settings(monkeypatch):
+    monkeypatch.setattr(app.config, "APP_ENV", "production")
+    monkeypatch.setattr(app.config, "DATABASE_URL", "postgresql+psycopg2://user:pass@localhost/db")
+    monkeypatch.setattr(app.config, "EVIDENCE_HMAC_SECRET", "x" * 32)
+    monkeypatch.setattr(app.config, "STRIPE_API_KEY", "sk_live_real")
+    monkeypatch.setattr(app.config, "STRIPE_WEBHOOK_SECRET", "whsec_real")
+    monkeypatch.setattr(app.config, "FRONTEND_URL", "https://dashboard.example")
+    monkeypatch.setattr(app.config, "AI_PROVIDER_MODE", "live")
+    monkeypatch.setattr(app.config, "OPENAI_API_KEY", "sk-live-test")
+
+    app.config.validate_runtime_config()
+
+
 def test_db_sqlite_branch_behavior():
     from app.db import create_app_engine
     from unittest.mock import patch
@@ -55,4 +81,3 @@ def test_db_postgres_pooling_branch_behavior():
     assert engine.pool._max_overflow == 10
     assert engine.pool._timeout == 30
     assert engine.pool._recycle == 1800
-

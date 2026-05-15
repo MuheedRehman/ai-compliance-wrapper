@@ -17,7 +17,7 @@ from app.models import (
 from app.schemas import AiSystemCreate, AiSystemUpdate
 from app.services.compliance_control_service import ComplianceControlService
 
-def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate) -> AiSystem:
+def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate, *, commit: bool = True) -> AiSystem:
     ai_system = AiSystem(
         id=f"sys-{uuid.uuid4().hex[:8]}",
         tenant_id=tenant_id,
@@ -26,8 +26,10 @@ def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate) -> Ai
         # DB defaults will handle deployment_status and registration_status if not provided
     )
     db.add(ai_system)
-    db.commit()
-    db.refresh(ai_system)
+    db.flush()
+    if commit:
+        db.commit()
+        db.refresh(ai_system)
     return ai_system
 
 def list_ai_systems(db: Session, tenant_id: str):

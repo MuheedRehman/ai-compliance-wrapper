@@ -146,6 +146,7 @@ class ComplianceControlService:
         intake_id: str,
         obligation_path: str,
         ai_system_id: Optional[str] = None,
+        commit: bool = True,
     ) -> List[ComplianceControl]:
         ComplianceControlService._require_system(db, tenant_id, ai_system_id)
         created: list[ComplianceControl] = []
@@ -188,9 +189,11 @@ class ComplianceControlService:
             db.add(control)
             created.append(control)
 
-        db.commit()
-        for control in created:
-            db.refresh(control)
+        db.flush()
+        if commit:
+            db.commit()
+            for control in created:
+                db.refresh(control)
         return created
 
     @staticmethod
