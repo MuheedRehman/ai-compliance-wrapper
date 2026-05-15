@@ -40,10 +40,10 @@ Current technical baseline:
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
-| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, and role-based obligation scenarios exist. | Harden crawl/extraction quality, add deeper public-page evidence extraction, and polish report/audit pack output. |
+| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, and persisted role selection for conversion/report generation exist. | Harden crawl/extraction quality, add deeper public-page evidence extraction, and polish report/audit pack output. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, Google login resolution, dashboard settings page exist. | Verify role mapping, lock down staging assumptions, add/confirm audit coverage for important user actions. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
-| 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and convert role scenario choice into a persisted intake option. |
+| 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
@@ -73,6 +73,7 @@ Recovered from repo state:
 - Module 4 Annex III subcategory slice completed and deployed: official high-risk category catalog, `/v1/obligations/annex-iii`, text matcher, scanner `annex_iii_matches`, intake graph propagation, scanner dashboard display, and tests now exist.
 - Module 4 penalty exposure slice completed and deployed: Article 99/101 fine bands now appear in obligation dimensions, scanner gaps/actions, controls, report JSON/Markdown, scanner/report dashboard pages, and `/v1/obligations/penalties`.
 - Module 4 role-branching slice completed and deployed: each scanner result now includes Provider, Deployer, and Importer/Distributor obligation scenarios with role-specific dimensions, controls, evidence requirements, manual-review flags, and fine exposure.
+- Module 4 role-selection slice completed locally: scanner users can choose Provider, Deployer, or Importer/Distributor before creating a workspace/report, and that chosen role now drives the created intake, controls, evidence scope, and persisted scan state.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -106,6 +107,8 @@ Use this as the next session checklist.
 - [x] Deploy penalty exposure mapping to GCP staging and update the deployed baseline.
 - [x] Implement scanner provider/deployer/importer role scenario branching.
 - [x] Deploy scanner role scenario branching to GCP staging and update the deployed baseline.
+- [x] Implement scanner role scenario choice as a persisted intake/report option.
+- [ ] Deploy scanner role scenario choice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

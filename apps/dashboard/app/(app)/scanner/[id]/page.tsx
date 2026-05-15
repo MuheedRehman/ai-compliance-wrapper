@@ -17,13 +17,24 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
   const [loading, setLoading] = useState(true);
   const [converting, setConverting] = useState(false);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [selectedActorRole, setSelectedActorRole] = useState<string>('Provider');
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
     api.getWebsiteScan(params.id)
-      .then(setScan)
+      .then((data) => {
+        setScan(data);
+        const scenarios = data.classification_json?.role_scenarios || [];
+        const defaultScenario = scenarios.find((scenario: any) => scenario.is_default) || scenarios[0];
+        setSelectedActorRole(
+          data.classification_json?.selected_actor_role ||
+          (data.intake_id ? data.classification_json?.canonical_actor_role : undefined) ||
+          defaultScenario?.actor_role ||
+          'Provider'
+        );
+      })
       .catch((err) => setError(err.body?.detail || err.message || 'Failed to load website scan'))
       .finally(() => setLoading(false));
   }, [params.id]);
@@ -34,9 +45,10 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
     setConverting(true);
     setError(null);
     try {
-      const result = await api.convertWebsiteScan(params.id);
+      const result = await api.convertWebsiteScan(params.id, { actor_role: selectedActorRole });
       setScan(result.scan);
       setConversionResult(result);
+      setSelectedActorRole(result.intake?.actor_role || selectedActorRole);
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to convert scan');
     } finally {
@@ -48,10 +60,11 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
     setGeneratingReport(true);
     setError(null);
     try {
-      const result = await api.generateWebsiteScanReport(params.id);
+      const result = await api.generateWebsiteScanReport(params.id, { actor_role: selectedActorRole });
       setScan(result.scan);
       setConversionResult(result);
       setGeneratedReport(result.report);
+      setSelectedActorRole(result.intake?.actor_role || selectedActorRole);
     } catch (err: any) {
       setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to generate report');
     } finally {
@@ -68,6 +81,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
   const annexMatches = classification.annex_iii_matches || [];
   const roleScenarios = classification.role_scenarios || [];
   const penaltyText = (penalty: any) => penalty?.maximum_text || penalty?.notes || '';
+  const selectedScenario = roleScenarios.find((scenario: any) => scenario.actor_role === selectedActorRole);
 
   return (
     <PageShell
@@ -86,7 +100,7 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
             className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
           >
             <Layers className="h-4 w-4" />
-            {scan.ai_system_id ? 'WORKSPACE READY' : converting ? 'CONVERTING...' : 'CREATE WORKSPACE'}
+            {scan.ai_system_id ? 'WORKSPACE READY' : converting ? 'CONVERTING...' : `CREATE ${selectedActorRole.toUpperCase()} WORKSPACE`}
           </button>
           <button
             disabled={generatingReport || scan.status !== 'completed'}
@@ -153,12 +167,20 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
 
         {roleScenarios.length > 0 && (
           <Card title="Role-Based Obligation Scenarios">
+            {!scan.ai_system_id && (
+              <div className="mb-4 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-3">
+                <p className="text-xs font-bold text-white">Selected conversion role: {selectedScenario?.label || selectedActorRole}</p>
+                <p className="mt-1 text-xs text-zinc-500">
+                  Create Workspace and Generate Report will use this role to build the intake, controls, evidence, and report scope.
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
               {roleScenarios.map((scenario: any) => (
                 <div
                   key={scenario.actor_role}
                   className={`rounded-lg border p-3 ${
-                    scenario.is_default
+                    scenario.actor_role === selectedActorRole
                       ? 'border-indigo-500/30 bg-indigo-500/5'
                       : 'border-zinc-800 bg-zinc-950'
                   }`}
@@ -168,9 +190,9 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                       <p className="text-[10px] font-mono uppercase text-zinc-500">{scenario.actor_role}</p>
                       <h3 className="mt-1 text-sm font-bold text-white">{scenario.label}</h3>
                     </div>
-                    {scenario.is_default && (
+                    {scenario.actor_role === selectedActorRole && (
                       <span className="rounded bg-indigo-500/10 px-2 py-1 text-[10px] font-mono uppercase text-indigo-300 ring-1 ring-indigo-500/20">
-                        default
+                        selected
                       </span>
                     )}
                   </div>
@@ -201,6 +223,15 @@ export default function ScannerDetailPage({ params }: { params: { id: string } }
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-red-300">Top Fine Exposure</p>
                       <p className="mt-1 text-xs text-zinc-500">{penaltyText(scenario.primary_penalty_exposure)}</p>
                     </div>
+                  )}
+                  {!scan.ai_system_id && (
+                    <button
+                      onClick={() => setSelectedActorRole(scenario.actor_role)}
+                      className="mt-3 w-full rounded bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={scenario.actor_role === selectedActorRole}
+                    >
+                      {scenario.actor_role === selectedActorRole ? 'SELECTED ROLE' : 'USE THIS ROLE'}
+                    </button>
                   )}
                 </div>
               ))}

@@ -4,7 +4,14 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.schemas import ReportCreate, WebsiteScanConvertResponse, WebsiteScanCreate, WebsiteScanReportResponse, WebsiteScanResponse
+from app.schemas import (
+    ReportCreate,
+    WebsiteScanConvertRequest,
+    WebsiteScanConvertResponse,
+    WebsiteScanCreate,
+    WebsiteScanReportResponse,
+    WebsiteScanResponse,
+)
 from app.services.auth_service import authenticate_api_key
 from app.services.entitlement_service import check_entitlement
 from app.services.report_service import ReportService
@@ -45,11 +52,17 @@ def get_website_scan(
 @router.post("/{scan_id}/convert", response_model=WebsiteScanConvertResponse)
 def convert_website_scan(
     scan_id: str,
+    payload: WebsiteScanConvertRequest | None = None,
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="scanner:write")
-    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(db, auth["tenant_id"], scan_id)
+    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(
+        db,
+        auth["tenant_id"],
+        scan_id,
+        actor_role=payload.actor_role if payload else None,
+    )
     return {
         "scan": scan,
         "ai_system": system,
@@ -62,13 +75,19 @@ def convert_website_scan(
 @router.post("/{scan_id}/report", response_model=WebsiteScanReportResponse)
 def generate_website_scan_report(
     scan_id: str,
+    payload: WebsiteScanConvertRequest | None = None,
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="reports:write")
     if not check_entitlement(db, auth["tenant_id"], "report_generation"):
         raise HTTPException(status_code=403, detail="Report generation not entitled for this tenant")
-    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(db, auth["tenant_id"], scan_id)
+    scan, system, intake, controls, evidence_event_id = WebsiteScannerService.convert_scan(
+        db,
+        auth["tenant_id"],
+        scan_id,
+        actor_role=payload.actor_role if payload else None,
+    )
     report = ReportService.generate_report(
         db,
         auth["tenant_id"],

@@ -459,6 +459,10 @@ class WebsiteScanCreate(BaseModel):
     max_pages: int = Field(default=6, ge=1, le=12)
 
 
+class WebsiteScanConvertRequest(BaseModel):
+    actor_role: Optional[Literal["Provider", "Deployer", "Importer/Distributor"]] = None
+
+
 class WebsiteScanResponse(BaseModel):
     id: str
     tenant_id: str

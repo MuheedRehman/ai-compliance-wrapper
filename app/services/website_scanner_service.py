@@ -273,6 +273,7 @@ class WebsiteScannerService:
         db: Session,
         tenant_id: str,
         scan_id: str,
+        actor_role: str | None = None,
     ) -> tuple[WebsiteScan, AiSystem, Any, list[ComplianceControl], str | None]:
         scan = cls.get_scan(db, tenant_id, scan_id)
         if scan.status != "completed":
@@ -281,9 +282,14 @@ class WebsiteScannerService:
         if scan.ai_system_id and scan.intake_id:
             system = ai_system_service.get_ai_system(db, tenant_id, scan.ai_system_id)
             intake = ClassificationService.get_intake(db, tenant_id, scan.intake_id)
+            if actor_role and intake.actor_role != actor_role:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Scan is already converted as {intake.actor_role}. Create a new scan to convert as {actor_role}.",
+                )
         else:
-            classification = scan.classification_json or {}
-            answers = classification.get("intake_answers") or {}
+            classification = dict(scan.classification_json or {})
+            answers = cls.answers_for_actor_role(classification.get("intake_answers") or {}, actor_role)
             system = ai_system_service.create_ai_system(
                 db,
                 tenant_id,
@@ -302,6 +308,8 @@ class WebsiteScannerService:
             )
             scan.ai_system_id = system.id
             scan.intake_id = intake.id
+            classification["selected_actor_role"] = intake.actor_role
+            scan.classification_json = classification
             db.commit()
             db.refresh(scan)
 
@@ -316,6 +324,18 @@ class WebsiteScannerService:
         evidence_event_id = cls.ensure_conversion_evidence(db, tenant_id, scan, system, intake, controls)
         db.refresh(scan)
         return scan, system, intake, controls, evidence_event_id
+
+    @staticmethod
+    def answers_for_actor_role(answers: dict[str, Any], actor_role: str | None) -> dict[str, Any]:
+        selected = actor_role or "Provider"
+        if selected not in {"Provider", "Deployer", "Importer/Distributor"}:
+            raise HTTPException(status_code=400, detail="Unsupported scanner conversion actor role")
+
+        converted = dict(answers)
+        converted["selected_actor_role"] = selected
+        converted["is_developer"] = selected == "Provider"
+        converted["is_deployer"] = selected == "Deployer"
+        return converted
 
     @staticmethod
     def ensure_conversion_evidence(

@@ -284,13 +284,15 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
-  convertWebsiteScan: (id: string) =>
+  convertWebsiteScan: (id: string, body?: { actor_role?: string }) =>
     fetchApi<any>(`/v1/website-scans/${id}/convert`, {
       method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
     }),
-  generateWebsiteScanReport: (id: string) =>
+  generateWebsiteScanReport: (id: string, body?: { actor_role?: string }) =>
     fetchApi<any>(`/v1/website-scans/${id}/report`, {
       method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
     }),
 
   // Tenant / User Administration

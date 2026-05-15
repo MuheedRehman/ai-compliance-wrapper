@@ -129,6 +129,68 @@ async def test_convert_website_scan_creates_system_and_intake(client, admin_head
 
 
 @pytest.mark.asyncio
+async def test_convert_website_scan_uses_selected_role_scenario(client, admin_headers, db_session, monkeypatch):
+    async def fake_collect_pages(self, normalized_url, max_pages):
+        return [
+            PageArtifact(
+                url=normalized_url,
+                status_code=200,
+                title="HireOps AI",
+                text=(
+                    "HireOps AI is an artificial intelligence recruiting and hiring platform. "
+                    "It performs resume screening, candidate ranking, chatbot interviews, "
+                    "human oversight, audit logs, privacy policy, GDPR, and security."
+                ),
+                links=[],
+            )
+        ]
+
+    monkeypatch.setattr(WebsiteScannerService, "validate_public_url", lambda self, url: None)
+    monkeypatch.setattr(WebsiteScannerService, "collect_pages", fake_collect_pages)
+
+    scan = client.post(
+        "/v1/website-scans",
+        headers=admin_headers,
+        json={"url": "hireops.example"},
+    ).json()
+
+    response = client.post(
+        f"/v1/website-scans/{scan['id']}/convert",
+        headers=admin_headers,
+        json={"actor_role": "Deployer"},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["intake"]["actor_role"] == "Deployer"
+    assert body["intake"]["obligation_path"] == "OPERATIONAL_GOVERNANCE_ART_26"
+    assert body["intake"]["answers_json"]["selected_actor_role"] == "Deployer"
+    assert body["scan"]["classification_json"]["selected_actor_role"] == "Deployer"
+    assert any(
+        item["dimension_id"] == "deployer_high_risk_operations"
+        for item in body["intake"]["obligation_graph_json"]
+    )
+    assert any(
+        item["dimension_id"] == "fria_screening"
+        for item in body["intake"]["obligation_graph_json"]
+    )
+
+    controls = db_session.query(ComplianceControl).filter(
+        ComplianceControl.ai_system_id == body["ai_system"]["id"],
+    ).all()
+    control_keys = {control.control_key for control in controls}
+    assert "intake_deployer_high_risk_operations" in control_keys
+    assert "intake_provider_high_risk_requirements" not in control_keys
+
+    conflict = client.post(
+        f"/v1/website-scans/{scan['id']}/convert",
+        headers=admin_headers,
+        json={"actor_role": "Provider"},
+    )
+    assert conflict.status_code == 409
+
+
+@pytest.mark.asyncio
 async def test_convert_website_scan_materializes_controls_and_evidence_once(
     client,
     admin_headers,
