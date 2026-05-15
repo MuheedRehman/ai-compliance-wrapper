@@ -8,12 +8,17 @@ The browser never receives the backend API key.
 Request flow:
 
 1. User signs in at `/login` with `DASHBOARD_ADMIN_PASSWORD`.
-2. The dashboard issues a signed `dashboard_session` cookie using `DASHBOARD_SESSION_SECRET`.
-3. Browser API calls go to `/api/backend/...` on the dashboard service.
-4. The dashboard server verifies the session cookie.
-5. The dashboard server forwards the request to the backend with:
+2. The dashboard resolves the password owner through `/v1/tenant-admin/login/resolve`.
+3. The dashboard issues a signed `dashboard_session` cookie using the backend tenant user id, email, and role.
+4. Browser API calls go to `/api/backend/...` on the dashboard service.
+5. The dashboard server verifies the session cookie.
+6. The dashboard server forwards the request to the backend with:
    - `x-api-key` from server-side `DASHBOARD_API_KEY`
+   - `x-dashboard-user-id`, `x-dashboard-user-email`, `x-dashboard-user-role`, and `x-dashboard-tenant-id`
    - Cloud Run identity token when `BACKEND_AUTH_MODE=google_id_token`
+
+The backend only accepts dashboard role headers when they match an active
+tenant user for the API-key tenant.
 
 ## Required Dashboard Runtime Secrets
 

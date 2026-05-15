@@ -53,18 +53,55 @@ def permissions_for_role(role: str) -> list[str]:
     return ROLE_PERMISSIONS.get(role, ["tenant:read"])
 
 
-def require_tenant_reader(auth: dict, dashboard_role: str | None = None) -> None:
-    if auth.get("role") == "admin" and not dashboard_role:
+def resolve_dashboard_session_user(
+    db: Session,
+    tenant_id: str,
+    dashboard_email: str | None = None,
+    dashboard_role: str | None = None,
+    dashboard_user_id: str | None = None,
+    dashboard_tenant_id: str | None = None,
+) -> TenantUser | None:
+    has_dashboard_claim = any([dashboard_email, dashboard_role, dashboard_user_id, dashboard_tenant_id])
+    if not has_dashboard_claim:
+        return None
+
+    if dashboard_tenant_id and dashboard_tenant_id != tenant_id:
+        raise HTTPException(status_code=403, detail="Dashboard tenant does not match API key tenant")
+
+    normalized_role = (dashboard_role or "").strip().lower()
+    if normalized_role not in TENANT_ROLES:
+        raise HTTPException(status_code=403, detail="Valid dashboard user role is required")
+
+    normalized_email = normalize_email(dashboard_email) if dashboard_email else None
+    if not normalized_email and not dashboard_user_id:
+        raise HTTPException(status_code=403, detail="Dashboard user identity is required")
+
+    query = db.query(TenantUser).filter(TenantUser.tenant_id == tenant_id)
+    if dashboard_user_id:
+        query = query.filter(TenantUser.id == dashboard_user_id)
+    if normalized_email:
+        query = query.filter(TenantUser.email == normalized_email)
+
+    user = query.first()
+    if not user or user.status != "active":
+        raise HTTPException(status_code=403, detail="Active tenant user session is required")
+    if user.role != normalized_role:
+        raise HTTPException(status_code=403, detail="Dashboard role does not match tenant user")
+    return user
+
+
+def require_tenant_reader(auth: dict, dashboard_user: TenantUser | None = None) -> None:
+    if auth.get("role") == "admin" and not dashboard_user:
         return
-    if (dashboard_role or "").lower() in READ_ROLES:
+    if dashboard_user and dashboard_user.role in READ_ROLES:
         return
     raise HTTPException(status_code=403, detail="Tenant user session is required")
 
 
-def require_tenant_admin(auth: dict, dashboard_role: str | None = None) -> None:
-    if auth.get("role") == "admin" and not dashboard_role:
+def require_tenant_admin(auth: dict, dashboard_user: TenantUser | None = None) -> None:
+    if auth.get("role") == "admin" and not dashboard_user:
         return
-    if (dashboard_role or "").lower() in ADMIN_ROLES:
+    if dashboard_user and dashboard_user.role in ADMIN_ROLES:
         return
     raise HTTPException(status_code=403, detail="Tenant administrator role is required")
 

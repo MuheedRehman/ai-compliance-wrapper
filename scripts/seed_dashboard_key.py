@@ -22,7 +22,7 @@ DEMO_SYSTEM_ID = "sys-dashboard-demo"
 DEMO_FEATURE_ID = "dashboard_demo_assistant"
 DB_RETRIES = int(os.getenv("SEED_DB_RETRIES", "5"))
 DB_RETRY_DELAY_SECONDS = float(os.getenv("SEED_DB_RETRY_DELAY_SECONDS", "2"))
-DASHBOARD_OWNER_EMAIL = os.getenv("DASHBOARD_OWNER_EMAIL", "").strip().lower()
+DASHBOARD_OWNER_EMAIL = (os.getenv("DASHBOARD_OWNER_EMAIL") or "dashboard-admin@local").strip().lower()
 DASHBOARD_OWNER_NAME = os.getenv("DASHBOARD_OWNER_NAME", "Dashboard Owner")
 
 ENTITLEMENTS = [
@@ -102,7 +102,7 @@ def _seed_once():
                     name=DASHBOARD_OWNER_NAME,
                     role="owner",
                     status="active",
-                    auth_provider="google",
+                    auth_provider="password",
                 ))
                 print(f"Created tenant owner user: {DASHBOARD_OWNER_EMAIL}")
 

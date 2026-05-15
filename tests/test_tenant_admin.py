@@ -1,6 +1,23 @@
 from tests.conftest import TENANT_ID
 
 
+def owner_session_headers(client, admin_headers, email="owner@example.com"):
+    response = client.post(
+        "/v1/tenant-admin/login/resolve",
+        headers=admin_headers,
+        json={"email": email, "name": "Owner", "provider": "google"},
+    )
+    assert response.status_code == 200
+    user = response.json()["user"]
+    return {
+        **admin_headers,
+        "x-dashboard-user-email": user["email"],
+        "x-dashboard-user-role": user["role"],
+        "x-dashboard-user-id": user["id"],
+        "x-dashboard-tenant-id": TENANT_ID,
+    }
+
+
 def test_tenant_admin_summary_bootstraps_policy(client, admin_headers):
     response = client.get("/v1/tenant-admin/summary", headers=admin_headers)
 
@@ -13,7 +30,7 @@ def test_tenant_admin_summary_bootstraps_policy(client, admin_headers):
 
 
 def test_owner_session_can_manage_users_policy_and_invitations(client, admin_headers):
-    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner", "x-dashboard-user-email": "owner@example.com"}
+    owner_headers = owner_session_headers(client, admin_headers)
 
     user_response = client.post(
         "/v1/tenant-admin/users",
@@ -54,7 +71,19 @@ def test_owner_session_can_manage_users_policy_and_invitations(client, admin_hea
 
 
 def test_viewer_session_cannot_write_tenant_admin_data(client, admin_headers):
-    viewer_headers = {**admin_headers, "x-dashboard-user-role": "viewer"}
+    owner_headers = owner_session_headers(client, admin_headers)
+    viewer = client.post(
+        "/v1/tenant-admin/users",
+        headers=owner_headers,
+        json={"email": "viewer@example.com", "role": "viewer", "status": "active"},
+    ).json()
+    viewer_headers = {
+        **admin_headers,
+        "x-dashboard-user-email": viewer["email"],
+        "x-dashboard-user-role": viewer["role"],
+        "x-dashboard-user-id": viewer["id"],
+        "x-dashboard-tenant-id": TENANT_ID,
+    }
 
     response = client.post(
         "/v1/tenant-admin/users",
@@ -63,6 +92,48 @@ def test_viewer_session_cannot_write_tenant_admin_data(client, admin_headers):
     )
 
     assert response.status_code == 403
+
+
+def test_dashboard_role_header_requires_active_tenant_user(client, admin_headers):
+    spoofed_headers = {
+        **admin_headers,
+        "x-dashboard-user-role": "owner",
+        "x-dashboard-user-email": "ghost@example.com",
+        "x-dashboard-tenant-id": TENANT_ID,
+    }
+
+    response = client.post(
+        "/v1/tenant-admin/users",
+        headers=spoofed_headers,
+        json={"email": "reviewer@example.com", "role": "reviewer"},
+    )
+
+    assert response.status_code == 403
+    assert "active tenant user" in response.json()["error"]["message"].lower()
+
+
+def test_dashboard_role_header_must_match_persisted_user_role(client, admin_headers):
+    owner_headers = owner_session_headers(client, admin_headers)
+    mismatched_headers = {**owner_headers, "x-dashboard-user-role": "viewer"}
+
+    response = client.patch(
+        "/v1/tenant-admin/auth-policy",
+        headers=mismatched_headers,
+        json={"default_role": "auditor"},
+    )
+
+    assert response.status_code == 403
+    assert "does not match" in response.json()["error"]["message"].lower()
+
+
+def test_dashboard_tenant_header_must_match_api_key_tenant(client, admin_headers):
+    owner_headers = owner_session_headers(client, admin_headers)
+    mismatched_headers = {**owner_headers, "x-dashboard-tenant-id": "other-tenant"}
+
+    response = client.get("/v1/tenant-admin/users", headers=mismatched_headers)
+
+    assert response.status_code == 403
+    assert "tenant does not match" in response.json()["error"]["message"].lower()
 
 
 def test_login_resolve_first_google_user_becomes_owner_and_is_audited(client, admin_headers):
@@ -85,7 +156,7 @@ def test_login_resolve_first_google_user_becomes_owner_and_is_audited(client, ad
 
 
 def test_login_policy_blocks_unallowed_google_identity(client, admin_headers):
-    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner"}
+    owner_headers = owner_session_headers(client, admin_headers)
     policy_response = client.patch(
         "/v1/tenant-admin/auth-policy",
         headers=owner_headers,
@@ -105,7 +176,7 @@ def test_login_policy_blocks_unallowed_google_identity(client, admin_headers):
 
 
 def test_pending_invitation_is_accepted_on_matching_google_login(client, admin_headers):
-    owner_headers = {**admin_headers, "x-dashboard-user-role": "owner"}
+    owner_headers = owner_session_headers(client, admin_headers)
     invite_response = client.post(
         "/v1/tenant-admin/invitations",
         headers=owner_headers,
