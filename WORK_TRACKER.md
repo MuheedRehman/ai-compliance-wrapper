@@ -28,13 +28,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `53321fc` via Cloud Build `e675cc07-0507-4853-a8bb-f004f5066fc9` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `1a14f23` via Cloud Build `b3f161a0-2435-4e19-95a2-04f1444d2fc1` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00034-7wn`
-  - Backend: `ai-compliance-backend-00065-snd`
+  - Dashboard: `ai-compliance-dashboard-00035-v2p`
+  - Backend: `ai-compliance-backend-00067-xbd`
 
 ## Module Status Board
 
@@ -75,7 +75,7 @@ Recovered from repo state:
 - Module 4 role-branching slice completed and deployed: each scanner result now includes Provider, Deployer, and Importer/Distributor obligation scenarios with role-specific dimensions, controls, evidence requirements, manual-review flags, and fine exposure.
 - Module 4 role-selection slice completed and deployed: scanner users can choose Provider, Deployer, or Importer/Distributor before creating a workspace/report, and that chosen role now drives the created intake, controls, evidence scope, and persisted scan state.
 - Backend hardening slice completed and deployed: scanner workspace/report creation now runs atomically with rollback coverage, shared creation services support caller-owned transactions, and production config rejects SQLite, weak evidence secrets, wildcard frontend CORS, demo AI mode, mock Stripe defaults, and missing live OpenAI credentials.
-- Module 2 RBAC hardening slice completed locally: tenant-admin dashboard role headers must now match an active tenant user, tenant headers must match the API-key tenant, password login resolves through the backend before issuing a session cookie, and staging seed creates the password owner user.
+- Module 2 RBAC hardening slice completed and deployed: tenant-admin dashboard role headers must now match an active tenant user, tenant headers must match the API-key tenant, password login resolves through the backend before issuing a session cookie, and staging seed creates the password owner user.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -114,7 +114,7 @@ Use this as the next session checklist.
 - [x] Implement backend hardening for scanner report transaction rollback and production config guardrails.
 - [x] Deploy backend hardening slice to GCP staging and update the deployed baseline.
 - [x] Implement Module 2 active-user-bound dashboard RBAC headers for tenant admin.
-- [ ] Deploy Module 2 RBAC hardening slice to GCP staging and update the deployed baseline.
+- [x] Deploy Module 2 RBAC hardening slice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
