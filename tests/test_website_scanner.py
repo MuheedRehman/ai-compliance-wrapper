@@ -225,6 +225,37 @@ def test_should_render_page_marks_script_heavy_app_shell(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_collect_pages_does_not_render_missing_candidate_pages(monkeypatch):
+    service = WebsiteScannerService()
+    render_calls = 0
+
+    async def fake_fetch_page(self, url):
+        if url.endswith("/"):
+            return PageArtifact(
+                url=url,
+                status_code=200,
+                title="Static SaaS",
+                text="Static SaaS is an AI chatbot with a privacy policy.",
+                links=[],
+                render_metadata={"script_count": 0, "app_shell_detected": False},
+            )
+        return None
+
+    async def fake_render_page(self, url, fallback_page=None):
+        nonlocal render_calls
+        render_calls += 1
+        return fallback_page
+
+    monkeypatch.setenv("SCANNER_RENDERED_CRAWL_ENABLED", "true")
+    monkeypatch.setattr(WebsiteScannerService, "fetch_page", fake_fetch_page)
+    monkeypatch.setattr(WebsiteScannerService, "render_page", fake_render_page)
+
+    pages = await service.collect_pages("https://static.example/", 3)
+    assert len(pages) == 1
+    assert render_calls == 0
+
+
+@pytest.mark.asyncio
 async def test_convert_website_scan_creates_system_and_intake(client, admin_headers, monkeypatch):
     async def fake_collect_pages(self, normalized_url, max_pages):
         return [

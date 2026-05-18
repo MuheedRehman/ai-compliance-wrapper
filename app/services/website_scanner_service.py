@@ -625,8 +625,6 @@ class WebsiteScannerService:
             page = await self.fetch_page(url)
             if page and self.should_render_page(page):
                 page = await self.render_page_if_better(url, page)
-            elif page is None and self.rendered_crawl_enabled():
-                page = await self.render_page(url)
             if page:
                 pages.append(page)
                 for discovered in self.discover_compliance_links(normalized_url, page.links):

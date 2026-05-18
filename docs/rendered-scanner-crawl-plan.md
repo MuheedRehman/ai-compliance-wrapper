@@ -10,7 +10,7 @@ The upgraded scanner uses a hybrid strategy:
 
 1. Fetch raw HTML first.
 2. Detect JavaScript-dependent or shallow pages.
-3. Render only likely-problem pages with headless Chromium through Playwright.
+3. Render only successfully fetched likely-problem pages with headless Chromium through Playwright.
 4. Scroll in bounded steps until text/page height stop changing.
 5. Safely expand non-destructive controls such as "show more" and accordions.
 6. Prefer rendered text only when it materially improves extracted evidence.
@@ -18,7 +18,7 @@ The upgraded scanner uses a hybrid strategy:
 
 ## Trigger Rules
 
-Rendered crawling is selective. A page becomes a render candidate when one or more of these conditions apply:
+Rendered crawling is selective. The scanner does not render missing/404 candidate URLs. A successfully fetched page becomes a render candidate when one or more of these conditions apply:
 
 - The raw page looks like a JavaScript app shell (`__next`, `__nuxt`, `id="root"`, `id="app"`, React/Angular/Vite markers) and has shallow readable text.
 - The page has many scripts and little readable text.
