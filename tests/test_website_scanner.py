@@ -95,6 +95,62 @@ async def test_create_website_scan_detects_ai_and_high_risk(client, admin_header
 
 
 @pytest.mark.asyncio
+async def test_website_scan_extracts_public_evidence_profile_and_richer_gaps(client, admin_headers, monkeypatch):
+    async def fake_collect_pages(self, normalized_url, max_pages):
+        return [
+            PageArtifact(
+                url=normalized_url,
+                status_code=200,
+                title="AssessPro AI",
+                text=(
+                    "AssessPro AI uses artificial intelligence for credit scoring and loan eligibility. "
+                    "It ranks applicants automatically. Model limitations and accuracy warnings may apply."
+                ),
+                links=[],
+            ),
+            PageArtifact(
+                url=f"{normalized_url.rstrip('/')}/privacy",
+                status_code=200,
+                title="Privacy",
+                text="Privacy policy, GDPR, data processing, DPA, subprocessors, and data retention are documented.",
+                links=[],
+            ),
+            PageArtifact(
+                url=f"{normalized_url.rstrip('/')}/security",
+                status_code=200,
+                title="Security",
+                text="Security controls include SOC 2, ISO 27001, encryption, and vulnerability management.",
+                links=[],
+            ),
+        ]
+
+    monkeypatch.setattr(WebsiteScannerService, "validate_public_url", lambda self, url: None)
+    monkeypatch.setattr(WebsiteScannerService, "collect_pages", fake_collect_pages)
+
+    response = client.post(
+        "/v1/website-scans",
+        headers=admin_headers,
+        json={"url": "https://assesspro.example", "max_pages": 4},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    profile = body["classification_json"]["public_evidence_profile"]
+    assert profile["coverage"]["data_governance"] is True
+    assert profile["coverage"]["security_certification"] is True
+    assert profile["coverage"]["limitations_accuracy"] is True
+    assert profile["coverage"]["human_oversight"] is False
+    assert profile["coverage_score"] > 40
+    assert any(ref["type"] == "public_evidence_topic" for ref in body["evidence_refs_json"])
+    assert any("data_governance" in page["evidence_topics"] for page in body["source_pages_json"])
+
+    gap_titles = {gap["title"] for gap in body["gap_findings_json"]}
+    assert "User-facing AI disclosure evidence not found" in gap_titles
+    assert "Human oversight evidence missing for high-risk triage" in gap_titles
+    assert "Logging or incident process evidence missing" in gap_titles
+
+
+@pytest.mark.asyncio
 async def test_convert_website_scan_creates_system_and_intake(client, admin_headers, monkeypatch):
     async def fake_collect_pages(self, normalized_url, max_pages):
         return [
@@ -299,6 +355,17 @@ async def test_generate_website_scan_report_converts_scan_and_links_sources(
     assert body["evidence_event_id"]
     assert body["report"]["report_type"] == "compliance_readiness_summary"
     assert body["report"]["ai_system_id"] == body["ai_system"]["id"]
+    audit_pack = body["report"]["report_json"]["scanner_audit_pack"]
+    assert audit_pack["summary"]["scan_count"] == 1
+    assert audit_pack["summary"]["found_topic_count"] >= 3
+    assert audit_pack["summary"]["average_public_evidence_coverage"] > 0
+    assert any(topic["topic"] == "human_oversight" for topic in audit_pack["found_topics"])
+    assert any(topic["topic"] == "logging_monitoring" for topic in audit_pack["found_topics"])
+    assert any(source["url"] == scan["normalized_url"] for source in audit_pack["public_sources"])
+    assert any(
+        finding["title"].startswith("Scanner gap:")
+        for finding in body["report"]["report_json"]["findings"]
+    )
     assert any(ref["type"] == "website_scan" and ref["id"] == scan["id"] for ref in body["report"]["source_refs_json"])
     assert any(ref["type"] == "intake" and ref["id"] == body["intake"]["id"] for ref in body["report"]["source_refs_json"])
     assert any(ref["type"] == "evidence_log" and ref["id"] == body["evidence_event_id"] for ref in body["report"]["source_refs_json"])
@@ -306,6 +373,11 @@ async def test_generate_website_scan_report_converts_scan_and_links_sources(
     report = db_session.query(ReportRecord).filter(ReportRecord.id == body["report"]["id"]).first()
     assert report is not None
     assert report.ai_system_id == body["ai_system"]["id"]
+
+    artifact = client.get(f"/v1/reports/{body['report']['id']}/artifacts/report.md", headers=admin_headers)
+    assert artifact.status_code == 200
+    assert "## Website Scanner Audit Pack" in artifact.text
+    assert "Public evidence coverage" in artifact.text
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-15
+Last updated: 2026-05-19
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -19,6 +19,23 @@ Current product focus:
 3. Keep Module 3 AI System Lifecycle Workspace usable as the command center for each AI system.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
 5. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
+
+## Mandatory Module Execution Workflow
+
+When the user asks to continue, carry on, execute, or implement any module slice, the default workflow is end-to-end:
+
+1. Read `WORK_TRACKER.md`, read `MODULE_ROADMAP_RECOVERY.md`, and run `git status --short --branch`.
+2. Continue from the latest deployed staging baseline recorded in this tracker.
+3. Implement the requested slice locally with scoped tests and UI checks where applicable.
+4. Run the relevant test suite; for deployable slices, run the full backend suite and dashboard lint/build checks when frontend code changed.
+5. Update `WORK_TRACKER.md` and any relevant roadmap/docs.
+6. Commit all intended changes in the canonical nested `backend` repo.
+7. Push the commit to GitHub `main`.
+8. Deploy the pushed commit to GCP staging through Cloud Build.
+9. Verify the live Cloud Run backend/dashboard revisions and live smoke/E2E result.
+10. Update this tracker with the new deployed commit, Cloud Build id/status, Cloud Run revisions, and any verification notes.
+
+Do not stop after local implementation unless the user explicitly asks for local-only work or deployment is blocked by credentials, infrastructure, or a failing gate.
 
 Current technical baseline:
 
@@ -40,14 +57,14 @@ Current technical baseline:
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
-| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, and persisted role selection for conversion/report generation exist. | Harden crawl/extraction quality, add deeper public-page evidence extraction, and polish report/audit pack output. |
+| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, and topic-level public evidence profiling exist. | Continue hardening crawl quality and polish report/audit pack output. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
-| 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete. | Produce polished audit pack: PDF, evidence bundle, factsheet, gap assessment, remediation plan. |
+| 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete, and scanner-generated reports now include a scanner audit pack with public evidence coverage, found/missing evidence topics, public source excerpts, scanner gap findings, and remediation actions. | Continue polished audit pack work: PDF, evidence bundle packaging, AI system factsheet, and richer remediation plan export. |
 | 9. Runtime Governance SDK | Foundation only | Chat pipeline, feature approvals, provider abstraction, evidence logging exist. | Package policy checks, developer API keys, usage dashboard, and SDK-style docs. |
 | 10. Integrations | Future | Stripe billing/provider foundations exist. | Add Drive/SharePoint, Slack/Teams, Jira/Linear, GitHub, cloud logs after core workflows stabilize. |
 
@@ -77,6 +94,8 @@ Recovered from repo state:
 - Backend hardening slice completed and deployed: scanner workspace/report creation now runs atomically with rollback coverage, shared creation services support caller-owned transactions, and production config rejects SQLite, weak evidence secrets, wildcard frontend CORS, demo AI mode, mock Stripe defaults, and missing live OpenAI credentials.
 - Module 2 RBAC hardening slice completed and deployed: tenant-admin dashboard role headers must now match an active tenant user, tenant headers must match the API-key tenant, password login resolves through the backend before issuing a session cookie, and staging seed creates the password owner user.
 - Module 2 action audit slice completed and deployed: tenant/user creation, role/status updates, invitation creation/revocation, and auth policy changes now create before/after admin audit events exposed through `/v1/tenant-admin/action-audit`, tenant summary, and the dashboard Users & Access page.
+- Module 1 scanner extraction hardening completed locally: scanner crawl candidates now include trust center, security/compliance, DPA, subprocessors, docs, and help pages; public evidence profiling extracts disclosure, human oversight, logging/monitoring, limitations, data governance, security, and vendor-documentation evidence; source pages now include evidence topics; and high-risk gap output now flags missing disclosure, oversight, and logging/incident evidence more specifically.
+- Module 8 scanner audit pack polish completed locally: scanner-generated compliance readiness reports now include a dedicated `scanner_audit_pack` in report JSON/Markdown with coverage score, found/missing public evidence topics, source excerpts, scanner-derived findings, remediation actions, and penalty exposure propagation; dashboard report detail now renders the scanner audit pack.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -89,7 +108,7 @@ Use this as the next session checklist.
 - [x] Run backend test suite from `backend`.
 - [x] Confirm Alembic head is `0010_tenant_action_audit.py`.
 - [x] Validate Module 1 scanner happy path in API and dashboard.
-- [ ] Improve scanner extraction/gap output if results are shallow.
+- [x] Improve scanner extraction/gap output if results are shallow.
 - [x] Make "convert scan" create or update a useful AI system profile.
 - [x] Connect scanner result to controls/evidence/report generation.
 - [x] Decide whether to finish Module 1 before further Module 2 hardening. Decision: move into Module 3 while preserving Module 1 links.
@@ -118,15 +137,17 @@ Use this as the next session checklist.
 - [x] Deploy Module 2 RBAC hardening slice to GCP staging and update the deployed baseline.
 - [x] Implement Module 2 admin action audit trail for tenant/user changes.
 - [x] Deploy Module 2 admin action audit trail to GCP staging and update the deployed baseline.
+- [x] Implement Module 8 scanner audit pack polish for scanner-generated reports.
 
 ## Tracking Rules Going Forward
 
-1. Update this file after every implementation session.
+1. Update this file after every implementation session and again after deployment verification.
 2. Add new completed files/routes/tests under the relevant module status.
 3. Keep `MODULE_ROADMAP_RECOVERY.md` as the product roadmap.
 4. Keep this file as the operational task board.
 5. When a module moves status, update both the status board and active checklist.
 6. Before starting a new module, record the reason in "Current Position".
+7. Every module slice is expected to be committed, pushed, deployed to GCP staging, and verified unless explicitly marked local-only or blocked.
 
 ## Status Definitions
 

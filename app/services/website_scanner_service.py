@@ -85,10 +85,17 @@ class WebsiteScannerService:
         "/terms",
         "/terms-of-service",
         "/security",
+        "/trust-center",
         "/trust",
         "/compliance",
+        "/security-and-compliance",
         "/ai",
         "/responsible-ai",
+        "/data-processing",
+        "/dpa",
+        "/subprocessors",
+        "/docs",
+        "/help",
         "/legal",
     ]
 
@@ -132,6 +139,16 @@ class WebsiteScannerService:
             r"\bbiometric\b",
             r"\bcritical infrastructure\b",
             r"\bessential service(s)?\b",
+            r"\bpublic benefit(s)?\b",
+            r"\bhealth insurance\b",
+            r"\blife insurance\b",
+            r"\bworker monitoring\b",
+            r"\bemployee monitoring\b",
+            r"\bperformance evaluation\b",
+            r"\btask allocation\b",
+            r"\bproctoring\b",
+            r"\bemergency dispatch\b",
+            r"\bemergency triage\b",
         ],
         "prohibited_risk": [
             r"\bsocial scoring\b",
@@ -151,10 +168,17 @@ class WebsiteScannerService:
             r"\bresponsible ai\b",
             r"\bethical ai\b",
             r"\bhuman oversight\b",
+            r"\bhuman review\b",
+            r"\bhuman[- ]in[- ]the[- ]loop\b",
             r"\brisk management\b",
             r"\baudit log(s)?\b",
+            r"\bactivity log(s)?\b",
             r"\bincident\b",
+            r"\bpost-market monitoring\b",
+            r"\bappeal(s)?\b",
+            r"\bcontest (a )?decision\b",
             r"\bmodel card\b",
+            r"\bmodel limitation(s)?\b",
         ],
         "privacy_security": [
             r"\bprivacy policy\b",
@@ -163,7 +187,116 @@ class WebsiteScannerService:
             r"\bsecurity\b",
             r"\bsoc 2\b",
             r"\biso 27001\b",
+            r"\bdata protection addendum\b",
+            r"\bdpa\b",
+            r"\bsubprocessor(s)?\b",
+            r"\bencryption\b",
         ],
+    }
+
+    PUBLIC_EVIDENCE_TOPICS = {
+        "ai_disclosure": {
+            "label": "User-facing AI disclosure",
+            "dimension_id": "transparency_notice",
+            "article": "Article 50",
+            "evidence_domain": "transparency",
+            "patterns": [
+                r"\bai disclosure\b",
+                r"\bai notice\b",
+                r"\bclearly identif(y|ies|ied) as ai\b",
+                r"\binteracting with (an )?ai\b",
+                r"\bai-generated\b",
+                r"\bmachine-generated\b",
+                r"\bwatermark(ed|ing)?\b",
+            ],
+        },
+        "human_oversight": {
+            "label": "Human oversight or appeal path",
+            "dimension_id": "deployer_high_risk_operations",
+            "article": "Article 26",
+            "evidence_domain": "human_oversight",
+            "patterns": [
+                r"\bhuman oversight\b",
+                r"\bhuman review\b",
+                r"\bhuman[- ]in[- ]the[- ]loop\b",
+                r"\bmanual review\b",
+                r"\bappeal(s)?\b",
+                r"\bcontest (a )?decision\b",
+            ],
+        },
+        "logging_monitoring": {
+            "label": "Logging, monitoring, or incident process",
+            "dimension_id": "post_market_monitoring",
+            "article": "Articles 72-73",
+            "evidence_domain": "post_market_monitoring",
+            "patterns": [
+                r"\baudit log(s)?\b",
+                r"\bactivity log(s)?\b",
+                r"\blog retention\b",
+                r"\bmonitoring\b",
+                r"\bincident reporting\b",
+                r"\bpost-market monitoring\b",
+                r"\bstatus page\b",
+            ],
+        },
+        "limitations_accuracy": {
+            "label": "Model limitations or accuracy warning",
+            "dimension_id": "transparency_notice",
+            "article": "Article 50",
+            "evidence_domain": "transparency",
+            "patterns": [
+                r"\bmodel limitation(s)?\b",
+                r"\blimitation(s)? of (the )?(ai|model|system)\b",
+                r"\bmay be inaccurate\b",
+                r"\baccuracy\b",
+                r"\bhallucination(s)?\b",
+                r"\bnot (legal|medical|financial) advice\b",
+            ],
+        },
+        "data_governance": {
+            "label": "Privacy and data governance",
+            "dimension_id": "provider_high_risk_requirements",
+            "article": "Articles 8-16",
+            "evidence_domain": "provider_controls",
+            "patterns": [
+                r"\bprivacy policy\b",
+                r"\bgdpr\b",
+                r"\bdata processing\b",
+                r"\bdata protection addendum\b",
+                r"\bdpa\b",
+                r"\bsubprocessor(s)?\b",
+                r"\bdata retention\b",
+                r"\btraining data\b",
+            ],
+        },
+        "security_certification": {
+            "label": "Security certification or controls",
+            "dimension_id": "provider_high_risk_requirements",
+            "article": "Articles 8-16",
+            "evidence_domain": "provider_controls",
+            "patterns": [
+                r"\bsecurity\b",
+                r"\bsoc 2\b",
+                r"\biso 27001\b",
+                r"\bencryption\b",
+                r"\bpenetration test(ing)?\b",
+                r"\bvulnerability management\b",
+            ],
+        },
+        "vendor_documentation": {
+            "label": "Technical or vendor documentation",
+            "dimension_id": "importer_distributor_verification",
+            "article": "Articles 23-24",
+            "evidence_domain": "value_chain_review",
+            "patterns": [
+                r"\bmodel card\b",
+                r"\btechnical documentation\b",
+                r"\binstructions for use\b",
+                r"\bdeclaration of conformity\b",
+                r"\bce marking\b",
+                r"\bvendor documentation\b",
+            ],
+        },
     }
 
     PAGE_KEYWORDS = {
@@ -171,7 +304,7 @@ class WebsiteScannerService:
         "terms": ["terms"],
         "security": ["security", "trust"],
         "ai": ["ai", "artificial-intelligence", "responsible-ai"],
-        "compliance": ["compliance", "legal"],
+        "compliance": ["compliance", "legal", "dpa", "data-processing", "subprocessor", "docs", "help"],
     }
 
     SIGNAL_CATEGORY_DIMENSIONS = {
@@ -487,9 +620,12 @@ class WebsiteScannerService:
         combined = "\n".join(page.text for page in pages)
         title = pages[0].title or urlparse(normalized_url).hostname
         signals, evidence_refs = self.detect_signals(pages)
+        evidence_profile = self.extract_public_evidence_profile(pages)
+        evidence_refs = self.merge_evidence_refs(evidence_refs, evidence_profile)
         annex_iii_matches = match_annex_iii_categories(combined)
         classification = self.classify(signals, annex_iii_matches)
-        gaps = self.find_gaps(signals, pages, classification)
+        classification["public_evidence_profile"] = evidence_profile
+        gaps = self.find_gaps(signals, pages, classification, evidence_profile)
         suggested_actions = self.suggest_actions(classification, gaps)
         confidence = self.score_confidence(pages, signals)
         source_pages = [
@@ -498,6 +634,11 @@ class WebsiteScannerService:
                 "status_code": page.status_code,
                 "title": page.title,
                 "text_excerpt": page.text[:280],
+                "evidence_topics": [
+                    topic["topic"]
+                    for topic in evidence_profile.get("topics", [])
+                    if topic.get("source_url") == page.url
+                ],
             }
             for page in pages
         ]
@@ -549,6 +690,79 @@ class WebsiteScannerService:
                     break
 
         return signals, evidence_refs[:20]
+
+    def extract_public_evidence_profile(self, pages: list[PageArtifact]) -> dict[str, Any]:
+        topics: list[dict[str, Any]] = []
+        seen_topics: set[str] = set()
+
+        for page in pages:
+            text_lower = page.text.lower()
+            for topic, config in self.PUBLIC_EVIDENCE_TOPICS.items():
+                if topic in seen_topics:
+                    continue
+                for pattern in config["patterns"]:
+                    match = re.search(pattern, text_lower, flags=re.IGNORECASE)
+                    if not match:
+                        continue
+                    seen_topics.add(topic)
+                    topics.append({
+                        "topic": topic,
+                        "label": config["label"],
+                        "source_url": page.url,
+                        "excerpt": self.excerpt(page.text, match.start(), match.end()),
+                        "dimension_id": config["dimension_id"],
+                        "article": config["article"],
+                        "evidence_domain": config["evidence_domain"],
+                    })
+                    break
+
+        topic_ids = {topic["topic"] for topic in topics}
+        return {
+            "topics": topics,
+            "coverage": {
+                "ai_disclosure": "ai_disclosure" in topic_ids,
+                "human_oversight": "human_oversight" in topic_ids,
+                "logging_monitoring": "logging_monitoring" in topic_ids,
+                "limitations_accuracy": "limitations_accuracy" in topic_ids,
+                "data_governance": "data_governance" in topic_ids,
+                "security_certification": "security_certification" in topic_ids,
+                "vendor_documentation": "vendor_documentation" in topic_ids,
+            },
+            "coverage_score": self.score_public_evidence_coverage(topic_ids),
+            "missing_topics": [
+                config["label"]
+                for topic, config in self.PUBLIC_EVIDENCE_TOPICS.items()
+                if topic not in topic_ids
+            ],
+        }
+
+    @staticmethod
+    def score_public_evidence_coverage(topic_ids: set[str]) -> int:
+        if not topic_ids:
+            return 0
+        core_topics = {"ai_disclosure", "human_oversight", "data_governance", "security_certification"}
+        core_score = sum(18 for topic in core_topics if topic in topic_ids)
+        supporting_score = sum(7 for topic in topic_ids - core_topics)
+        return min(100, core_score + supporting_score)
+
+    @staticmethod
+    def merge_evidence_refs(
+        signal_refs: list[dict[str, Any]],
+        evidence_profile: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        refs = list(signal_refs)
+        for topic in evidence_profile.get("topics", []):
+            refs.append({
+                "type": "public_evidence_topic",
+                "category": topic["topic"],
+                "label": topic["label"],
+                "source_url": topic["source_url"],
+                "excerpt": topic["excerpt"],
+                "dimension_id": topic["dimension_id"],
+                "article": topic["article"],
+                "evidence_domain": topic["evidence_domain"],
+            })
+        return refs[:30]
 
     def classify(
         self,
@@ -772,12 +986,14 @@ class WebsiteScannerService:
         signals: list[dict[str, Any]],
         pages: list[PageArtifact],
         classification: dict[str, Any],
+        evidence_profile: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         categories = {signal["category"] for signal in signals}
         page_urls = " ".join(page.url.lower() for page in pages)
+        coverage = (evidence_profile or {}).get("coverage", {})
         gaps: list[dict[str, Any]] = []
 
-        if "ai_claim" in categories and "governance" not in categories:
+        if "ai_claim" in categories and "governance" not in categories and not coverage.get("human_oversight"):
             gaps.append({
                 "severity": "medium",
                 "title": "No public responsible AI governance signal found",
@@ -786,6 +1002,16 @@ class WebsiteScannerService:
                 "article": "Article 4",
                 "evidence_domain": "ai_literacy",
                 "penalty_exposure": penalty_exposure_for_dimension("ai_literacy", "Article 4"),
+            })
+        if classification["risk_level"] in {"limited", "high", "prohibited_review"} and not coverage.get("ai_disclosure"):
+            gaps.append({
+                "severity": "medium",
+                "title": "User-facing AI disclosure evidence not found",
+                "detail": "The scanner found AI functionality but did not find a clear public notice that users are interacting with AI or receiving AI-generated content.",
+                "dimension_id": "transparency_notice",
+                "article": "Article 50",
+                "evidence_domain": "transparency",
+                "penalty_exposure": penalty_exposure_for_dimension("transparency_notice", "Article 50"),
             })
         if classification["risk_level"] in {"high", "prohibited_review"}:
             dimension_id = "prohibited_practice_review" if classification["risk_level"] == "prohibited_review" else "high_risk_classification"
@@ -799,6 +1025,26 @@ class WebsiteScannerService:
                 "evidence_domain": "classification",
                 "penalty_exposure": penalty_exposure_for_dimension(dimension_id, article),
             })
+            if not coverage.get("human_oversight"):
+                gaps.append({
+                    "severity": "high",
+                    "title": "Human oversight evidence missing for high-risk triage",
+                    "detail": "High-risk or prohibited-review signals were detected, but public pages did not show human oversight, manual review, appeals, or decision-contestation evidence.",
+                    "dimension_id": "deployer_high_risk_operations",
+                    "article": "Article 26",
+                    "evidence_domain": "human_oversight",
+                    "penalty_exposure": penalty_exposure_for_dimension("deployer_high_risk_operations", "Article 26"),
+                })
+            if not coverage.get("logging_monitoring"):
+                gaps.append({
+                    "severity": "medium",
+                    "title": "Logging or incident process evidence missing",
+                    "detail": "The scanner did not find public evidence of audit logging, monitoring, incident reporting, or post-market monitoring for this higher-risk workflow.",
+                    "dimension_id": "post_market_monitoring",
+                    "article": "Articles 72-73",
+                    "evidence_domain": "post_market_monitoring",
+                    "penalty_exposure": penalty_exposure_for_dimension("post_market_monitoring", "Articles 72-73"),
+                })
         if "human_interaction" in categories and "ai" not in page_urls and "responsible-ai" not in page_urls:
             gaps.append({
                 "severity": "medium",
@@ -809,7 +1055,7 @@ class WebsiteScannerService:
                 "evidence_domain": "transparency",
                 "penalty_exposure": penalty_exposure_for_dimension("transparency_notice", "Article 50"),
             })
-        if "privacy_security" not in categories:
+        if "privacy_security" not in categories and not (coverage.get("data_governance") or coverage.get("security_certification")):
             gaps.append({
                 "severity": "medium",
                 "title": "Privacy/security evidence not found in scanned pages",

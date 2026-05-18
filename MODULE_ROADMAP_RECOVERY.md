@@ -4,6 +4,10 @@ Recovered from repository state on 2026-05-14. The previous chat transcript is n
 
 Operational tracker: `WORK_TRACKER.md`.
 
+## Operational Execution Rule
+
+Module work is not considered complete when it is only implemented locally. For every module slice, use the mandatory workflow in `WORK_TRACKER.md`: implement, test, update tracker/docs, commit in the nested `backend` repo, push to GitHub `main`, deploy to GCP staging through Cloud Build, verify live Cloud Run/backend-dashboard behavior, and record the deployed baseline. Only skip push/deploy when the user explicitly requests local-only work or a deploy gate is blocked.
+
 ## Confirmed Completed Phases
 
 - Phase 1: Core AI Registry & Evidence Base

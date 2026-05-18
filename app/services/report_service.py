@@ -14,6 +14,7 @@ from app.models import (
     IntakeAssessment,
     OversightAssignment,
     ReportRecord,
+    WebsiteScan,
 )
 from app.schemas import ReportCreate
 from app.services.entitlement_service import check_entitlement
@@ -72,6 +73,7 @@ class ReportService:
         remediation_actions = []
         evidence_refs = []
         penalty_exposures = []
+        scanner_audit_pack = None
         readiness = "needs_attention"
         
         # System-level context
@@ -171,6 +173,15 @@ class ReportService:
             elif fria_list or ovs_list or control_list:
                 readiness = "partially_ready"
 
+            scanner_audit_pack = ReportService._build_scanner_audit_pack(db, tenant_id, source_refs, ai_system_id)
+            if scanner_audit_pack:
+                findings.extend(scanner_audit_pack["findings"])
+                remediation_actions.extend(scanner_audit_pack["remediation_actions"])
+                evidence_refs.extend(scanner_audit_pack["evidence_references"])
+                penalty_exposures.extend(scanner_audit_pack["penalty_exposures"])
+                if scanner_audit_pack["high_or_medium_gap_count"]:
+                    readiness = "needs_attention" if readiness == "ready" else readiness
+
         elif payload.report_type == "incident_summary":
             incidents = db.query(IncidentRecord).filter(IncidentRecord.tenant_id == tenant_id)
             if ai_system_id:
@@ -218,6 +229,8 @@ class ReportService:
                 "rationale": "Generated based on available control, FRIA, oversight, incident, and evidence records."
             }
         }
+        if scanner_audit_pack:
+            report_data["scanner_audit_pack"] = scanner_audit_pack
         manifest = {
             "source_ref_count": len(source_refs),
             "evidence_ref_count": len(evidence_refs),
@@ -249,6 +262,132 @@ class ReportService:
             db.commit()
             db.refresh(report)
         return report
+
+    @staticmethod
+    def _build_scanner_audit_pack(
+        db: Session,
+        tenant_id: str,
+        source_refs: list[dict[str, Any]],
+        ai_system_id: str | None,
+    ) -> dict[str, Any] | None:
+        scan_ids = [
+            ref.get("id")
+            for ref in source_refs
+            if ref.get("type") == "website_scan" and ref.get("id")
+        ]
+        query = db.query(WebsiteScan).filter(WebsiteScan.tenant_id == tenant_id)
+        if scan_ids:
+            scans = query.filter(WebsiteScan.id.in_(scan_ids)).all()
+        elif ai_system_id:
+            scans = query.filter(WebsiteScan.ai_system_id == ai_system_id).order_by(WebsiteScan.created_at.desc()).limit(3).all()
+        else:
+            scans = []
+        if not scans:
+            return None
+
+        findings: list[dict[str, Any]] = []
+        remediation_actions: list[dict[str, Any]] = []
+        evidence_references: list[dict[str, Any]] = []
+        penalty_exposures: list[dict[str, Any]] = []
+        scans_summary: list[dict[str, Any]] = []
+        public_sources: list[dict[str, Any]] = []
+        found_topics: list[dict[str, Any]] = []
+        missing_topics: set[str] = set()
+        high_or_medium_gap_count = 0
+
+        for scan in scans:
+            classification = scan.classification_json or {}
+            profile = classification.get("public_evidence_profile") or {}
+            topics = profile.get("topics") or []
+            gaps = scan.gap_findings_json or []
+            annex_matches = classification.get("annex_iii_matches") or []
+
+            for topic in topics:
+                found_topics.append({
+                    "scan_id": scan.id,
+                    "topic": topic.get("topic"),
+                    "label": topic.get("label"),
+                    "source_url": topic.get("source_url"),
+                    "excerpt": topic.get("excerpt"),
+                    "dimension_id": topic.get("dimension_id"),
+                    "article": topic.get("article"),
+                    "evidence_domain": topic.get("evidence_domain"),
+                })
+                evidence_references.append({
+                    "id": f"{scan.id}:{topic.get('topic')}",
+                    "domain": topic.get("evidence_domain") or "website_scan",
+                    "type": "public_evidence_topic",
+                    "source_url": topic.get("source_url"),
+                })
+
+            for topic in profile.get("missing_topics") or []:
+                missing_topics.add(topic)
+
+            for gap in gaps:
+                if gap.get("severity") in {"high", "medium"}:
+                    high_or_medium_gap_count += 1
+                    findings.append({
+                        "title": f"Scanner gap: {gap.get('title', 'Public-page evidence gap')}",
+                        "severity": gap.get("severity", "medium"),
+                        "description": gap.get("detail", "The website scanner identified a public-page evidence gap."),
+                        "article": gap.get("article"),
+                        "dimension_id": gap.get("dimension_id"),
+                        "penalty_exposure": gap.get("penalty_exposure"),
+                    })
+                    remediation_actions.append({
+                        "title": f"Resolve scanner gap: {gap.get('title', 'Public-page evidence gap')}",
+                        "description": gap.get("detail", "Add or attach evidence that closes this scanner finding."),
+                        "article": gap.get("article"),
+                        "dimension_id": gap.get("dimension_id"),
+                        "penalty_exposure": gap.get("penalty_exposure"),
+                    })
+                    if gap.get("penalty_exposure"):
+                        penalty_exposures.append(gap["penalty_exposure"])
+
+            for page in scan.source_pages_json or []:
+                public_sources.append({
+                    "scan_id": scan.id,
+                    "url": page.get("url"),
+                    "title": page.get("title"),
+                    "text_excerpt": page.get("text_excerpt"),
+                    "evidence_topics": page.get("evidence_topics", []),
+                })
+
+            scans_summary.append({
+                "scan_id": scan.id,
+                "url": scan.normalized_url,
+                "title": scan.title,
+                "status": scan.status,
+                "confidence_score": scan.confidence_score,
+                "risk_level": classification.get("risk_level"),
+                "classification": classification.get("classification"),
+                "selected_actor_role": classification.get("selected_actor_role") or classification.get("canonical_actor_role"),
+                "coverage_score": profile.get("coverage_score", 0),
+                "coverage": profile.get("coverage", {}),
+                "gap_count": len(gaps),
+                "high_or_medium_gap_count": sum(1 for gap in gaps if gap.get("severity") in {"high", "medium"}),
+                "annex_iii_matches": annex_matches,
+            })
+
+        coverage_scores = [scan["coverage_score"] for scan in scans_summary if scan.get("coverage_score") is not None]
+        return {
+            "summary": {
+                "scan_count": len(scans_summary),
+                "average_public_evidence_coverage": round(sum(coverage_scores) / len(coverage_scores)) if coverage_scores else 0,
+                "found_topic_count": len(found_topics),
+                "missing_topic_count": len(missing_topics),
+                "high_or_medium_gap_count": high_or_medium_gap_count,
+            },
+            "scans": scans_summary,
+            "found_topics": found_topics,
+            "missing_topics": sorted(missing_topics),
+            "public_sources": public_sources,
+            "findings": findings,
+            "remediation_actions": remediation_actions,
+            "evidence_references": evidence_references,
+            "penalty_exposures": ReportService._dedupe_penalty_exposures(penalty_exposures),
+            "high_or_medium_gap_count": high_or_medium_gap_count,
+        }
 
     @staticmethod
     def get_artifact(report: ReportRecord, artifact_name: str) -> str:
@@ -295,6 +434,26 @@ class ReportService:
             for penalty in data["penalty_exposures"]:
                 md += f"- **{penalty['enforcement_article']}**: {penalty['maximum_text']} {penalty['notes']}\n"
             md += "\n"
+
+        if data.get("scanner_audit_pack"):
+            pack = data["scanner_audit_pack"]
+            summary = pack.get("summary", {})
+            md += "## Website Scanner Audit Pack\n"
+            md += f"- Scans reviewed: {summary.get('scan_count', 0)}\n"
+            md += f"- Public evidence coverage: {summary.get('average_public_evidence_coverage', 0)}%\n"
+            md += f"- Found evidence topics: {summary.get('found_topic_count', 0)}\n"
+            md += f"- Missing evidence topics: {summary.get('missing_topic_count', 0)}\n"
+            md += f"- High/medium scanner gaps: {summary.get('high_or_medium_gap_count', 0)}\n\n"
+            if pack.get("missing_topics"):
+                md += "### Missing Public Evidence Topics\n"
+                for topic in pack["missing_topics"]:
+                    md += f"- {topic}\n"
+                md += "\n"
+            if pack.get("found_topics"):
+                md += "### Found Public Evidence Topics\n"
+                for topic in pack["found_topics"][:10]:
+                    md += f"- **{topic.get('label')}** ({topic.get('article')}): {topic.get('source_url')}\n"
+                md += "\n"
         
         md += "## Evidence Traceability\n"
         for e in data['evidence_references']:
