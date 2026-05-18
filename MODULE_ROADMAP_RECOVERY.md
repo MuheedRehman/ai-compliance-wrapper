@@ -50,7 +50,7 @@ Rendered SaaS crawl upgrade:
 
 Technical design: `docs/rendered-scanner-crawl-plan.md`.
 
-Status: in progress. Backend route, service, migration, tests, dashboard scanner pages, evidence profiling, scanner audit pack reports, rendered crawl design, and Playwright smart scrolling implementation exist; deployment verification is the current checkpoint.
+Status: in progress. Backend route, service, migration, tests, dashboard scanner pages, evidence profiling, scanner audit pack reports, rendered crawl design, and Playwright smart scrolling implementation are deployed to staging. Next scanner hardening should focus on multilingual signal catalogs, rendered screenshot evidence, and queue/progress UX for slower rendered scans.
 
 ### Module 2: Real Auth, Tenants, Users, Roles
 
