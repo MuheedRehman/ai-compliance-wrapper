@@ -139,6 +139,8 @@ steps:
       - APP_ENV=staging,FRONTEND_URL=*,AI_PROVIDER_MODE=demo
       - --set-secrets
       - DATABASE_URL=DATABASE_URL:latest,EVIDENCE_HMAC_SECRET=EVIDENCE_HMAC_SECRET:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest
+      - --memory
+      - 1Gi
       - --max-instances
       - '2'
     waitFor:

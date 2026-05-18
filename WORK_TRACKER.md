@@ -14,11 +14,15 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Build Module 4: Obligation Engine 2.0 from the EU AI Act best-practice blueprint.
+1. Harden Module 1 scanner quality with the rendered SaaS crawl upgrade.
 2. Keep Module 5 Evidence Vault connected to obligation evidence requirements.
 3. Keep Module 3 AI System Lifecycle Workspace usable as the command center for each AI system.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
 5. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
+
+Current module slice:
+
+- Module 1 Rendered SaaS Crawl Upgrade: add a hybrid raw HTML + Playwright rendered crawler with smart scroll convergence, safe expansion clicks, extraction-mode evidence metadata, render fallback notes, and durable design documentation in `docs/rendered-scanner-crawl-plan.md`.
 
 ## Mandatory Module Execution Workflow
 
@@ -57,7 +61,7 @@ Current technical baseline:
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
-| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, and topic-level public evidence profiling exist. | Continue hardening crawl quality and polish report/audit pack output. |
+| 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, topic-level public evidence profiling, and a Playwright smart-scroller rendered crawl implementation exist. | Deploy and verify the Playwright smart-scroller upgrade, then add multilingual signal catalogs and rendered screenshots. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, and incidents around one AI system. | Add editable owners/deadlines/review history and deeper drill-down actions from each workspace section. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
@@ -97,6 +101,7 @@ Recovered from repo state:
 - Module 1 scanner extraction hardening completed and deployed: scanner crawl candidates now include trust center, security/compliance, DPA, subprocessors, docs, and help pages; public evidence profiling extracts disclosure, human oversight, logging/monitoring, limitations, data governance, security, and vendor-documentation evidence; source pages now include evidence topics; and high-risk gap output now flags missing disclosure, oversight, and logging/incident evidence more specifically.
 - Module 8 scanner audit pack polish completed and deployed: scanner-generated compliance readiness reports now include a dedicated `scanner_audit_pack` in report JSON/Markdown with coverage score, found/missing public evidence topics, source excerpts, scanner-derived findings, remediation actions, and penalty exposure propagation; dashboard report detail now renders the scanner audit pack.
 - Deployment workflow memory completed and pushed: `WORK_TRACKER.md` and `MODULE_ROADMAP_RECOVERY.md` now state that module work must be implemented, tested, committed, pushed, deployed to GCP staging, verified, and recorded unless explicitly local-only or blocked.
+- Module 1 rendered SaaS crawl upgrade completed locally: design documented in `docs/rendered-scanner-crawl-plan.md`; scanner now has a hybrid raw HTML plus Playwright rendering strategy with app-shell detection, bounded smart scrolling, safe expansion clicks, extraction modes, render metadata, fallback gap reporting, Dockerized Chromium support, and backend Cloud Run memory increased to `1Gi` for rendered scans.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -140,6 +145,9 @@ Use this as the next session checklist.
 - [x] Deploy Module 2 admin action audit trail to GCP staging and update the deployed baseline.
 - [x] Implement Module 8 scanner audit pack polish for scanner-generated reports.
 - [x] Deploy Module 8 scanner audit pack polish to GCP staging and update the deployed baseline.
+- [x] Document Module 1 rendered SaaS crawl upgrade design for future sessions.
+- [x] Implement Module 1 Playwright smart-scroller rendered crawl upgrade.
+- [ ] Deploy Module 1 Playwright smart-scroller upgrade to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

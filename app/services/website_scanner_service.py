@@ -1,8 +1,9 @@
 import ipaddress
+import os
 import re
 import socket
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any
@@ -32,6 +33,8 @@ class PageArtifact:
     title: str | None
     text: str
     links: list[str]
+    extraction_mode: str = "raw_html"
+    render_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class _ReadableHTMLParser(HTMLParser):
@@ -79,6 +82,43 @@ class _ReadableHTMLParser(HTMLParser):
 
 
 class WebsiteScannerService:
+    USER_AGENT = "AIComplianceScanner/0.2 (+https://example.com/compliance-scanner)"
+    RENDER_TRIGGER_MIN_TEXT_CHARS = 900
+    RENDER_TRIGGER_SCRIPT_COUNT = 8
+    RENDER_TEXT_GAIN_CHARS = 400
+    RENDER_TEXT_GAIN_RATIO = 1.15
+    APP_SHELL_MARKERS = [
+        "__next",
+        "__nuxt",
+        "id=\"root\"",
+        "id=\"app\"",
+        "data-reactroot",
+        "ng-version",
+        "vite/client",
+    ]
+    HIGH_VALUE_RENDER_PATH_KEYWORDS = [
+        "ai",
+        "responsible-ai",
+        "trust",
+        "security",
+        "compliance",
+        "privacy",
+        "data-processing",
+        "dpa",
+        "subprocessor",
+        "docs",
+        "help",
+    ]
+    SAFE_EXPAND_LABELS = [
+        "show more",
+        "read more",
+        "view more",
+        "see more",
+        "expand",
+        "more details",
+        "details",
+    ]
+
     COMPLIANCE_PATHS = [
         "/privacy",
         "/privacy-policy",
@@ -583,6 +623,10 @@ class WebsiteScannerService:
                 continue
             seen.add(url)
             page = await self.fetch_page(url)
+            if page and self.should_render_page(page):
+                page = await self.render_page_if_better(url, page)
+            elif page is None and self.rendered_crawl_enabled():
+                page = await self.render_page(url)
             if page:
                 pages.append(page)
                 for discovered in self.discover_compliance_links(normalized_url, page.links):
@@ -597,7 +641,7 @@ class WebsiteScannerService:
                 response = await client.get(
                     url,
                     headers={
-                        "user-agent": "AIComplianceScanner/0.1 (+https://example.com/compliance-scanner)",
+                        "user-agent": self.USER_AGENT,
                         "accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
                     },
                 )
@@ -612,9 +656,260 @@ class WebsiteScannerService:
                 title=parser.title,
                 text=parser.text[:120_000],
                 links=parser.links,
+                render_metadata={
+                    "content_type": content_type,
+                    "raw_html_bytes": len(response.text.encode("utf-8", errors="ignore")),
+                    "raw_text_chars": len(parser.text),
+                    "script_count": len(re.findall(r"<script\b", response.text, flags=re.IGNORECASE)),
+                    "app_shell_detected": self.detect_app_shell(response.text, parser.text),
+                    "render_candidate": False,
+                },
             )
         except Exception:
             return None
+
+    def should_render_page(self, page: PageArtifact) -> bool:
+        if not self.rendered_crawl_enabled():
+            return False
+        metadata = page.render_metadata or {}
+        path = urlparse(page.url).path.lower()
+        high_value_path = any(keyword in path for keyword in self.HIGH_VALUE_RENDER_PATH_KEYWORDS)
+        shallow_text = len(page.text or "") < self.RENDER_TRIGGER_MIN_TEXT_CHARS
+        script_heavy = int(metadata.get("script_count") or 0) >= self.RENDER_TRIGGER_SCRIPT_COUNT
+        app_shell = bool(metadata.get("app_shell_detected"))
+        should_render = app_shell or (script_heavy and (shallow_text or high_value_path))
+        metadata["render_candidate"] = should_render
+        metadata["render_reason"] = {
+            "app_shell": app_shell,
+            "script_heavy": script_heavy,
+            "shallow_text": shallow_text,
+            "high_value_path": high_value_path,
+        }
+        page.render_metadata = metadata
+        return should_render
+
+    async def render_page_if_better(self, url: str, raw_page: PageArtifact) -> PageArtifact:
+        rendered = await self.render_page(url, fallback_page=raw_page)
+        if not rendered or rendered is raw_page:
+            return raw_page
+
+        raw_chars = len(raw_page.text or "")
+        rendered_chars = len(rendered.text or "")
+        enough_gain = (
+            rendered_chars >= raw_chars + self.RENDER_TEXT_GAIN_CHARS
+            or rendered_chars >= int(raw_chars * self.RENDER_TEXT_GAIN_RATIO)
+        )
+        if rendered_chars > raw_chars and enough_gain:
+            rendered.render_metadata.update({
+                "raw_text_chars": raw_chars,
+                "render_kept": True,
+                "render_text_gain": rendered_chars - raw_chars,
+            })
+            return rendered
+
+        raw_page.render_metadata.update({
+            "render_attempted": True,
+            "render_kept": False,
+            "render_text_chars": rendered_chars,
+            "render_text_gain": rendered_chars - raw_chars,
+        })
+        return raw_page
+
+    async def render_page(self, url: str, fallback_page: PageArtifact | None = None) -> PageArtifact | None:
+        try:
+            from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+            from playwright.async_api import async_playwright
+        except Exception as exc:
+            if fallback_page:
+                fallback_page.render_metadata.update({
+                    "render_attempted": True,
+                    "render_error": f"Playwright unavailable: {exc.__class__.__name__}",
+                })
+            return fallback_page
+
+        browser = None
+        try:
+            async with async_playwright() as playwright:
+                browser = await playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        "--no-sandbox",
+                        "--disable-dev-shm-usage",
+                        "--disable-gpu",
+                        "--disable-background-networking",
+                    ],
+                )
+                context = await browser.new_context(
+                    user_agent=self.USER_AGENT,
+                    viewport={"width": 1365, "height": 900},
+                    java_script_enabled=True,
+                    ignore_https_errors=True,
+                )
+                page = await context.new_page()
+                timeout_ms = self.render_timeout_ms()
+                await page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+                try:
+                    await page.wait_for_load_state("networkidle", timeout=min(timeout_ms, 5_000))
+                except PlaywrightTimeoutError:
+                    pass
+
+                expanded_count = await self.expand_safe_content(page)
+                scroll_metadata = await self.smart_scroll_page(page)
+                text = await self.extract_rendered_text(page)
+                links = await page.eval_on_selector_all(
+                    "a[href]",
+                    "els => els.map(el => el.href).filter(Boolean)",
+                )
+                title = await page.title()
+                html_chars = await page.evaluate("document.documentElement.outerHTML.length")
+                final_url = page.url
+                await context.close()
+
+                extraction_mode = "rendered_scrolled" if scroll_metadata["scroll_steps"] else "rendered_dom"
+                if expanded_count:
+                    extraction_mode = "rendered_interacted"
+                return PageArtifact(
+                    url=final_url,
+                    status_code=200,
+                    title=title[:180] if title else (fallback_page.title if fallback_page else None),
+                    text=text[:120_000],
+                    links=links,
+                    extraction_mode=extraction_mode,
+                    render_metadata={
+                        "render_attempted": True,
+                        "render_error": None,
+                        "rendered_html_chars": html_chars,
+                        "rendered_text_chars": len(text),
+                        "safe_expansion_clicks": expanded_count,
+                        **scroll_metadata,
+                    },
+                )
+        except Exception as exc:
+            if fallback_page:
+                fallback_page.render_metadata.update({
+                    "render_attempted": True,
+                    "render_error": f"{exc.__class__.__name__}: {str(exc)[:180]}",
+                })
+            return fallback_page
+        finally:
+            if browser:
+                try:
+                    await browser.close()
+                except Exception:
+                    pass
+
+    async def expand_safe_content(self, page: Any) -> int:
+        try:
+            return int(await page.evaluate(
+                """
+                labels => {
+                  const visible = el => {
+                    const style = window.getComputedStyle(el);
+                    const rect = el.getBoundingClientRect();
+                    return style.visibility !== 'hidden' && style.display !== 'none' && rect.width > 0 && rect.height > 0;
+                  };
+                  const candidates = Array.from(document.querySelectorAll('button,[role="button"],summary,[aria-expanded="false"]'));
+                  let clicked = 0;
+                  for (const el of candidates) {
+                    if (clicked >= 8 || !visible(el)) continue;
+                    const text = (el.innerText || el.textContent || el.getAttribute('aria-label') || '').trim().toLowerCase();
+                    if (!text || !labels.some(label => text.includes(label))) continue;
+                    try {
+                      el.click();
+                      clicked += 1;
+                    } catch (_) {}
+                  }
+                  return clicked;
+                }
+                """,
+                self.SAFE_EXPAND_LABELS,
+            ))
+        except Exception:
+            return 0
+
+    async def smart_scroll_page(self, page: Any) -> dict[str, Any]:
+        max_steps = self.render_scroll_steps()
+        stable_passes = 0
+        last_height = await self.safe_page_metric(page, "height")
+        last_text_chars = await self.safe_page_metric(page, "text")
+        steps = 0
+
+        for _ in range(max_steps):
+            await page.evaluate("window.scrollBy(0, Math.max(window.innerHeight * 0.85, 700))")
+            steps += 1
+            await page.wait_for_timeout(450)
+            try:
+                await page.wait_for_load_state("networkidle", timeout=1_500)
+            except Exception:
+                pass
+
+            height = await self.safe_page_metric(page, "height")
+            text_chars = await self.safe_page_metric(page, "text")
+            height_delta = height - last_height
+            text_delta = text_chars - last_text_chars
+            if height_delta <= 20 and text_delta <= 120:
+                stable_passes += 1
+            else:
+                stable_passes = 0
+            last_height = height
+            last_text_chars = text_chars
+            if stable_passes >= 2:
+                break
+
+        try:
+            await page.evaluate("window.scrollTo(0, 0)")
+        except Exception:
+            pass
+
+        return {
+            "scroll_steps": steps,
+            "scroll_stable_passes": stable_passes,
+            "final_scroll_height": last_height,
+            "final_text_chars": last_text_chars,
+        }
+
+    @staticmethod
+    async def safe_page_metric(page: Any, metric: str) -> int:
+        try:
+            if metric == "height":
+                return int(await page.evaluate("document.documentElement.scrollHeight || document.body.scrollHeight || 0"))
+            return int(await page.evaluate("(document.body && document.body.innerText ? document.body.innerText.length : 0)"))
+        except Exception:
+            return 0
+
+    @staticmethod
+    async def extract_rendered_text(page: Any) -> str:
+        try:
+            text = await page.locator("body").inner_text(timeout=2_000)
+        except Exception:
+            text = await page.evaluate("document.body ? document.body.innerText : ''")
+        return re.sub(r"\s+", " ", text or "").strip()
+
+    @staticmethod
+    def rendered_crawl_enabled() -> bool:
+        return (os.getenv("SCANNER_RENDERED_CRAWL_ENABLED", "true") or "true").strip().lower() not in {"0", "false", "no", "off"}
+
+    @staticmethod
+    def render_timeout_ms() -> int:
+        try:
+            return max(2_000, min(int(os.getenv("SCANNER_RENDER_TIMEOUT_MS", "9000")), 20_000))
+        except ValueError:
+            return 9_000
+
+    @staticmethod
+    def render_scroll_steps() -> int:
+        try:
+            return max(0, min(int(os.getenv("SCANNER_RENDER_SCROLL_STEPS", "6")), 12))
+        except ValueError:
+            return 6
+
+    @classmethod
+    def detect_app_shell(cls, html: str, text: str) -> bool:
+        value = html[:250_000].lower()
+        text_chars = len(text or "")
+        has_marker = any(marker in value for marker in cls.APP_SHELL_MARKERS)
+        has_bootstrap_payload = "__next_data__" in value or "self.__next_f" in value
+        return bool((has_marker or has_bootstrap_payload) and text_chars < cls.RENDER_TRIGGER_MIN_TEXT_CHARS)
 
     def analyze_pages(self, normalized_url: str, pages: list[PageArtifact]) -> dict[str, Any]:
         combined = "\n".join(page.text for page in pages)
@@ -625,6 +920,7 @@ class WebsiteScannerService:
         annex_iii_matches = match_annex_iii_categories(combined)
         classification = self.classify(signals, annex_iii_matches)
         classification["public_evidence_profile"] = evidence_profile
+        classification["crawl_quality"] = self.summarize_crawl_quality(pages)
         gaps = self.find_gaps(signals, pages, classification, evidence_profile)
         suggested_actions = self.suggest_actions(classification, gaps)
         confidence = self.score_confidence(pages, signals)
@@ -634,6 +930,8 @@ class WebsiteScannerService:
                 "status_code": page.status_code,
                 "title": page.title,
                 "text_excerpt": page.text[:280],
+                "extraction_mode": page.extraction_mode,
+                "render_metadata": self.public_render_metadata(page.render_metadata),
                 "evidence_topics": [
                     topic["topic"]
                     for topic in evidence_profile.get("topics", [])
@@ -679,6 +977,7 @@ class WebsiteScannerService:
                         "label": label,
                         "source_url": page.url,
                         "excerpt": excerpt,
+                        "extraction_mode": page.extraction_mode,
                     }
                     signals.append(signal)
                     evidence_refs.append({
@@ -686,6 +985,7 @@ class WebsiteScannerService:
                         "category": category,
                         "source_url": page.url,
                         "excerpt": excerpt,
+                        "extraction_mode": page.extraction_mode,
                     })
                     break
 
@@ -710,6 +1010,7 @@ class WebsiteScannerService:
                         "label": config["label"],
                         "source_url": page.url,
                         "excerpt": self.excerpt(page.text, match.start(), match.end()),
+                        "extraction_mode": page.extraction_mode,
                         "dimension_id": config["dimension_id"],
                         "article": config["article"],
                         "evidence_domain": config["evidence_domain"],
@@ -758,11 +1059,67 @@ class WebsiteScannerService:
                 "label": topic["label"],
                 "source_url": topic["source_url"],
                 "excerpt": topic["excerpt"],
+                "extraction_mode": topic.get("extraction_mode", "raw_html"),
                 "dimension_id": topic["dimension_id"],
                 "article": topic["article"],
                 "evidence_domain": topic["evidence_domain"],
             })
         return refs[:30]
+
+    @staticmethod
+    def summarize_crawl_quality(pages: list[PageArtifact]) -> dict[str, Any]:
+        extraction_modes: dict[str, int] = {}
+        render_attempted = 0
+        render_failures = 0
+        render_kept = 0
+        render_candidates = 0
+        for page in pages:
+            extraction_modes[page.extraction_mode] = extraction_modes.get(page.extraction_mode, 0) + 1
+            metadata = page.render_metadata or {}
+            if metadata.get("render_candidate"):
+                render_candidates += 1
+            if metadata.get("render_attempted"):
+                render_attempted += 1
+            if metadata.get("render_error"):
+                render_failures += 1
+            if metadata.get("render_kept") or page.extraction_mode.startswith("rendered"):
+                render_kept += 1
+
+        return {
+            "page_count": len(pages),
+            "extraction_modes": extraction_modes,
+            "render_candidates": render_candidates,
+            "render_attempted": render_attempted,
+            "render_failures": render_failures,
+            "render_kept": render_kept,
+            "rendered_crawl_enabled": WebsiteScannerService.rendered_crawl_enabled(),
+        }
+
+    @staticmethod
+    def public_render_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+        metadata = metadata or {}
+        allowed = {
+            "content_type",
+            "raw_html_bytes",
+            "raw_text_chars",
+            "script_count",
+            "app_shell_detected",
+            "render_candidate",
+            "render_reason",
+            "render_attempted",
+            "render_error",
+            "render_kept",
+            "render_text_chars",
+            "render_text_gain",
+            "rendered_html_chars",
+            "rendered_text_chars",
+            "safe_expansion_clicks",
+            "scroll_steps",
+            "scroll_stable_passes",
+            "final_scroll_height",
+            "final_text_chars",
+        }
+        return {key: metadata[key] for key in allowed if key in metadata}
 
     def classify(
         self,
@@ -991,6 +1348,7 @@ class WebsiteScannerService:
         categories = {signal["category"] for signal in signals}
         page_urls = " ".join(page.url.lower() for page in pages)
         coverage = (evidence_profile or {}).get("coverage", {})
+        crawl_quality = classification.get("crawl_quality") or {}
         gaps: list[dict[str, Any]] = []
 
         if "ai_claim" in categories and "governance" not in categories and not coverage.get("human_oversight"):
@@ -1064,6 +1422,16 @@ class WebsiteScannerService:
                 "article": "Articles 8-16",
                 "evidence_domain": "provider_controls",
                 "penalty_exposure": penalty_exposure_for_dimension("provider_high_risk_requirements", "Articles 8-16"),
+            })
+        if crawl_quality.get("render_failures"):
+            gaps.append({
+                "severity": "medium",
+                "title": "Rendered crawl fallback used on some pages",
+                "detail": "One or more JavaScript-dependent pages could not be fully rendered, so the scanner fell back to available raw HTML evidence for those pages.",
+                "dimension_id": "ai_literacy",
+                "article": "Article 4",
+                "evidence_domain": "scanner_limitations",
+                "penalty_exposure": penalty_exposure_for_dimension("ai_literacy", "Article 4"),
             })
         if not gaps:
             gaps.append({

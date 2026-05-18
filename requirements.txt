@@ -6,6 +6,7 @@ pydantic
 sqlalchemy
 psycopg2-binary
 stripe
+playwright
 
 pytest
 pytest-asyncio

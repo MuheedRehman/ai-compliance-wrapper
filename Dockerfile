@@ -14,6 +14,7 @@ RUN apt-get update \
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m playwright install --with-deps chromium
 RUN pip install --no-cache-dir psycopg2-binary uvicorn gunicorn
 
 COPY . .

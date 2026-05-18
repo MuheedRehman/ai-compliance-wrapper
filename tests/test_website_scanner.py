@@ -151,6 +151,80 @@ async def test_website_scan_extracts_public_evidence_profile_and_richer_gaps(cli
 
 
 @pytest.mark.asyncio
+async def test_collect_pages_uses_rendered_scrolled_content_for_js_shell(monkeypatch):
+    service = WebsiteScannerService()
+
+    async def fake_fetch_page(self, url):
+        return PageArtifact(
+            url=url,
+            status_code=200,
+            title="Shell App",
+            text="Loading...",
+            links=[],
+            render_metadata={
+                "script_count": 14,
+                "app_shell_detected": True,
+                "raw_text_chars": 10,
+            },
+        )
+
+    async def fake_render_page(self, url, fallback_page=None):
+        return PageArtifact(
+            url=url,
+            status_code=200,
+            title="Rendered SaaS AI",
+            text=(
+                "Rendered SaaS AI is an artificial intelligence chatbot. "
+                "The rendered page includes an AI disclosure, human oversight, "
+                "audit logs, privacy policy, GDPR, security, and model limitations. "
+            ) * 8,
+            links=[],
+            extraction_mode="rendered_scrolled",
+            render_metadata={
+                "render_attempted": True,
+                "rendered_text_chars": 1400,
+                "scroll_steps": 4,
+                "safe_expansion_clicks": 1,
+            },
+        )
+
+    monkeypatch.setenv("SCANNER_RENDERED_CRAWL_ENABLED", "true")
+    monkeypatch.setattr(WebsiteScannerService, "fetch_page", fake_fetch_page)
+    monkeypatch.setattr(WebsiteScannerService, "render_page", fake_render_page)
+
+    pages = await service.collect_pages("https://rendered.example/", 1)
+    assert len(pages) == 1
+    assert pages[0].extraction_mode == "rendered_scrolled"
+    assert pages[0].render_metadata["render_kept"] is True
+    assert pages[0].render_metadata["render_text_gain"] > 1000
+
+    analysis = service.analyze_pages("https://rendered.example/", pages)
+    assert analysis["source_pages"][0]["extraction_mode"] == "rendered_scrolled"
+    assert analysis["source_pages"][0]["render_metadata"]["scroll_steps"] == 4
+    assert analysis["classification"]["crawl_quality"]["render_kept"] == 1
+    assert any(ref["extraction_mode"] == "rendered_scrolled" for ref in analysis["evidence_refs"])
+
+
+def test_should_render_page_marks_script_heavy_app_shell(monkeypatch):
+    monkeypatch.setenv("SCANNER_RENDERED_CRAWL_ENABLED", "true")
+    page = PageArtifact(
+        url="https://example.com/responsible-ai",
+        status_code=200,
+        title="App Shell",
+        text="Loading",
+        links=[],
+        render_metadata={
+            "script_count": 12,
+            "app_shell_detected": True,
+        },
+    )
+
+    assert WebsiteScannerService().should_render_page(page) is True
+    assert page.render_metadata["render_candidate"] is True
+    assert page.render_metadata["render_reason"]["app_shell"] is True
+
+
+@pytest.mark.asyncio
 async def test_convert_website_scan_creates_system_and_intake(client, admin_headers, monkeypatch):
     async def fake_collect_pages(self, normalized_url, max_pages):
         return [

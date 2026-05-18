@@ -39,7 +39,18 @@ Outputs:
 - Suggested controls
 - One-click compliance report
 
-Status: started. Backend route, service, migration, tests, and dashboard scanner pages exist.
+Rendered SaaS crawl upgrade:
+- Keep raw HTML fetch as the fast first pass.
+- Detect shallow JavaScript app shells and script-heavy compliance pages.
+- Use Playwright Chromium only for likely JS-dependent pages.
+- Scroll in bounded steps until text/page height stop changing.
+- Safely expand non-destructive "show more" and accordion-style controls.
+- Record `extraction_mode` and `render_metadata` for each source page and evidence ref.
+- Fall back to raw HTML with an explicit scanner limitation gap if rendering fails.
+
+Technical design: `docs/rendered-scanner-crawl-plan.md`.
+
+Status: in progress. Backend route, service, migration, tests, dashboard scanner pages, evidence profiling, scanner audit pack reports, rendered crawl design, and Playwright smart scrolling implementation exist; deployment verification is the current checkpoint.
 
 ### Module 2: Real Auth, Tenants, Users, Roles
 
