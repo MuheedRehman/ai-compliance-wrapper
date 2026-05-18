@@ -45,13 +45,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `5c22496` via Cloud Build `a917bc98-d7c8-47c8-af70-646ab3a1f375` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `4f6d0be` via Cloud Build `0250cca0-8306-4bbb-8731-cb84a2b06f75` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00036-pkr`
-  - Backend: `ai-compliance-backend-00069-9xv`
+  - Dashboard: `ai-compliance-dashboard-00037-cnp`
+  - Backend: `ai-compliance-backend-00071-pms`
 
 ## Module Status Board
 
@@ -94,8 +94,9 @@ Recovered from repo state:
 - Backend hardening slice completed and deployed: scanner workspace/report creation now runs atomically with rollback coverage, shared creation services support caller-owned transactions, and production config rejects SQLite, weak evidence secrets, wildcard frontend CORS, demo AI mode, mock Stripe defaults, and missing live OpenAI credentials.
 - Module 2 RBAC hardening slice completed and deployed: tenant-admin dashboard role headers must now match an active tenant user, tenant headers must match the API-key tenant, password login resolves through the backend before issuing a session cookie, and staging seed creates the password owner user.
 - Module 2 action audit slice completed and deployed: tenant/user creation, role/status updates, invitation creation/revocation, and auth policy changes now create before/after admin audit events exposed through `/v1/tenant-admin/action-audit`, tenant summary, and the dashboard Users & Access page.
-- Module 1 scanner extraction hardening completed locally: scanner crawl candidates now include trust center, security/compliance, DPA, subprocessors, docs, and help pages; public evidence profiling extracts disclosure, human oversight, logging/monitoring, limitations, data governance, security, and vendor-documentation evidence; source pages now include evidence topics; and high-risk gap output now flags missing disclosure, oversight, and logging/incident evidence more specifically.
-- Module 8 scanner audit pack polish completed locally: scanner-generated compliance readiness reports now include a dedicated `scanner_audit_pack` in report JSON/Markdown with coverage score, found/missing public evidence topics, source excerpts, scanner-derived findings, remediation actions, and penalty exposure propagation; dashboard report detail now renders the scanner audit pack.
+- Module 1 scanner extraction hardening completed and deployed: scanner crawl candidates now include trust center, security/compliance, DPA, subprocessors, docs, and help pages; public evidence profiling extracts disclosure, human oversight, logging/monitoring, limitations, data governance, security, and vendor-documentation evidence; source pages now include evidence topics; and high-risk gap output now flags missing disclosure, oversight, and logging/incident evidence more specifically.
+- Module 8 scanner audit pack polish completed and deployed: scanner-generated compliance readiness reports now include a dedicated `scanner_audit_pack` in report JSON/Markdown with coverage score, found/missing public evidence topics, source excerpts, scanner-derived findings, remediation actions, and penalty exposure propagation; dashboard report detail now renders the scanner audit pack.
+- Deployment workflow memory completed and pushed: `WORK_TRACKER.md` and `MODULE_ROADMAP_RECOVERY.md` now state that module work must be implemented, tested, committed, pushed, deployed to GCP staging, verified, and recorded unless explicitly local-only or blocked.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -138,6 +139,7 @@ Use this as the next session checklist.
 - [x] Implement Module 2 admin action audit trail for tenant/user changes.
 - [x] Deploy Module 2 admin action audit trail to GCP staging and update the deployed baseline.
 - [x] Implement Module 8 scanner audit pack polish for scanner-generated reports.
+- [x] Deploy Module 8 scanner audit pack polish to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
