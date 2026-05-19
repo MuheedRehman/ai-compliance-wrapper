@@ -96,7 +96,7 @@ Current lifecycle workspace operations slice:
 - `/v1/ai-systems/{id}/workspace` returns owner coverage, review deadline status, and review-event metrics.
 - The dashboard system detail page lets users update lifecycle metadata and record review checkpoints from the workspace.
 
-Deployment checkpoint: lifecycle owner/deadline/review-history implementation exists locally and is the current deployment checkpoint.
+Deployment checkpoint: lifecycle owner/deadline/review-history implementation is deployed to staging. Next workspace hardening should connect review follow-up actions to controls/evidence tasks and add deeper drill-down actions from each workspace section.
 
 ### Module 4: Obligation Engine 2.0
 

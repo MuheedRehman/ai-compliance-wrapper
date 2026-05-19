@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Complete and deploy the Module 3 AI System Lifecycle Workspace operations slice.
+1. Continue hardening the Module 3 AI System Lifecycle Workspace now that lifecycle owner/review operations are deployed.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 3 Lifecycle Workspace Operations: add editable business/technical/legal owners, review status, next-review deadline, lifecycle notes, review-history events, workspace governance summary metrics, and dashboard controls for recording review checkpoints.
+- Module 3 Lifecycle Workspace Operations completed and deployed: editable business/technical/legal owners, review status, next-review deadline, lifecycle notes, review-history events, workspace governance summary metrics, and dashboard controls for recording review checkpoints.
 
 ## Mandatory Module Execution Workflow
 
@@ -49,13 +49,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `8cf3fcf` via Cloud Build `bcbd4add-0288-489c-9f14-958ccbad2cd0` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `ea1107b` via Cloud Build `1fab1f14-e234-4378-ba93-be62ba832ea3` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00039-hdp`
-  - Backend: `ai-compliance-backend-00075-456`
+  - Dashboard: `ai-compliance-dashboard-00040-h7d`
+  - Backend: `ai-compliance-backend-00077-xrx`
 
 ## Module Status Board
 
@@ -63,7 +63,7 @@ Current technical baseline:
 | --- | --- | --- | --- |
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, topic-level public evidence profiling, and a deployed Playwright smart-scroller rendered crawl implementation exist. | Add multilingual signal catalogs, rendered screenshot evidence, and scanner queue/progress UI if rendered scans become slow for larger SaaS sites. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
-| 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, and review-history events around one AI system. | Deploy and verify the lifecycle operations slice, then add deeper drill-down actions from each workspace section. |
+| 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, and deployed review-history events around one AI system. | Add deeper drill-down actions from each workspace section and connect review follow-up actions to controls/evidence tasks. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
@@ -103,7 +103,7 @@ Recovered from repo state:
 - Deployment workflow memory completed and pushed: `WORK_TRACKER.md` and `MODULE_ROADMAP_RECOVERY.md` now state that module work must be implemented, tested, committed, pushed, deployed to GCP staging, verified, and recorded unless explicitly local-only or blocked.
 - Module 1 rendered SaaS crawl upgrade completed and deployed: design documented in `docs/rendered-scanner-crawl-plan.md`; scanner now has a hybrid raw HTML plus Playwright rendering strategy with app-shell detection, bounded smart scrolling, safe expansion clicks, extraction modes, render metadata, fallback gap reporting, Dockerized Chromium support, and backend Cloud Run memory increased to `1Gi` for rendered scans.
 - Module 1 smart-scroller deployment note: initial Cloud Build `41c6e5e7-2807-47d1-b5b3-9c3e886261f4` deployed backend/dashboard but failed final live E2E because missing candidate pages such as guessed privacy/terms URLs were being rendered, making the live scanner path too slow. Follow-up commit `8cf3fcf` prevents rendering missing/404 candidate URLs, keeps rendering only for successfully fetched shallow JavaScript pages, adds regression coverage, and deployed successfully through Cloud Build `bcbd4add-0288-489c-9f14-958ccbad2cd0`.
-- Module 3 lifecycle workspace operations completed locally: AI systems now support business/technical/legal owners, review status, next-review deadline, lifecycle notes, and a signed-style review event timeline through migration `0011`; `/v1/ai-systems/{id}/workspace` now returns governance summary and review metrics; dashboard system detail pages can update lifecycle metadata and record review checkpoints.
+- Module 3 lifecycle workspace operations completed and deployed: AI systems now support business/technical/legal owners, review status, next-review deadline, lifecycle notes, and a review event timeline through migration `0011`; `/v1/ai-systems/{id}/workspace` now returns governance summary and review metrics; dashboard system detail pages can update lifecycle metadata and record review checkpoints. Deployed through Cloud Build `1fab1f14-e234-4378-ba93-be62ba832ea3` to backend `ai-compliance-backend-00077-xrx` and dashboard `ai-compliance-dashboard-00040-h7d`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -151,7 +151,7 @@ Use this as the next session checklist.
 - [x] Implement Module 1 Playwright smart-scroller rendered crawl upgrade.
 - [x] Deploy Module 1 Playwright smart-scroller upgrade to GCP staging and update the deployed baseline.
 - [x] Implement Module 3 lifecycle owner/deadline/review-history workspace slice.
-- [ ] Deploy Module 3 lifecycle owner/deadline/review-history workspace slice to GCP staging and update the deployed baseline.
+- [x] Deploy Module 3 lifecycle owner/deadline/review-history workspace slice to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
