@@ -1,9 +1,11 @@
 import uuid
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import (
     AiFeature,
     AiSystem,
+    AiSystemReviewEvent,
     ComplianceControl,
     EvidenceItem,
     EvidenceLog,
@@ -14,8 +16,38 @@ from app.models import (
     ReportRecord,
     WebsiteScan,
 )
-from app.schemas import AiSystemCreate, AiSystemUpdate
+from app.schemas import AiSystemCreate, AiSystemReviewCreate, AiSystemUpdate
 from app.services.compliance_control_service import ComplianceControlService
+
+
+def _normalize_email(value: str | None) -> str | None:
+    cleaned = (value or "").strip().lower()
+    return cleaned or None
+
+
+def _normalize_datetime(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _review_deadline_status(system: AiSystem) -> str:
+    due_at = _normalize_datetime(system.next_review_at)
+    if not due_at:
+        return "unscheduled"
+    now = _now_utc()
+    if due_at < now:
+        return "overdue"
+    if due_at <= now + timedelta(days=30):
+        return "due_soon"
+    return "scheduled"
+
 
 def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate, *, commit: bool = True) -> AiSystem:
     ai_system = AiSystem(
@@ -23,6 +55,12 @@ def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate, *, co
         tenant_id=tenant_id,
         name=payload.name,
         description=payload.description,
+        owner_email=_normalize_email(payload.owner_email),
+        technical_owner_email=_normalize_email(payload.technical_owner_email),
+        legal_owner_email=_normalize_email(payload.legal_owner_email),
+        review_status=payload.review_status,
+        next_review_at=_normalize_datetime(payload.next_review_at),
+        lifecycle_notes=payload.lifecycle_notes,
         # DB defaults will handle deployment_status and registration_status if not provided
     )
     db.add(ai_system)
@@ -45,12 +83,70 @@ def update_ai_system(db: Session, tenant_id: str, ai_system_id: str, payload: Ai
     ai_system = get_ai_system(db, tenant_id, ai_system_id)
     
     update_data = payload.model_dump(exclude_unset=True)
+    for email_field in ("owner_email", "technical_owner_email", "legal_owner_email"):
+        if email_field in update_data:
+            update_data[email_field] = _normalize_email(update_data[email_field])
+    for date_field in ("next_review_at", "last_reviewed_at"):
+        if date_field in update_data:
+            update_data[date_field] = _normalize_datetime(update_data[date_field])
     for key, value in update_data.items():
         setattr(ai_system, key, value)
     
     db.commit()
     db.refresh(ai_system)
     return ai_system
+
+
+def list_ai_system_reviews(db: Session, tenant_id: str, ai_system_id: str, limit: int = 25) -> list[AiSystemReviewEvent]:
+    get_ai_system(db, tenant_id, ai_system_id)
+    safe_limit = min(max(limit, 1), 100)
+    return (
+        db.query(AiSystemReviewEvent)
+        .filter(AiSystemReviewEvent.tenant_id == tenant_id, AiSystemReviewEvent.ai_system_id == ai_system_id)
+        .order_by(AiSystemReviewEvent.created_at.desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+
+def record_ai_system_review(
+    db: Session,
+    tenant_id: str,
+    ai_system_id: str,
+    payload: AiSystemReviewCreate,
+) -> AiSystemReviewEvent:
+    system = get_ai_system(db, tenant_id, ai_system_id)
+    now = _now_utc()
+    event = AiSystemReviewEvent(
+        id=f"rev_{uuid.uuid4().hex}",
+        tenant_id=tenant_id,
+        ai_system_id=ai_system_id,
+        reviewer_email=_normalize_email(payload.reviewer_email),
+        review_type=payload.review_type,
+        status=payload.status,
+        notes=payload.notes,
+        findings_json=payload.findings,
+        actions_json=payload.actions,
+        next_review_at=_normalize_datetime(payload.next_review_at),
+    )
+    db.add(event)
+
+    if payload.status == "completed":
+        system.review_status = "completed"
+        system.last_reviewed_at = now
+    elif payload.status == "needs_follow_up":
+        system.review_status = "in_review"
+        system.last_reviewed_at = now
+    else:
+        system.review_status = payload.status
+
+    if event.next_review_at:
+        system.next_review_at = event.next_review_at
+
+    db.commit()
+    db.refresh(event)
+    db.refresh(system)
+    return event
 
 
 def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> dict:
@@ -117,11 +213,25 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         .order_by(ReportRecord.created_at.desc())
         .all()
     )
+    review_events = (
+        db.query(AiSystemReviewEvent)
+        .filter(AiSystemReviewEvent.tenant_id == tenant_id, AiSystemReviewEvent.ai_system_id == ai_system_id)
+        .order_by(AiSystemReviewEvent.created_at.desc())
+        .limit(25)
+        .all()
+    )
 
     latest_intake = intakes[0] if intakes else None
     open_incidents = [incident for incident in incidents if incident.status not in {"resolved", "closed"}]
     high_severity_incidents = [incident for incident in incidents if incident.severity in {"high", "critical"}]
     open_controls = [control for control in controls if control.status not in {"completed", "signed_off"}]
+    owner_roles = {
+        "business_owner": system.owner_email,
+        "technical_owner": system.technical_owner_email,
+        "legal_owner": system.legal_owner_email,
+    }
+    assigned_owner_count = len([email for email in owner_roles.values() if email])
+    review_deadline_status = _review_deadline_status(system)
 
     return {
         "system": system,
@@ -138,6 +248,17 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
             "incident_count": len(incidents),
             "open_incident_count": len(open_incidents),
             "high_severity_incident_count": len(high_severity_incidents),
+            "review_event_count": len(review_events),
+            "assigned_owner_count": assigned_owner_count,
+        },
+        "governance_summary": {
+            "owner_roles": owner_roles,
+            "assigned_owner_count": assigned_owner_count,
+            "missing_owner_roles": [role for role, email in owner_roles.items() if not email],
+            "review_deadline_status": review_deadline_status,
+            "next_review_at": system.next_review_at,
+            "last_reviewed_at": system.last_reviewed_at,
+            "latest_review_status": system.review_status,
         },
         "readiness_scorecard": scorecard,
         "latest_classification": (
@@ -164,4 +285,5 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         "oversight_assignments": oversight_assignments,
         "incidents": incidents,
         "reports": reports,
+        "review_events": review_events,
     }

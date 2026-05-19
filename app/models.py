@@ -137,9 +137,33 @@ class AiSystem(Base):
     
     deployment_status = Column(String, nullable=False, server_default="draft", default="draft")
     registration_status = Column(String, nullable=False, server_default="draft", default="draft")
+    owner_email = Column(String, nullable=True, index=True)
+    technical_owner_email = Column(String, nullable=True)
+    legal_owner_email = Column(String, nullable=True)
+    review_status = Column(String, nullable=False, server_default="not_started", default="not_started")
+    next_review_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    last_reviewed_at = Column(DateTime(timezone=True), nullable=True)
+    lifecycle_notes = Column(Text, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class AiSystemReviewEvent(Base):
+    __tablename__ = "ai_system_review_events"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
+    reviewer_email = Column(String, nullable=True, index=True)
+    review_type = Column(String, nullable=False, default="lifecycle_review", index=True)
+    status = Column(String, nullable=False, default="completed", index=True)
+    notes = Column(Text, nullable=True)
+    findings_json = Column(JSON, nullable=False, default=list)
+    actions_json = Column(JSON, nullable=False, default=list)
+    next_review_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class AiFeature(Base):

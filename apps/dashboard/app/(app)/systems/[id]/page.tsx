@@ -9,11 +9,13 @@ import {
   ArrowLeft,
   BarChart3,
   Bot,
+  CalendarClock,
+  ClipboardCheck,
   FileSearch,
   FileText,
-  Layers,
   ListChecks,
   Scale,
+  Save,
   ShieldCheck,
   Users,
 } from 'lucide-react';
@@ -38,6 +40,24 @@ function metricColor(value: number) {
   return 'text-red-400';
 }
 
+function toDateInput(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+}
+
+function fromDateInput(value: string) {
+  return value ? new Date(`${value}T12:00:00.000Z`).toISOString() : null;
+}
+
+function displayDate(value?: string | null) {
+  if (!value) return 'Not scheduled';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not scheduled';
+  return date.toLocaleDateString(undefined, { dateStyle: 'medium' });
+}
+
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
@@ -45,6 +65,23 @@ export default function SystemDetailPage() {
   const [workspace, setWorkspace] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [recordingReview, setRecordingReview] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    owner_email: '',
+    technical_owner_email: '',
+    legal_owner_email: '',
+    review_status: 'not_started',
+    next_review_at: '',
+    lifecycle_notes: '',
+  });
+  const [reviewForm, setReviewForm] = useState({
+    reviewer_email: '',
+    review_type: 'lifecycle_review',
+    status: 'completed',
+    next_review_at: '',
+    notes: '',
+  });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -59,14 +96,78 @@ export default function SystemDetailPage() {
 
   const system = workspace?.system;
   const metrics = workspace?.metrics || {};
+  const governance = workspace?.governance_summary || {};
   const scorecard = workspace?.readiness_scorecard || {};
   const classification = workspace?.latest_classification;
+  const reviewEvents = workspace?.review_events || [];
   const readinessScore = scorecard.readiness_score || 0;
+
+  useEffect(() => {
+    if (!system) return;
+    setProfileForm({
+      owner_email: system.owner_email || '',
+      technical_owner_email: system.technical_owner_email || '',
+      legal_owner_email: system.legal_owner_email || '',
+      review_status: system.review_status || 'not_started',
+      next_review_at: toDateInput(system.next_review_at),
+      lifecycle_notes: system.lifecycle_notes || '',
+    });
+  }, [system]);
 
   const openControls = useMemo(
     () => (workspace?.controls || []).filter((control: any) => !['completed', 'signed_off'].includes(control.status)),
     [workspace],
   );
+
+  async function handleProfileSave(event: React.FormEvent) {
+    event.preventDefault();
+    if (!system) return;
+    setSavingProfile(true);
+    setError(null);
+    try {
+      await api.updateSystem(system.id, {
+        owner_email: profileForm.owner_email.trim() || null,
+        technical_owner_email: profileForm.technical_owner_email.trim() || null,
+        legal_owner_email: profileForm.legal_owner_email.trim() || null,
+        review_status: profileForm.review_status,
+        next_review_at: fromDateInput(profileForm.next_review_at),
+        lifecycle_notes: profileForm.lifecycle_notes.trim() || null,
+      });
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to update lifecycle profile');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleReviewSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    if (!system) return;
+    setRecordingReview(true);
+    setError(null);
+    try {
+      await api.createSystemReview(system.id, {
+        reviewer_email: reviewForm.reviewer_email.trim() || null,
+        review_type: reviewForm.review_type,
+        status: reviewForm.status,
+        next_review_at: fromDateInput(reviewForm.next_review_at),
+        notes: reviewForm.notes.trim() || null,
+      });
+      setReviewForm({
+        reviewer_email: '',
+        review_type: 'lifecycle_review',
+        status: 'completed',
+        next_review_at: '',
+        notes: '',
+      });
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to record review');
+    } finally {
+      setRecordingReview(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -137,6 +238,166 @@ export default function SystemDetailPage() {
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          <Card title="Lifecycle Ownership" className="xl:col-span-2">
+            <form onSubmit={handleProfileSave} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Business owner</span>
+                  <input
+                    type="email"
+                    value={profileForm.owner_email}
+                    onChange={(event) => setProfileForm({ ...profileForm, owner_email: event.target.value })}
+                    placeholder="owner@example.com"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Technical owner</span>
+                  <input
+                    type="email"
+                    value={profileForm.technical_owner_email}
+                    onChange={(event) => setProfileForm({ ...profileForm, technical_owner_email: event.target.value })}
+                    placeholder="tech@example.com"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Legal owner</span>
+                  <input
+                    type="email"
+                    value={profileForm.legal_owner_email}
+                    onChange={(event) => setProfileForm({ ...profileForm, legal_owner_email: event.target.value })}
+                    placeholder="legal@example.com"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-[180px_180px_1fr] gap-3">
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Review status</span>
+                  <select
+                    value={profileForm.review_status}
+                    onChange={(event) => setProfileForm({ ...profileForm, review_status: event.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  >
+                    <option value="not_started">Not started</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="in_review">In review</option>
+                    <option value="completed">Completed</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Next review</span>
+                  <input
+                    type="date"
+                    value={profileForm.next_review_at}
+                    onChange={(event) => setProfileForm({ ...profileForm, next_review_at: event.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Lifecycle notes</span>
+                  <input
+                    value={profileForm.lifecycle_notes}
+                    onChange={(event) => setProfileForm({ ...profileForm, lifecycle_notes: event.target.value })}
+                    placeholder="Release, scope, or review notes"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge value={governance.review_deadline_status || 'unscheduled'} />
+                  <span className="rounded-lg bg-zinc-950 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 ring-1 ring-zinc-800">
+                    {metrics.assigned_owner_count || 0}/3 owners
+                  </span>
+                </div>
+                <button
+                  disabled={savingProfile}
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  {savingProfile ? 'SAVING...' : 'SAVE PROFILE'}
+                </button>
+              </div>
+            </form>
+          </Card>
+
+          <Card title="Review Checkpoint">
+            <form onSubmit={handleReviewSubmit} className="space-y-3">
+              <div className="grid grid-cols-1 gap-3">
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Reviewer</span>
+                  <input
+                    type="email"
+                    value={reviewForm.reviewer_email}
+                    onChange={(event) => setReviewForm({ ...reviewForm, reviewer_email: event.target.value })}
+                    placeholder="reviewer@example.com"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Type</span>
+                    <select
+                      value={reviewForm.review_type}
+                      onChange={(event) => setReviewForm({ ...reviewForm, review_type: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    >
+                      <option value="lifecycle_review">Lifecycle</option>
+                      <option value="classification_review">Classification</option>
+                      <option value="control_review">Controls</option>
+                      <option value="evidence_review">Evidence</option>
+                      <option value="incident_review">Incidents</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Outcome</span>
+                    <select
+                      value={reviewForm.status}
+                      onChange={(event) => setReviewForm({ ...reviewForm, status: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    >
+                      <option value="completed">Completed</option>
+                      <option value="needs_follow_up">Follow up</option>
+                      <option value="scheduled">Scheduled</option>
+                      <option value="in_review">In review</option>
+                    </select>
+                  </label>
+                </div>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Next review</span>
+                  <input
+                    type="date"
+                    value={reviewForm.next_review_at}
+                    onChange={(event) => setReviewForm({ ...reviewForm, next_review_at: event.target.value })}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Notes</span>
+                  <textarea
+                    value={reviewForm.notes}
+                    onChange={(event) => setReviewForm({ ...reviewForm, notes: event.target.value })}
+                    rows={3}
+                    placeholder="Review outcome"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+              </div>
+              <button
+                disabled={recordingReview}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2 text-xs font-bold text-zinc-950 hover:bg-white disabled:opacity-50"
+              >
+                <ClipboardCheck className="h-4 w-4" />
+                {recordingReview ? 'RECORDING...' : 'RECORD REVIEW'}
+              </button>
+            </form>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <Card title="Lifecycle Snapshot" className="xl:col-span-1">
             <div className="space-y-4">
               <div className="flex items-center justify-between gap-3">
@@ -158,6 +419,14 @@ export default function SystemDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-zinc-500">Reports</span>
                 <span className="text-xs font-mono text-zinc-300">{metrics.report_count || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Next review</span>
+                <span className="text-xs font-mono text-zinc-300">{displayDate(system.next_review_at)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Last reviewed</span>
+                <span className="text-xs font-mono text-zinc-300">{displayDate(system.last_reviewed_at)}</span>
               </div>
             </div>
           </Card>
@@ -312,6 +581,37 @@ export default function SystemDetailPage() {
             </div>
           </Card>
         </div>
+
+        <Card title={`Review History (${reviewEvents.length})`} subtitle="Lifecycle decisions, review outcomes, and next checkpoints.">
+          {reviewEvents.length === 0 ? (
+            <EmptyPanel label="No lifecycle reviews recorded" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {reviewEvents.slice(0, 6).map((event: any) => (
+                <div key={event.id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <CalendarClock className="mt-0.5 h-4 w-4 text-indigo-400" />
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{event.review_type?.replaceAll('_', ' ') || 'review'}</p>
+                        <p className="mt-1 text-[10px] text-zinc-500">{event.reviewer_email || 'Unassigned reviewer'} / {displayDate(event.created_at)}</p>
+                      </div>
+                    </div>
+                    <StatusBadge value={event.status} />
+                  </div>
+                  {event.notes && (
+                    <p className="mt-3 text-xs leading-5 text-zinc-400">{event.notes}</p>
+                  )}
+                  {event.next_review_at && (
+                    <p className="mt-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                      Next: {displayDate(event.next_review_at)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
 
         <Card title={`Associated Features (${workspace.features.length})`} subtitle="Runtime-governed feature surfaces linked to this AI system.">
           {workspace.features.length === 0 ? (

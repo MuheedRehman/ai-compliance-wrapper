@@ -61,6 +61,12 @@ class VersionDecision(BaseModel):
 class AiSystemCreate(BaseModel):
     name: str
     description: Optional[str] = None
+    owner_email: Optional[str] = None
+    technical_owner_email: Optional[str] = None
+    legal_owner_email: Optional[str] = None
+    review_status: Literal["not_started", "scheduled", "in_review", "completed", "overdue"] = "not_started"
+    next_review_at: Optional[datetime] = None
+    lifecycle_notes: Optional[str] = None
 
 
 class AiSystemUpdate(BaseModel):
@@ -68,6 +74,23 @@ class AiSystemUpdate(BaseModel):
     description: Optional[str] = None
     deployment_status: Optional[Literal["draft", "deployed", "retired"]] = None
     registration_status: Optional[Literal["draft", "registered", "rejected"]] = None
+    owner_email: Optional[str] = None
+    technical_owner_email: Optional[str] = None
+    legal_owner_email: Optional[str] = None
+    review_status: Optional[Literal["not_started", "scheduled", "in_review", "completed", "overdue"]] = None
+    next_review_at: Optional[datetime] = None
+    last_reviewed_at: Optional[datetime] = None
+    lifecycle_notes: Optional[str] = None
+
+
+class AiSystemReviewCreate(BaseModel):
+    reviewer_email: Optional[str] = None
+    review_type: Literal["lifecycle_review", "classification_review", "control_review", "evidence_review", "incident_review"] = "lifecycle_review"
+    status: Literal["scheduled", "in_review", "completed", "needs_follow_up"] = "completed"
+    notes: Optional[str] = None
+    findings: List[Dict[str, Any]] = Field(default_factory=list)
+    actions: List[Dict[str, Any]] = Field(default_factory=list)
+    next_review_at: Optional[datetime] = None
 
 
 class AiSystemResponse(BaseModel):
@@ -77,8 +100,31 @@ class AiSystemResponse(BaseModel):
     description: Optional[str] = None
     deployment_status: str
     registration_status: str
+    owner_email: Optional[str] = None
+    technical_owner_email: Optional[str] = None
+    legal_owner_email: Optional[str] = None
+    review_status: str
+    next_review_at: Optional[datetime] = None
+    last_reviewed_at: Optional[datetime] = None
+    lifecycle_notes: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AiSystemReviewResponse(BaseModel):
+    id: str
+    tenant_id: str
+    ai_system_id: str
+    reviewer_email: Optional[str] = None
+    review_type: str
+    status: str
+    notes: Optional[str] = None
+    findings_json: List[Dict[str, Any]] = Field(default_factory=list)
+    actions_json: List[Dict[str, Any]] = Field(default_factory=list)
+    next_review_at: Optional[datetime] = None
+    created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -86,6 +132,7 @@ class AiSystemResponse(BaseModel):
 class AiSystemWorkspaceResponse(BaseModel):
     system: AiSystemResponse
     metrics: Dict[str, Any]
+    governance_summary: Dict[str, Any] = Field(default_factory=dict)
     readiness_scorecard: Dict[str, Any]
     latest_classification: Optional[Dict[str, Any]] = None
     features: List[Dict[str, Any]] = Field(default_factory=list)
@@ -98,6 +145,7 @@ class AiSystemWorkspaceResponse(BaseModel):
     oversight_assignments: List[Dict[str, Any]] = Field(default_factory=list)
     incidents: List[Dict[str, Any]] = Field(default_factory=list)
     reports: List[Dict[str, Any]] = Field(default_factory=list)
+    review_events: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SubscriptionStatusResponse(BaseModel):

@@ -88,7 +88,15 @@ Each AI system should have:
 - Review history
 - Deadlines
 
-Status: partially implemented. Registry, features, controls, evidence, incidents, FRIA, and reports exist as separate surfaces; the next step is unifying them into the AI system detail workspace.
+Status: in progress. Registry, features, controls, evidence, incidents, FRIA, reports, and lifecycle owner/review operations are being unified into the AI system detail workspace.
+
+Current lifecycle workspace operations slice:
+- AI systems carry business owner, technical owner, legal owner, review status, next-review deadline, last-reviewed timestamp, and lifecycle notes.
+- Review-history events capture reviewer, review type, outcome, notes, findings, follow-up actions, and next-review date.
+- `/v1/ai-systems/{id}/workspace` returns owner coverage, review deadline status, and review-event metrics.
+- The dashboard system detail page lets users update lifecycle metadata and record review checkpoints from the workspace.
+
+Deployment checkpoint: lifecycle owner/deadline/review-history implementation exists locally and is the current deployment checkpoint.
 
 ### Module 4: Obligation Engine 2.0
 

@@ -1,6 +1,7 @@
 import pytest
+from datetime import datetime, timedelta, timezone
 
-from app.models import Entitlement
+from app.models import AiSystem, Entitlement, Tenant
 from app.services.website_scanner_service import PageArtifact, WebsiteScannerService
 from tests.conftest import TENANT_ID
 
@@ -62,12 +63,91 @@ async def test_ai_system_workspace_aggregates_scanner_lifecycle_records(
 
 
 def test_ai_system_workspace_respects_tenant_isolation(client, admin_headers, db_session):
-    from app.models import AiSystem, Tenant
-
     db_session.add(Tenant(tenant_id="other-tenant", name="Other Tenant"))
     db_session.add(AiSystem(id="sys-other-workspace", tenant_id="other-tenant", name="Other Workspace"))
     db_session.commit()
 
     response = client.get("/v1/ai-systems/sys-other-workspace/workspace", headers=admin_headers)
+
+    assert response.status_code == 404
+
+
+def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_headers):
+    next_review = datetime.now(timezone.utc) + timedelta(days=14)
+    response = client.post(
+        "/v1/ai-systems",
+        headers=admin_headers,
+        json={
+            "name": "Lifecycle System",
+            "description": "Operational workspace test",
+            "owner_email": "Business.Owner@Example.com",
+            "technical_owner_email": "Tech.Owner@Example.com",
+            "review_status": "scheduled",
+            "next_review_at": next_review.isoformat(),
+            "lifecycle_notes": "Review quarterly before release expansion.",
+        },
+    )
+
+    assert response.status_code == 200
+    system = response.json()
+    system_id = system["id"]
+    assert system["owner_email"] == "business.owner@example.com"
+    assert system["technical_owner_email"] == "tech.owner@example.com"
+    assert system["legal_owner_email"] is None
+    assert system["review_status"] == "scheduled"
+    assert system["next_review_at"] is not None
+
+    review_next = datetime.now(timezone.utc) + timedelta(days=60)
+    review_response = client.post(
+        f"/v1/ai-systems/{system_id}/reviews",
+        headers=admin_headers,
+        json={
+            "reviewer_email": "Reviewer@Example.com",
+            "review_type": "classification_review",
+            "status": "completed",
+            "notes": "Classification and control linkage reviewed.",
+            "findings": [{"severity": "low", "summary": "Refresh evidence before launch."}],
+            "actions": [{"title": "Attach updated DPIA", "owner_email": "legal@example.com"}],
+            "next_review_at": review_next.isoformat(),
+        },
+    )
+
+    assert review_response.status_code == 200
+    review = review_response.json()
+    assert review["reviewer_email"] == "reviewer@example.com"
+    assert review["review_type"] == "classification_review"
+    assert review["status"] == "completed"
+    assert review["findings_json"][0]["summary"] == "Refresh evidence before launch."
+
+    get_response = client.get(f"/v1/ai-systems/{system_id}", headers=admin_headers)
+    updated_system = get_response.json()
+    assert updated_system["review_status"] == "completed"
+    assert updated_system["last_reviewed_at"] is not None
+    assert updated_system["next_review_at"] is not None
+
+    reviews_response = client.get(f"/v1/ai-systems/{system_id}/reviews", headers=admin_headers)
+    assert reviews_response.status_code == 200
+    assert len(reviews_response.json()) == 1
+
+    workspace_response = client.get(f"/v1/ai-systems/{system_id}/workspace", headers=admin_headers)
+    assert workspace_response.status_code == 200
+    workspace = workspace_response.json()
+    assert workspace["metrics"]["review_event_count"] == 1
+    assert workspace["metrics"]["assigned_owner_count"] == 2
+    assert workspace["governance_summary"]["missing_owner_roles"] == ["legal_owner"]
+    assert workspace["governance_summary"]["review_deadline_status"] == "scheduled"
+    assert workspace["review_events"][0]["id"] == review["id"]
+
+
+def test_ai_system_review_history_respects_tenant_isolation(client, admin_headers, db_session):
+    db_session.add(Tenant(tenant_id="other-tenant", name="Other Tenant"))
+    db_session.add(AiSystem(id="sys-other-review", tenant_id="other-tenant", name="Other Review"))
+    db_session.commit()
+
+    response = client.post(
+        "/v1/ai-systems/sys-other-review/reviews",
+        headers=admin_headers,
+        json={"status": "completed"},
+    )
 
     assert response.status_code == 404

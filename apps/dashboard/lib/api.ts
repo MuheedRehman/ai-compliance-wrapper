@@ -136,8 +136,27 @@ export const api = {
   listSystems: () => fetchApi<any[]>('/v1/ai-systems'),
   getSystem: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}`),
   getSystemWorkspace: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}/workspace`),
-  createSystem: (body: { name: string; description?: string }) =>
+  createSystem: (body: {
+    name: string;
+    description?: string;
+    owner_email?: string;
+    technical_owner_email?: string;
+    legal_owner_email?: string;
+    review_status?: string;
+    next_review_at?: string;
+    lifecycle_notes?: string;
+  }) =>
     fetchApi<any>('/v1/ai-systems', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  updateSystem: (id: string, body: any) =>
+    fetchApi<any>(`/v1/ai-systems/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+  createSystemReview: (id: string, body: any) =>
+    fetchApi<any>(`/v1/ai-systems/${id}/reviews`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

@@ -18,6 +18,9 @@ interface AiSystem {
   description: string | null;
   deployment_status: string;
   registration_status: string;
+  owner_email?: string | null;
+  review_status?: string;
+  next_review_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -28,7 +31,7 @@ export default function SystemsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [formData, setFormData] = useState({ name: '', description: '' });
+  const [formData, setFormData] = useState({ name: '', description: '', owner_email: '', next_review_at: '' });
 
   const load = () => {
     setLoading(true);
@@ -49,8 +52,11 @@ export default function SystemsPage() {
       await api.createSystem({
         name: formData.name.trim(),
         description: formData.description.trim() || undefined,
+        owner_email: formData.owner_email.trim() || undefined,
+        next_review_at: formData.next_review_at ? new Date(`${formData.next_review_at}T12:00:00.000Z`).toISOString() : undefined,
+        review_status: formData.next_review_at ? 'scheduled' : 'not_started',
       });
-      setFormData({ name: '', description: '' });
+      setFormData({ name: '', description: '', owner_email: '', next_review_at: '' });
       setShowCreate(false);
       load();
     } catch (err: any) {
@@ -88,7 +94,7 @@ export default function SystemsPage() {
         <div className="space-y-6">
           {showCreate && (
             <Card title="Register AI System">
-              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_1fr_220px_180px_auto] gap-3">
                 <input
                   required
                   value={formData.name}
@@ -100,6 +106,19 @@ export default function SystemsPage() {
                   value={formData.description}
                   onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                   placeholder="Short description"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  type="email"
+                  value={formData.owner_email}
+                  onChange={(event) => setFormData({ ...formData, owner_email: event.target.value })}
+                  placeholder="Owner email"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  type="date"
+                  value={formData.next_review_at}
+                  onChange={(event) => setFormData({ ...formData, next_review_at: event.target.value })}
                   className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
                 />
                 <button disabled={submitting} className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -118,7 +137,7 @@ export default function SystemsPage() {
         <div className="space-y-6">
           {showCreate && (
             <Card title="Register AI System">
-              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3">
+              <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1fr_1fr_220px_180px_auto] gap-3">
                 <input
                   required
                   value={formData.name}
@@ -130,6 +149,19 @@ export default function SystemsPage() {
                   value={formData.description}
                   onChange={(event) => setFormData({ ...formData, description: event.target.value })}
                   placeholder="Short description"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  type="email"
+                  value={formData.owner_email}
+                  onChange={(event) => setFormData({ ...formData, owner_email: event.target.value })}
+                  placeholder="Owner email"
+                  className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                />
+                <input
+                  type="date"
+                  value={formData.next_review_at}
+                  onChange={(event) => setFormData({ ...formData, next_review_at: event.target.value })}
                   className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
                 />
                 <button disabled={submitting} className="rounded-lg bg-indigo-600 px-5 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -161,6 +193,8 @@ export default function SystemsPage() {
                     <th>System Identity</th>
                     <th>Deployment</th>
                     <th>Registration</th>
+                    <th>Owner</th>
+                    <th>Review</th>
                     <th>Audit Date</th>
                   </tr>
                 </thead>
@@ -181,6 +215,17 @@ export default function SystemsPage() {
                       </td>
                       <td><StatusBadge value={s.deployment_status} /></td>
                       <td><StatusBadge value={s.registration_status} /></td>
+                      <td className="text-[10px] text-zinc-500 font-bold">
+                        {s.owner_email || 'Unassigned'}
+                      </td>
+                      <td>
+                        <div className="flex flex-col gap-1">
+                          <StatusBadge value={s.review_status || 'not_started'} />
+                          <span className="text-[10px] text-zinc-600">
+                            {s.next_review_at ? new Date(s.next_review_at).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'No date'}
+                          </span>
+                        </div>
+                      </td>
                       <td className="text-[10px] text-zinc-500 font-bold uppercase tracking-tighter">
                         {new Date(s.created_at).toLocaleDateString(undefined, { dateStyle: 'medium' })}
                       </td>
