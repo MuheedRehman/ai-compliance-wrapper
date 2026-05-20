@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import StatusBadge from '@/components/status-badge';
@@ -11,6 +12,8 @@ import Card from '@/components/card';
 import { ClipboardCheck, Filter } from 'lucide-react';
 
 export default function ReviewsPage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +24,12 @@ export default function ReviewsPage() {
     setError(null);
     const params: Record<string, string> = {};
     if (statusFilter) params.status = statusFilter;
+    if (systemFilter) params.ai_system_id = systemFilter;
     api.listReviews(Object.keys(params).length ? params : undefined)
       .then((data) => setReviews(data.review_tasks || []))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
-  }, [statusFilter]);
+  }, [statusFilter, systemFilter]);
 
   useEffect(() => { load(); }, [load]);
 

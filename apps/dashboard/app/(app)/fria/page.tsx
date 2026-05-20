@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import Card from '@/components/card';
@@ -10,6 +11,8 @@ import Loading from '@/components/loading';
 import { ShieldCheck, Plus, ArrowRight, ClipboardList, AlertCircle } from 'lucide-react';
 
 export default function FriaPage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [frias, setFrias] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +56,7 @@ export default function FriaPage() {
       </PageShell>
     );
   }
+  const visibleFrias = systemFilter ? frias.filter((fria) => fria.ai_system_id === systemFilter) : frias;
 
   return (
     <PageShell 
@@ -66,7 +70,7 @@ export default function FriaPage() {
       }
     >
       <div className="space-y-6">
-        {frias.length === 0 ? (
+        {visibleFrias.length === 0 ? (
           <Card>
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <div className="p-4 rounded-full bg-zinc-900 mb-6">
@@ -80,7 +84,7 @@ export default function FriaPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {frias.map((fria) => (
+            {visibleFrias.map((fria) => (
               <Link key={fria.id} href={`/fria/${fria.id}`}>
                 <Card className="hover:border-zinc-700 transition-all group">
                   <div className="flex items-center justify-between">

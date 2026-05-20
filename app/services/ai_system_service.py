@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlencode
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import (
@@ -329,6 +330,103 @@ def _create_follow_up_tasks(
     return linked_actions
 
 
+def _query(**params: str) -> str:
+    return urlencode({key: value for key, value in params.items() if value is not None})
+
+
+def _workspace_href(path: str, **params: str) -> str:
+    query = _query(**params)
+    return f"{path}?{query}" if query else path
+
+
+def _build_workspace_drill_down_actions(
+    system: AiSystem,
+    *,
+    controls: list[ComplianceControl],
+    evidence_items: list[EvidenceItem],
+    reports: list[ReportRecord],
+    fria_records: list[FRIARecord],
+    oversight_assignments: list[OversightAssignment],
+    incidents: list[IncidentRecord],
+    follow_up_tasks: list[ReviewTask],
+) -> dict:
+    system_query = {"ai_system_id": system.id}
+    open_controls = [control for control in controls if control.status not in {"completed", "signed_off"}]
+    open_follow_ups = [task for task in follow_up_tasks if task.status == "open"]
+    open_incidents = [incident for incident in incidents if incident.status not in {"resolved", "closed"}]
+    latest_fria = fria_records[0] if fria_records else None
+
+    return {
+        "controls": {
+            "href": _workspace_href("/controls", **system_query),
+            "api_endpoint": _workspace_href("/v1/compliance/controls/seed-baseline", **system_query),
+            "method": "POST",
+            "primary_label": "Seed Controls" if not controls else "Open Controls",
+            "next_action": "seed_baseline_controls" if not controls else "review_open_controls",
+            "count": len(controls),
+            "open_count": len(open_controls),
+        },
+        "evidence": {
+            "href": _workspace_href("/evidence", **system_query),
+            "create_href": _workspace_href(
+                "/evidence",
+                **system_query,
+                create="1",
+                source="ai_system_workspace",
+                evidence_type="policy",
+            ),
+            "primary_label": "Add Evidence" if not evidence_items else "Open Evidence",
+            "next_action": "add_evidence_item" if not evidence_items else "review_evidence_items",
+            "count": len(evidence_items),
+        },
+        "reports": {
+            "href": _workspace_href("/reports", **system_query),
+            "create_href": _workspace_href("/reports", **system_query, create="1"),
+            "api_endpoint": "/v1/reports",
+            "method": "POST",
+            "request_body": {
+                "report_type": "compliance_readiness_summary",
+                "ai_system_id": system.id,
+                "title": f"{system.name} Compliance Readiness",
+            },
+            "primary_label": "Generate Report",
+            "next_action": "generate_compliance_readiness_report",
+            "count": len(reports),
+        },
+        "fria": {
+            "href": _workspace_href("/fria", **system_query),
+            "create_href": _workspace_href("/fria", **system_query, create="1"),
+            "record_id": latest_fria.id if latest_fria else None,
+            "record_href": f"/fria/{latest_fria.id}" if latest_fria else None,
+            "primary_label": "Open FRIA" if latest_fria else "Start FRIA",
+            "next_action": "open_fria" if latest_fria else "start_fria_draft",
+            "count": len(fria_records),
+        },
+        "oversight": {
+            "href": _workspace_href("/oversight", **system_query),
+            "create_href": _workspace_href("/oversight", **system_query, create="1"),
+            "primary_label": "Assign Oversight" if not oversight_assignments else "Open Oversight",
+            "next_action": "assign_oversight" if not oversight_assignments else "review_oversight",
+            "count": len(oversight_assignments),
+        },
+        "incidents": {
+            "href": _workspace_href("/incidents", **system_query),
+            "create_href": _workspace_href("/incidents", **system_query, create="1"),
+            "primary_label": "Report Incident" if not open_incidents else "Open Incidents",
+            "next_action": "report_incident" if not open_incidents else "review_open_incidents",
+            "count": len(incidents),
+            "open_count": len(open_incidents),
+        },
+        "follow_ups": {
+            "href": _workspace_href("/reviews", **system_query),
+            "primary_label": "Open Follow-Ups",
+            "next_action": "review_follow_up_tasks",
+            "count": len(follow_up_tasks),
+            "open_count": len(open_follow_ups),
+        },
+    }
+
+
 def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate, *, commit: bool = True) -> AiSystem:
     ai_system = AiSystem(
         id=f"sys-{uuid.uuid4().hex[:8]}",
@@ -561,6 +659,16 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
             "latest_review_status": system.review_status,
             "open_follow_up_task_count": len(open_follow_up_tasks),
         },
+        "drill_down_actions": _build_workspace_drill_down_actions(
+            system,
+            controls=controls,
+            evidence_items=evidence_items,
+            reports=reports,
+            fria_records=fria_records,
+            oversight_assignments=oversight_assignments,
+            incidents=incidents,
+            follow_up_tasks=follow_up_tasks,
+        ),
         "readiness_scorecard": scorecard,
         "latest_classification": (
             {

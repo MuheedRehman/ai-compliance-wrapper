@@ -6,17 +6,25 @@ import { AlertCircle, CheckCircle2, Loader2, FileText } from 'lucide-react';
 
 interface ReportRunFormProps {
   onSuccess: (report: any) => void;
+  initialSystemId?: string;
+  initialReportType?: string;
+  initialTitle?: string;
 }
 
-export default function ReportRunForm({ onSuccess }: ReportRunFormProps) {
+export default function ReportRunForm({
+  onSuccess,
+  initialSystemId = '',
+  initialReportType = 'assessment_summary',
+  initialTitle = '',
+}: ReportRunFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [systems, setSystems] = useState<any[]>([]);
   
   const [formData, setFormData] = useState({
-    report_type: 'assessment_summary',
-    title: '',
-    ai_system_id: '',
+    report_type: initialReportType,
+    title: initialTitle,
+    ai_system_id: initialSystemId,
   });
 
   useEffect(() => {

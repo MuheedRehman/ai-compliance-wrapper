@@ -60,6 +60,16 @@ async def test_ai_system_workspace_aggregates_scanner_lifecycle_records(
     assert workspace["website_scans"][0]["id"] == scan["id"]
     assert workspace["reports"][0]["id"] == report_response.json()["report"]["id"]
     assert workspace["evidence_logs"][0]["event_type"] == "website_scan_converted"
+    actions = workspace["drill_down_actions"]
+    assert actions["controls"]["href"] == f"/controls?ai_system_id={system_id}"
+    assert actions["controls"]["api_endpoint"] == f"/v1/compliance/controls/seed-baseline?ai_system_id={system_id}"
+    assert actions["controls"]["next_action"] == "review_open_controls"
+    assert actions["evidence"]["create_href"] == (
+        f"/evidence?ai_system_id={system_id}&create=1&source=ai_system_workspace&evidence_type=policy"
+    )
+    assert actions["reports"]["request_body"]["ai_system_id"] == system_id
+    assert actions["fria"]["next_action"] == "start_fria_draft"
+    assert actions["follow_ups"]["open_count"] == 0
 
 
 def test_ai_system_workspace_respects_tenant_isolation(client, admin_headers, db_session):
@@ -274,6 +284,9 @@ def test_ai_system_review_multi_action_plan_creates_control_and_evidence_placeho
     assert workspace["metrics"]["linked_follow_up_task_count"] == 2
     assert workspace["metrics"]["control_count"] == 1
     assert workspace["metrics"]["evidence_item_count"] == 1
+    assert workspace["drill_down_actions"]["controls"]["count"] == 1
+    assert workspace["drill_down_actions"]["evidence"]["count"] == 1
+    assert workspace["drill_down_actions"]["follow_ups"]["open_count"] == 3
 
 
 def test_ai_system_review_history_respects_tenant_isolation(client, admin_headers, db_session):

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import Card from '@/components/card';
@@ -10,15 +11,17 @@ import Loading from '@/components/loading';
 import { AlertCircle, Plus, ArrowRight, MessageSquare, History } from 'lucide-react';
 
 export default function IncidentsPage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [incidents, setIncidents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(searchParams.get('create') === '1');
   const [systems, setSystems] = useState<any[]>([]);
   
   // Form State
   const [formData, setFormData] = useState({
-    ai_system_id: '',
+    ai_system_id: systemFilter,
     severity: 'medium',
     description: '',
     status: 'open'
@@ -48,7 +51,7 @@ export default function IncidentsPage() {
       const newInc = await api.createIncident(formData);
       setIncidents([newInc, ...incidents]);
       setShowAdd(false);
-      setFormData({ ai_system_id: '', severity: 'medium', description: '', status: 'open' });
+      setFormData({ ai_system_id: systemFilter, severity: 'medium', description: '', status: 'open' });
     } catch (err) {
       alert("Failed to create incident.");
     } finally {
@@ -73,6 +76,7 @@ export default function IncidentsPage() {
       </PageShell>
     );
   }
+  const visibleIncidents = systemFilter ? incidents.filter((incident) => incident.ai_system_id === systemFilter) : incidents;
 
   return (
     <PageShell 
@@ -141,7 +145,7 @@ export default function IncidentsPage() {
         )}
 
         <div className="grid grid-cols-1 gap-4">
-          {incidents.length === 0 ? (
+          {visibleIncidents.length === 0 ? (
             <Card>
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="p-4 rounded-full bg-zinc-900 mb-6">
@@ -154,7 +158,7 @@ export default function IncidentsPage() {
               </div>
             </Card>
           ) : (
-            incidents.map((inc) => (
+            visibleIncidents.map((inc) => (
               <Link key={inc.id} href={`/incidents/${inc.id}`}>
                 <Card className="hover:border-zinc-700 transition-all group border-l-4 border-l-red-500/30">
                   <div className="flex items-start justify-between">

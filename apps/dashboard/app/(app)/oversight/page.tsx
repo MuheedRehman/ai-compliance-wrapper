@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import Card from '@/components/card';
@@ -8,15 +9,17 @@ import Loading from '@/components/loading';
 import { ShieldCheck, Plus, UserPlus, Mail, Trash2, AlertCircle, Info } from 'lucide-react';
 
 export default function OversightPage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [assignments, setAssignments] = useState<any[]>([]);
   const [systems, setSystems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAdd, setShowAdd] = useState(searchParams.get('create') === '1');
   
   // Form State
   const [formData, setFormData] = useState({
-    ai_system_id: '',
+    ai_system_id: systemFilter,
     reviewer_email: '',
     role: 'technical_oversight'
   });
@@ -45,7 +48,7 @@ export default function OversightPage() {
       const newOvs = await api.createOversight(formData);
       setAssignments([...assignments, newOvs]);
       setShowAdd(false);
-      setFormData({ ai_system_id: '', reviewer_email: '', role: 'technical_oversight' });
+      setFormData({ ai_system_id: systemFilter, reviewer_email: '', role: 'technical_oversight' });
     } catch (err) {
       alert("Failed to create assignment.");
     } finally {
@@ -80,6 +83,7 @@ export default function OversightPage() {
       </PageShell>
     );
   }
+  const visibleAssignments = systemFilter ? assignments.filter((assignment) => assignment.ai_system_id === systemFilter) : assignments;
 
   return (
     <PageShell 
@@ -151,14 +155,14 @@ export default function OversightPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {assignments.length === 0 ? (
+          {visibleAssignments.length === 0 ? (
             <div className="col-span-full py-20 text-center bg-zinc-900/30 rounded-xl border border-zinc-800/60 border-dashed">
               <UserPlus className="h-10 w-10 text-zinc-700 mx-auto mb-4" />
               <h3 className="text-zinc-400 font-medium">No oversight roles assigned yet.</h3>
               <p className="text-zinc-600 text-sm mt-1">High-risk systems require human oversight under Article 14.</p>
             </div>
           ) : (
-            assignments.map((ovs) => (
+            visibleAssignments.map((ovs) => (
               <Card key={ovs.id} className="relative group">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

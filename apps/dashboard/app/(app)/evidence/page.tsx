@@ -49,6 +49,8 @@ function toIsoDate(value: string) {
 export default function EvidencePage() {
   const searchParams = useSearchParams();
   const systemFilter = searchParams.get('ai_system_id') || '';
+  const createRequested = searchParams.get('create') === '1';
+  const requestedEvidenceType = searchParams.get('evidence_type') || 'policy';
   const [logs, setLogs] = useState<any[]>([]);
   const [items, setItems] = useState<any[]>([]);
   const [summary, setSummary] = useState<any>(null);
@@ -56,13 +58,19 @@ export default function EvidencePage() {
   const [controls, setControls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(createRequested);
   const [error, setError] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState('');
   const [decisionFilter, setDecisionFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState({
+    ...emptyForm,
+    ai_system_id: systemFilter,
+    control_id: searchParams.get('control_id') || '',
+    evidence_type: evidenceTypes.includes(requestedEvidenceType) ? requestedEvidenceType : 'policy',
+    source: searchParams.get('source') || '',
+  });
 
   const load = useCallback(() => {
     setLoading(true);
@@ -116,7 +124,7 @@ export default function EvidencePage() {
         description: form.description || undefined,
         metadata_json: form.description ? { notes: form.description } : {},
       });
-      setForm(emptyForm);
+      setForm({ ...emptyForm, ai_system_id: systemFilter });
       setShowCreate(false);
       load();
     } catch (err: any) {

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import { 
   FileSearch, 
@@ -17,10 +18,12 @@ import {
 import ReportRunForm from '@/components/forms/report-run-form';
 
 export default function ReportsPage() {
+  const searchParams = useSearchParams();
+  const systemFilter = searchParams.get('ai_system_id') || '';
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreating, setIsCreating] = useState(searchParams.get('create') === '1');
 
   useEffect(() => {
     loadReports();
@@ -50,6 +53,7 @@ export default function ReportsPage() {
     const status = report.report_json?.readiness_summary?.status;
     return status ? status.replace(/_/g, ' ').toUpperCase() : 'NOT SCORED';
   };
+  const visibleReports = systemFilter ? reports.filter((report) => report.ai_system_id === systemFilter) : reports;
 
   return (
     <div className="max-w-[1200px] mx-auto space-y-8 pb-12">
@@ -92,7 +96,7 @@ export default function ReportsPage() {
           <ReportRunForm onSuccess={(r) => {
             setReports([r, ...reports]);
             setIsCreating(false);
-          }} />
+          }} initialSystemId={systemFilter} initialReportType={systemFilter ? 'compliance_readiness_summary' : 'assessment_summary'} />
         </div>
       )}
 
@@ -109,7 +113,7 @@ export default function ReportsPage() {
             <h3 className="text-white font-bold mb-2">Service Error</h3>
             <p className="text-zinc-400 text-sm">{error}</p>
           </div>
-        ) : reports.length === 0 ? (
+        ) : visibleReports.length === 0 ? (
           <div className="p-24 text-center bg-zinc-900/30 border border-dashed border-zinc-800 rounded-3xl">
             <div className="h-16 w-16 bg-zinc-800/50 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <FileSearch className="h-8 w-8 text-zinc-600" />
@@ -129,7 +133,7 @@ export default function ReportsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {reports.map((report) => (
+            {visibleReports.map((report) => (
               <Link 
                 key={report.id}
                 href={`/reports/${report.id}`}

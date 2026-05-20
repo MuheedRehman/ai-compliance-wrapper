@@ -114,6 +114,13 @@ Current multi-action review plan slice:
 
 Deployment checkpoint: multi-action review plans are deployed to staging through Cloud Build `ae655071-d756-4fe7-85cd-7ee2175c8779`, with backend revision `ai-compliance-backend-00081-n6k`, dashboard revision `ai-compliance-dashboard-00042-6sv`, and passing Cloud Build staging Playwright E2E. Next workspace hardening should add deeper drill-down actions from each workspace section.
 
+Current workspace drill-down actions slice:
+- `/v1/ai-systems/{id}/workspace` returns `drill_down_actions` for controls, evidence, reports, FRIA, oversight, incidents, and follow-up tasks.
+- The dashboard system workspace includes action tiles for seeding controls, opening or creating evidence, generating a readiness report, starting or opening FRIA, assigning oversight, and reporting incidents.
+- Evidence, reports, FRIA, oversight, incidents, and review task pages honor `ai_system_id` context for scoped lists and prefilled create flows where applicable.
+
+Deployment checkpoint: workspace drill-down actions are implemented locally and are the current deployment checkpoint.
+
 ### Module 4: Obligation Engine 2.0
 
 Add:

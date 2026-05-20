@@ -1,25 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  ArrowRight,
   BarChart3,
   Bot,
   CalendarClock,
   CheckCircle2,
   ClipboardCheck,
+  FilePlus2,
   FileSearch,
   FileText,
   Plus,
+  RefreshCw,
   Trash2,
   ListChecks,
   Scale,
   Save,
   ShieldCheck,
+  UserPlus,
   Users,
 } from 'lucide-react';
 import { api } from '@/lib/api';
@@ -62,10 +66,59 @@ function displayDate(value?: string | null) {
 }
 
 function followUpHref(systemId: string, task: any) {
-  const targetType = task.findings_json?.target_type;
-  if (targetType === 'control') return `/controls?ai_system_id=${systemId}`;
-  if (targetType === 'evidence') return `/evidence?ai_system_id=${systemId}`;
-  return '/reviews';
+  const details = task.findings_json || {};
+  const targetType = details.target_type;
+  if (targetType === 'control') {
+    const controlId = details.control_id || details.created_placeholder_id;
+    return `/controls?${new URLSearchParams({ ai_system_id: systemId, ...(controlId ? { control_id: controlId } : {}) }).toString()}`;
+  }
+  if (targetType === 'evidence') {
+    const evidenceId = details.evidence_item_id || details.created_placeholder_id;
+    return `/evidence?${new URLSearchParams({ ai_system_id: systemId, ...(evidenceId ? { evidence_item_id: evidenceId } : {}) }).toString()}`;
+  }
+  return `/reviews?${new URLSearchParams({ ai_system_id: systemId }).toString()}`;
+}
+
+function WorkspaceAction({
+  icon,
+  label,
+  value,
+  href,
+  onClick,
+  busy,
+  disabled,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  href?: string;
+  onClick?: () => void;
+  busy?: boolean;
+  disabled?: boolean;
+}) {
+  const content = (
+    <>
+      <div className="flex items-center gap-3 min-w-0">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-zinc-900 text-indigo-300 ring-1 ring-zinc-800">
+          {icon}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-xs font-bold text-zinc-100">{label}</span>
+          <span className="mt-1 block text-[10px] font-mono uppercase tracking-widest text-zinc-600">{value}</span>
+        </span>
+      </div>
+      {busy ? <RefreshCw className="h-4 w-4 shrink-0 animate-spin text-zinc-500" /> : <ArrowRight className="h-4 w-4 shrink-0 text-zinc-600" />}
+    </>
+  );
+  const className = "flex min-h-[74px] items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-left transition-colors hover:border-indigo-500/40 disabled:cursor-not-allowed disabled:opacity-50";
+  if (href && !disabled && !onClick) {
+    return <Link href={href} className={className}>{content}</Link>;
+  }
+  return (
+    <button type="button" onClick={onClick} disabled={disabled || busy} className={className}>
+      {content}
+    </button>
+  );
 }
 
 type FollowUpDraft = {
@@ -86,6 +139,7 @@ const EMPTY_FOLLOW_UP: FollowUpDraft = {
 
 export default function SystemDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const systemId = params.id as string;
 
   const [workspace, setWorkspace] = useState<any>(null);
@@ -94,6 +148,7 @@ export default function SystemDetailPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [recordingReview, setRecordingReview] = useState(false);
   const [closingTaskId, setClosingTaskId] = useState<string | null>(null);
+  const [runningAction, setRunningAction] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({
     owner_email: '',
     technical_owner_email: '',
@@ -129,6 +184,7 @@ export default function SystemDetailPage() {
   const classification = workspace?.latest_classification;
   const reviewEvents = workspace?.review_events || [];
   const followUpTasks = workspace?.follow_up_tasks || [];
+  const drillDownActions = workspace?.drill_down_actions || {};
   const readinessScore = scorecard.readiness_score || 0;
 
   useEffect(() => {
@@ -239,6 +295,66 @@ export default function SystemDetailPage() {
     }
   }
 
+  async function handleSeedControls() {
+    if (!system) return;
+    setRunningAction('controls');
+    setError(null);
+    try {
+      await api.seedBaselineControls(system.id);
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to seed controls');
+    } finally {
+      setRunningAction(null);
+    }
+  }
+
+  async function handleGenerateReport() {
+    if (!system) return;
+    setRunningAction('reports');
+    setError(null);
+    try {
+      const report = await api.createReport({
+        report_type: 'compliance_readiness_summary',
+        ai_system_id: system.id,
+        title: `${system.name} Compliance Readiness`,
+        source_refs: [{ type: 'ai_system_workspace', ai_system_id: system.id }],
+      });
+      router.push(`/reports/${report.id}`);
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to generate report');
+    } finally {
+      setRunningAction(null);
+    }
+  }
+
+  async function handleStartFria() {
+    if (!system) return;
+    const existingFria = workspace?.fria_records?.[0];
+    if (existingFria?.id) {
+      router.push(`/fria/${existingFria.id}`);
+      return;
+    }
+    setRunningAction('fria');
+    setError(null);
+    try {
+      const fria = await api.createFria({
+        ai_system_id: system.id,
+        status: 'draft',
+        assessment_json: {
+          source: 'ai_system_workspace',
+          system_name: system.name,
+          intended_purpose: system.description || system.name,
+        },
+      });
+      router.push(`/fria/${fria.id}`);
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to start FRIA');
+    } finally {
+      setRunningAction(null);
+    }
+  }
+
   if (loading) {
     return (
       <PageShell title="AI System Workspace" subtitle="Loading lifecycle record.">
@@ -306,6 +422,51 @@ export default function SystemDetailPage() {
             </div>
           </Card>
         </div>
+
+        <Card title="Workspace Actions">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <WorkspaceAction
+              icon={<ListChecks className="h-4 w-4" />}
+              label={(drillDownActions.controls?.count || 0) === 0 ? 'Seed Controls' : 'Open Controls'}
+              value={`${drillDownActions.controls?.open_count || 0} open`}
+              onClick={(drillDownActions.controls?.count || 0) === 0 ? handleSeedControls : undefined}
+              href={(drillDownActions.controls?.count || 0) === 0 ? undefined : drillDownActions.controls?.href || `/controls?ai_system_id=${system.id}`}
+              busy={runningAction === 'controls'}
+            />
+            <WorkspaceAction
+              icon={<FilePlus2 className="h-4 w-4" />}
+              label={(drillDownActions.evidence?.count || 0) === 0 ? 'Add Evidence' : 'Open Evidence'}
+              value={`${drillDownActions.evidence?.count || 0} items`}
+              href={(drillDownActions.evidence?.count || 0) === 0 ? drillDownActions.evidence?.create_href : drillDownActions.evidence?.href}
+            />
+            <WorkspaceAction
+              icon={<FileText className="h-4 w-4" />}
+              label="Generate Report"
+              value={`${drillDownActions.reports?.count || 0} reports`}
+              onClick={handleGenerateReport}
+              busy={runningAction === 'reports'}
+            />
+            <WorkspaceAction
+              icon={<ShieldCheck className="h-4 w-4" />}
+              label={drillDownActions.fria?.record_id ? 'Open FRIA' : 'Start FRIA'}
+              value={`${drillDownActions.fria?.count || 0} records`}
+              onClick={handleStartFria}
+              busy={runningAction === 'fria'}
+            />
+            <WorkspaceAction
+              icon={<UserPlus className="h-4 w-4" />}
+              label={(drillDownActions.oversight?.count || 0) === 0 ? 'Assign Oversight' : 'Open Oversight'}
+              value={`${drillDownActions.oversight?.count || 0} roles`}
+              href={(drillDownActions.oversight?.count || 0) === 0 ? drillDownActions.oversight?.create_href : drillDownActions.oversight?.href}
+            />
+            <WorkspaceAction
+              icon={<AlertTriangle className="h-4 w-4" />}
+              label={(drillDownActions.incidents?.open_count || 0) === 0 ? 'Report Incident' : 'Open Incidents'}
+              value={`${drillDownActions.incidents?.open_count || 0} open`}
+              href={(drillDownActions.incidents?.open_count || 0) === 0 ? drillDownActions.incidents?.create_href : drillDownActions.incidents?.href}
+            />
+          </div>
+        </Card>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           <Card title="Lifecycle Ownership" className="xl:col-span-2">

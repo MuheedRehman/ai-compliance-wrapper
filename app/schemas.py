@@ -133,6 +133,7 @@ class AiSystemWorkspaceResponse(BaseModel):
     system: AiSystemResponse
     metrics: Dict[str, Any]
     governance_summary: Dict[str, Any] = Field(default_factory=dict)
+    drill_down_actions: Dict[str, Any] = Field(default_factory=dict)
     readiness_scorecard: Dict[str, Any]
     latest_classification: Optional[Dict[str, Any]] = None
     features: List[Dict[str, Any]] = Field(default_factory=list)
