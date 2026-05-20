@@ -184,6 +184,11 @@ export const api = {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
     return fetchApi<{ tenant_id: string; review_tasks: any[] }>(`/v1/review-tasks${qs}`);
   },
+  closeReviewTask: (id: string, resolution_note?: string) =>
+    fetchApi<any>(`/v1/review-tasks/${id}/close`, {
+      method: 'PATCH',
+      body: JSON.stringify({ resolution_note }),
+    }),
 
   // Evidence / Logs
   listLogs: (params?: Record<string, string>) => {

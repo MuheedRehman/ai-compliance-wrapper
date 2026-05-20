@@ -98,6 +98,14 @@ Current lifecycle workspace operations slice:
 
 Deployment checkpoint: lifecycle owner/deadline/review-history implementation is deployed to staging. Next workspace hardening should connect review follow-up actions to controls/evidence tasks and add deeper drill-down actions from each workspace section.
 
+Current review follow-up actions slice:
+- Review checkpoint actions create AI-system-linked review tasks.
+- Follow-up tasks preserve the source review event, action index, target type, target control/evidence IDs when provided, owner, due date, and severity.
+- `/v1/ai-systems/{id}/workspace` includes follow-up task metrics and task records.
+- The dashboard system detail page lets users add one follow-up while recording a review, open the target controls/evidence area, and close follow-up tasks from the workspace.
+
+Deployment checkpoint: review follow-up actions exist locally and are the current deployment checkpoint.
+
 ### Module 4: Obligation Engine 2.0
 
 Add:

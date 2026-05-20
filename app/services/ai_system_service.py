@@ -14,10 +14,12 @@ from app.models import (
     IntakeAssessment,
     OversightAssignment,
     ReportRecord,
+    ReviewTask,
     WebsiteScan,
 )
 from app.schemas import AiSystemCreate, AiSystemReviewCreate, AiSystemUpdate
 from app.services.compliance_control_service import ComplianceControlService
+from app.services.review_service import get_or_create_open_review_task
 
 
 def _normalize_email(value: str | None) -> str | None:
@@ -31,6 +33,19 @@ def _normalize_datetime(value: datetime | None) -> datetime | None:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _coerce_datetime(value) -> datetime | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return _normalize_datetime(value)
+    if isinstance(value, str):
+        try:
+            return _normalize_datetime(datetime.fromisoformat(value.replace("Z", "+00:00")))
+        except ValueError:
+            return None
+    return None
 
 
 def _now_utc() -> datetime:
@@ -47,6 +62,118 @@ def _review_deadline_status(system: AiSystem) -> str:
     if due_at <= now + timedelta(days=30):
         return "due_soon"
     return "scheduled"
+
+
+def _action_target_type(action: dict) -> str:
+    target_type = str(action.get("target_type") or "").strip().lower()
+    if target_type in {"control", "evidence", "general"}:
+        return target_type
+    if action.get("control_id"):
+        return "control"
+    if action.get("evidence_item_id") or action.get("evidence_type"):
+        return "evidence"
+    return "general"
+
+
+def _validate_follow_up_links(db: Session, tenant_id: str, ai_system_id: str, action: dict) -> None:
+    control_id = action.get("control_id")
+    if control_id:
+        control = (
+            db.query(ComplianceControl)
+            .filter(ComplianceControl.tenant_id == tenant_id, ComplianceControl.id == control_id)
+            .first()
+        )
+        if not control:
+            raise HTTPException(status_code=404, detail="Follow-up control not found")
+        if control.ai_system_id and control.ai_system_id != ai_system_id:
+            raise HTTPException(status_code=400, detail="Follow-up control belongs to a different AI system")
+
+    evidence_item_id = action.get("evidence_item_id")
+    if evidence_item_id:
+        evidence = (
+            db.query(EvidenceItem)
+            .filter(EvidenceItem.tenant_id == tenant_id, EvidenceItem.id == evidence_item_id)
+            .first()
+        )
+        if not evidence:
+            raise HTTPException(status_code=404, detail="Follow-up evidence item not found")
+        if evidence.ai_system_id and evidence.ai_system_id != ai_system_id:
+            raise HTTPException(status_code=400, detail="Follow-up evidence item belongs to a different AI system")
+
+
+def _normalize_follow_up_action(action: dict, index: int) -> dict:
+    title = str(
+        action.get("title")
+        or action.get("summary")
+        or action.get("description")
+        or f"Review follow-up action {index + 1}"
+    ).strip()
+    severity = str(action.get("severity") or "medium").strip().lower()
+    if severity not in {"low", "medium", "high", "critical"}:
+        severity = "medium"
+    target_type = _action_target_type(action)
+    due_at = _coerce_datetime(action.get("due_at") or action.get("due_date"))
+    normalized = {
+        **action,
+        "title": title,
+        "description": action.get("description") or action.get("summary"),
+        "target_type": target_type,
+        "severity": severity,
+        "owner_email": _normalize_email(action.get("owner_email")),
+        "due_at": due_at.isoformat() if due_at else None,
+    }
+    if target_type == "control":
+        normalized["target_route"] = "controls"
+    elif target_type == "evidence":
+        normalized["target_route"] = "evidence"
+    else:
+        normalized["target_route"] = "reviews"
+    return normalized
+
+
+def _create_follow_up_tasks(
+    db: Session,
+    tenant_id: str,
+    ai_system_id: str,
+    event: AiSystemReviewEvent,
+    actions: list[dict],
+) -> list[dict]:
+    linked_actions: list[dict] = []
+    for index, action in enumerate(actions):
+        if not isinstance(action, dict):
+            continue
+        normalized = _normalize_follow_up_action(action, index)
+        _validate_follow_up_links(db, tenant_id, ai_system_id, normalized)
+        trigger_reason = f"ai_system_review_follow_up:{event.id}:{index}"
+        task = get_or_create_open_review_task(
+            db=db,
+            tenant_id=tenant_id,
+            feature_id=None,
+            review_type="ai_system_lifecycle_follow_up",
+            trigger_reason=trigger_reason,
+            severity=normalized["severity"],
+            findings={
+                "source": "ai_system_review_event",
+                "source_review_event_id": event.id,
+                "action_index": index,
+                "title": normalized["title"],
+                "description": normalized.get("description"),
+                "target_type": normalized["target_type"],
+                "target_route": normalized["target_route"],
+                "control_id": normalized.get("control_id"),
+                "evidence_item_id": normalized.get("evidence_item_id"),
+                "owner_email": normalized.get("owner_email"),
+                "due_at": normalized.get("due_at"),
+                "review_type": event.review_type,
+            },
+            ai_system_id=ai_system_id,
+        )
+        linked_actions.append({
+            **normalized,
+            "review_task_id": task.review_task_id,
+            "task_status": task.status,
+        })
+    return linked_actions
 
 
 def create_ai_system(db: Session, tenant_id: str, payload: AiSystemCreate, *, commit: bool = True) -> AiSystem:
@@ -130,6 +257,7 @@ def record_ai_system_review(
         next_review_at=_normalize_datetime(payload.next_review_at),
     )
     db.add(event)
+    event.actions_json = _create_follow_up_tasks(db, tenant_id, ai_system_id, event, payload.actions)
 
     if payload.status == "completed":
         system.review_status = "completed"
@@ -220,6 +348,17 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         .limit(25)
         .all()
     )
+    follow_up_tasks = (
+        db.query(ReviewTask)
+        .filter(
+            ReviewTask.tenant_id == tenant_id,
+            ReviewTask.ai_system_id == ai_system_id,
+            ReviewTask.review_type == "ai_system_lifecycle_follow_up",
+        )
+        .order_by(ReviewTask.created_at.desc())
+        .limit(50)
+        .all()
+    )
 
     latest_intake = intakes[0] if intakes else None
     open_incidents = [incident for incident in incidents if incident.status not in {"resolved", "closed"}]
@@ -232,6 +371,11 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
     }
     assigned_owner_count = len([email for email in owner_roles.values() if email])
     review_deadline_status = _review_deadline_status(system)
+    open_follow_up_tasks = [task for task in follow_up_tasks if task.status == "open"]
+    linked_follow_up_tasks = [
+        task for task in follow_up_tasks
+        if (task.findings_json or {}).get("target_type") in {"control", "evidence"}
+    ]
 
     return {
         "system": system,
@@ -250,6 +394,9 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
             "high_severity_incident_count": len(high_severity_incidents),
             "review_event_count": len(review_events),
             "assigned_owner_count": assigned_owner_count,
+            "follow_up_task_count": len(follow_up_tasks),
+            "open_follow_up_task_count": len(open_follow_up_tasks),
+            "linked_follow_up_task_count": len(linked_follow_up_tasks),
         },
         "governance_summary": {
             "owner_roles": owner_roles,
@@ -259,6 +406,7 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
             "next_review_at": system.next_review_at,
             "last_reviewed_at": system.last_reviewed_at,
             "latest_review_status": system.review_status,
+            "open_follow_up_task_count": len(open_follow_up_tasks),
         },
         "readiness_scorecard": scorecard,
         "latest_classification": (
@@ -286,4 +434,5 @@ def get_ai_system_workspace(db: Session, tenant_id: str, ai_system_id: str) -> d
         "incidents": incidents,
         "reports": reports,
         "review_events": review_events,
+        "follow_up_tasks": follow_up_tasks,
     }

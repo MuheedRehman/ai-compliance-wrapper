@@ -97,6 +97,20 @@ def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_he
     assert system["review_status"] == "scheduled"
     assert system["next_review_at"] is not None
 
+    control_response = client.post(
+        "/v1/compliance/controls",
+        headers=admin_headers,
+        json={
+            "ai_system_id": system_id,
+            "control_key": "review_follow_up_control",
+            "article": "Article 9",
+            "title": "Review follow-up risk control",
+            "evidence_domain": "risk_management",
+        },
+    )
+    assert control_response.status_code == 200
+    control_id = control_response.json()["id"]
+
     review_next = datetime.now(timezone.utc) + timedelta(days=60)
     review_response = client.post(
         f"/v1/ai-systems/{system_id}/reviews",
@@ -107,7 +121,13 @@ def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_he
             "status": "completed",
             "notes": "Classification and control linkage reviewed.",
             "findings": [{"severity": "low", "summary": "Refresh evidence before launch."}],
-            "actions": [{"title": "Attach updated DPIA", "owner_email": "legal@example.com"}],
+            "actions": [{
+                "title": "Attach updated DPIA",
+                "owner_email": "legal@example.com",
+                "target_type": "control",
+                "control_id": control_id,
+                "severity": "high",
+            }],
             "next_review_at": review_next.isoformat(),
         },
     )
@@ -118,6 +138,9 @@ def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_he
     assert review["review_type"] == "classification_review"
     assert review["status"] == "completed"
     assert review["findings_json"][0]["summary"] == "Refresh evidence before launch."
+    assert review["actions_json"][0]["target_type"] == "control"
+    assert review["actions_json"][0]["control_id"] == control_id
+    assert review["actions_json"][0]["review_task_id"]
 
     get_response = client.get(f"/v1/ai-systems/{system_id}", headers=admin_headers)
     updated_system = get_response.json()
@@ -133,10 +156,31 @@ def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_he
     assert workspace_response.status_code == 200
     workspace = workspace_response.json()
     assert workspace["metrics"]["review_event_count"] == 1
+    assert workspace["metrics"]["follow_up_task_count"] == 1
+    assert workspace["metrics"]["open_follow_up_task_count"] == 1
+    assert workspace["metrics"]["linked_follow_up_task_count"] == 1
     assert workspace["metrics"]["assigned_owner_count"] == 2
     assert workspace["governance_summary"]["missing_owner_roles"] == ["legal_owner"]
     assert workspace["governance_summary"]["review_deadline_status"] == "scheduled"
     assert workspace["review_events"][0]["id"] == review["id"]
+    follow_up = workspace["follow_up_tasks"][0]
+    assert follow_up["ai_system_id"] == system_id
+    assert follow_up["review_type"] == "ai_system_lifecycle_follow_up"
+    assert follow_up["severity"] == "high"
+    assert follow_up["findings_json"]["source_review_event_id"] == review["id"]
+    assert follow_up["findings_json"]["control_id"] == control_id
+
+    close_response = client.patch(
+        f"/v1/review-tasks/{follow_up['review_task_id']}/close",
+        headers=admin_headers,
+        json={"resolution_note": "Resolved from workspace"},
+    )
+    assert close_response.status_code == 200
+    assert close_response.json()["status"] == "closed"
+
+    closed_workspace = client.get(f"/v1/ai-systems/{system_id}/workspace", headers=admin_headers).json()
+    assert closed_workspace["metrics"]["follow_up_task_count"] == 1
+    assert closed_workspace["metrics"]["open_follow_up_task_count"] == 0
 
 
 def test_ai_system_review_history_respects_tenant_isolation(client, admin_headers, db_session):

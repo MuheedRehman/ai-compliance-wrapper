@@ -146,6 +146,7 @@ class AiSystemWorkspaceResponse(BaseModel):
     incidents: List[Dict[str, Any]] = Field(default_factory=list)
     reports: List[Dict[str, Any]] = Field(default_factory=list)
     review_events: List[Dict[str, Any]] = Field(default_factory=list)
+    follow_up_tasks: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class SubscriptionStatusResponse(BaseModel):

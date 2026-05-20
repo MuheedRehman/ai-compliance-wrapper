@@ -10,6 +10,7 @@ import {
   BarChart3,
   Bot,
   CalendarClock,
+  CheckCircle2,
   ClipboardCheck,
   FileSearch,
   FileText,
@@ -58,6 +59,13 @@ function displayDate(value?: string | null) {
   return date.toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
+function followUpHref(systemId: string, task: any) {
+  const targetType = task.findings_json?.target_type;
+  if (targetType === 'control') return `/controls?ai_system_id=${systemId}`;
+  if (targetType === 'evidence') return `/evidence?ai_system_id=${systemId}`;
+  return '/reviews';
+}
+
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
@@ -67,6 +75,7 @@ export default function SystemDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [recordingReview, setRecordingReview] = useState(false);
+  const [closingTaskId, setClosingTaskId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState({
     owner_email: '',
     technical_owner_email: '',
@@ -81,6 +90,11 @@ export default function SystemDetailPage() {
     status: 'completed',
     next_review_at: '',
     notes: '',
+    follow_up_title: '',
+    follow_up_target_type: 'control',
+    follow_up_owner_email: '',
+    follow_up_due_at: '',
+    follow_up_severity: 'medium',
   });
 
   const load = useCallback(() => {
@@ -100,6 +114,7 @@ export default function SystemDetailPage() {
   const scorecard = workspace?.readiness_scorecard || {};
   const classification = workspace?.latest_classification;
   const reviewEvents = workspace?.review_events || [];
+  const followUpTasks = workspace?.follow_up_tasks || [];
   const readinessScore = scorecard.readiness_score || 0;
 
   useEffect(() => {
@@ -153,6 +168,13 @@ export default function SystemDetailPage() {
         status: reviewForm.status,
         next_review_at: fromDateInput(reviewForm.next_review_at),
         notes: reviewForm.notes.trim() || null,
+        actions: reviewForm.follow_up_title.trim() ? [{
+          title: reviewForm.follow_up_title.trim(),
+          target_type: reviewForm.follow_up_target_type,
+          owner_email: reviewForm.follow_up_owner_email.trim() || null,
+          due_at: fromDateInput(reviewForm.follow_up_due_at),
+          severity: reviewForm.follow_up_severity,
+        }] : [],
       });
       setReviewForm({
         reviewer_email: '',
@@ -160,12 +182,30 @@ export default function SystemDetailPage() {
         status: 'completed',
         next_review_at: '',
         notes: '',
+        follow_up_title: '',
+        follow_up_target_type: 'control',
+        follow_up_owner_email: '',
+        follow_up_due_at: '',
+        follow_up_severity: 'medium',
       });
       load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to record review');
     } finally {
       setRecordingReview(false);
+    }
+  }
+
+  async function handleCloseFollowUp(taskId: string) {
+    setClosingTaskId(taskId);
+    setError(null);
+    try {
+      await api.closeReviewTask(taskId, 'Closed from AI system workspace');
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to close follow-up task');
+    } finally {
+      setClosingTaskId(null);
     }
   }
 
@@ -385,6 +425,63 @@ export default function SystemDetailPage() {
                     className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
                   />
                 </label>
+                <label className="space-y-1">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Follow-up action</span>
+                  <input
+                    value={reviewForm.follow_up_title}
+                    onChange={(event) => setReviewForm({ ...reviewForm, follow_up_title: event.target.value })}
+                    placeholder="Attach updated evidence or resolve control gap"
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                  />
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Target</span>
+                    <select
+                      value={reviewForm.follow_up_target_type}
+                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_target_type: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    >
+                      <option value="control">Control</option>
+                      <option value="evidence">Evidence</option>
+                      <option value="general">General</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Severity</span>
+                    <select
+                      value={reviewForm.follow_up_severity}
+                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_severity: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </label>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Owner</span>
+                    <input
+                      type="email"
+                      value={reviewForm.follow_up_owner_email}
+                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_owner_email: event.target.value })}
+                      placeholder="owner@example.com"
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    />
+                  </label>
+                  <label className="space-y-1">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Due</span>
+                    <input
+                      type="date"
+                      value={reviewForm.follow_up_due_at}
+                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_due_at: event.target.value })}
+                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                    />
+                  </label>
+                </div>
               </div>
               <button
                 disabled={recordingReview}
@@ -419,6 +516,10 @@ export default function SystemDetailPage() {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-zinc-500">Reports</span>
                 <span className="text-xs font-mono text-zinc-300">{metrics.report_count || 0}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs text-zinc-500">Open follow-ups</span>
+                <span className="text-xs font-mono text-zinc-300">{metrics.open_follow_up_task_count || 0}</span>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <span className="text-xs text-zinc-500">Next review</span>
@@ -609,6 +710,50 @@ export default function SystemDetailPage() {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </Card>
+
+        <Card title={`Review Follow-Ups (${followUpTasks.length})`} subtitle="Open review actions linked back to controls, evidence, or the wider workspace.">
+          {followUpTasks.length === 0 ? (
+            <EmptyPanel label="No review follow-up tasks" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {followUpTasks.slice(0, 8).map((task: any) => {
+                const details = task.findings_json || {};
+                return (
+                  <div key={task.review_task_id} className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-bold text-zinc-200">{details.title || task.trigger_reason}</p>
+                        <p className="mt-1 text-[10px] font-mono text-zinc-600">{details.target_type || 'general'} / {task.review_task_id.slice(0, 8)}</p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <StatusBadge value={task.status} />
+                        <StatusBadge value={task.severity || 'medium'} />
+                      </div>
+                    </div>
+                    {details.description && (
+                      <p className="mt-3 text-xs leading-5 text-zinc-400">{details.description}</p>
+                    )}
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <Link href={followUpHref(system.id, task)} className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300">
+                        Open Target
+                      </Link>
+                      {task.status === 'open' && (
+                        <button
+                          onClick={() => handleCloseFollowUp(task.review_task_id)}
+                          disabled={closingTaskId === task.review_task_id}
+                          className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800 disabled:opacity-50"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          {closingTaskId === task.review_task_id ? 'Closing' : 'Close'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </Card>
