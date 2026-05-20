@@ -119,7 +119,7 @@ Current workspace drill-down actions slice:
 - The dashboard system workspace includes action tiles for seeding controls, opening or creating evidence, generating a readiness report, starting or opening FRIA, assigning oversight, and reporting incidents.
 - Evidence, reports, FRIA, oversight, incidents, and review task pages honor `ai_system_id` context for scoped lists and prefilled create flows where applicable.
 
-Deployment checkpoint: workspace drill-down actions are implemented locally and are the current deployment checkpoint.
+Deployment checkpoint: workspace drill-down actions are deployed to staging through Cloud Build `9f80eded-091c-4d76-8fdd-64fb76e06cd5`, with backend revision `ai-compliance-backend-00083-td5`, dashboard revision `ai-compliance-dashboard-00043-6gj`, and passing Cloud Build staging Playwright E2E. Next workspace polish can deepen section-specific create/edit flows, or the product can move to Module 5 evidence uploads.
 
 ### Module 4: Obligation Engine 2.0
 
