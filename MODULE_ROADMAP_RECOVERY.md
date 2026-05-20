@@ -104,7 +104,7 @@ Current review follow-up actions slice:
 - `/v1/ai-systems/{id}/workspace` includes follow-up task metrics and task records.
 - The dashboard system detail page lets users add one follow-up while recording a review, open the target controls/evidence area, and close follow-up tasks from the workspace.
 
-Deployment checkpoint: review follow-up actions exist locally and are the current deployment checkpoint.
+Deployment checkpoint: review follow-up actions are deployed to staging. Next workspace hardening should add multi-action review plans and more direct creation of controls/evidence placeholders from follow-up actions.
 
 ### Module 4: Obligation Engine 2.0
 
