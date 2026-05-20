@@ -106,6 +106,14 @@ Current review follow-up actions slice:
 
 Deployment checkpoint: review follow-up actions are deployed to staging. Next workspace hardening should add multi-action review plans and more direct creation of controls/evidence placeholders from follow-up actions.
 
+Current multi-action review plan slice:
+- The dashboard review checkpoint can capture up to five follow-up actions in one review.
+- Control-targeted follow-ups without an existing control create a placeholder compliance control linked to the AI system.
+- Evidence-targeted follow-ups without an existing evidence item create a signed `needs_review` evidence placeholder linked to the AI system.
+- Follow-up review tasks include created placeholder IDs, owner, due date, severity, and source review event metadata.
+
+Deployment checkpoint: multi-action review plan implementation exists locally and is the current deployment checkpoint.
+
 ### Module 4: Obligation Engine 2.0
 
 Add:

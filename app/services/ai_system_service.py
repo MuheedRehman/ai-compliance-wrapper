@@ -19,6 +19,7 @@ from app.models import (
 )
 from app.schemas import AiSystemCreate, AiSystemReviewCreate, AiSystemUpdate
 from app.services.compliance_control_service import ComplianceControlService
+from app.services.hashing import hash_object, hmac_signature
 from app.services.review_service import get_or_create_open_review_task
 
 
@@ -113,6 +114,7 @@ def _normalize_follow_up_action(action: dict, index: int) -> dict:
         severity = "medium"
     target_type = _action_target_type(action)
     due_at = _coerce_datetime(action.get("due_at") or action.get("due_date"))
+    create_placeholder = bool(action.get("create_placeholder", True))
     normalized = {
         **action,
         "title": title,
@@ -121,6 +123,7 @@ def _normalize_follow_up_action(action: dict, index: int) -> dict:
         "severity": severity,
         "owner_email": _normalize_email(action.get("owner_email")),
         "due_at": due_at.isoformat() if due_at else None,
+        "create_placeholder": create_placeholder,
     }
     if target_type == "control":
         normalized["target_route"] = "controls"
@@ -129,6 +132,153 @@ def _normalize_follow_up_action(action: dict, index: int) -> dict:
     else:
         normalized["target_route"] = "reviews"
     return normalized
+
+
+def _create_placeholder_control(
+    db: Session,
+    tenant_id: str,
+    ai_system_id: str,
+    event: AiSystemReviewEvent,
+    action: dict,
+    index: int,
+) -> ComplianceControl:
+    control_key = f"review_follow_up_{event.id}_{index}"
+    existing = (
+        db.query(ComplianceControl)
+        .filter(
+            ComplianceControl.tenant_id == tenant_id,
+            ComplianceControl.ai_system_id == ai_system_id,
+            ComplianceControl.control_key == control_key,
+        )
+        .first()
+    )
+    if existing:
+        return existing
+
+    control = ComplianceControl(
+        id=f"ctl-{uuid.uuid4().hex[:8]}",
+        tenant_id=tenant_id,
+        ai_system_id=ai_system_id,
+        control_key=control_key,
+        article=action.get("article") or "EU AI Act",
+        title=action["title"],
+        owner_email=action.get("owner_email"),
+        status="not_started",
+        due_at=_coerce_datetime(action.get("due_at")),
+        evidence_domain=action.get("evidence_domain") or "review_follow_up",
+        details_json={
+            "source": "ai_system_review_follow_up",
+            "source_review_event_id": event.id,
+            "action_index": index,
+            "target_type": action.get("target_type"),
+            "description": action.get("description"),
+            "severity": action.get("severity"),
+        },
+    )
+    db.add(control)
+    db.flush()
+    return control
+
+
+def _seal_evidence_item(item: EvidenceItem) -> None:
+    collected_at = _coerce_datetime(item.collected_at)
+    review_at = _coerce_datetime(item.review_at)
+    expires_at = _coerce_datetime(item.expires_at)
+    fingerprint = {
+        "id": item.id,
+        "tenant_id": item.tenant_id,
+        "ai_system_id": item.ai_system_id,
+        "control_id": item.control_id,
+        "title": item.title,
+        "description": item.description,
+        "evidence_type": item.evidence_type,
+        "source": item.source,
+        "source_url": item.source_url,
+        "owner_email": item.owner_email,
+        "status": item.status,
+        "collected_at": collected_at.isoformat() if collected_at else None,
+        "review_at": review_at.isoformat() if review_at else None,
+        "expires_at": expires_at.isoformat() if expires_at else None,
+        "metadata_json": item.metadata_json or {},
+    }
+    item.evidence_hash = hash_object(fingerprint)
+    item.hmac_signature = hmac_signature({
+        "evidence_item_id": item.id,
+        "tenant_id": item.tenant_id,
+        "evidence_hash": item.evidence_hash,
+    })
+
+
+def _create_placeholder_evidence(
+    db: Session,
+    tenant_id: str,
+    ai_system_id: str,
+    event: AiSystemReviewEvent,
+    action: dict,
+    index: int,
+) -> EvidenceItem:
+    metadata = {
+        "source": "ai_system_review_follow_up",
+        "source_review_event_id": event.id,
+        "action_index": index,
+        "target_type": action.get("target_type"),
+        "severity": action.get("severity"),
+    }
+    item = EvidenceItem(
+        id=f"evi-{uuid.uuid4().hex[:10]}",
+        tenant_id=tenant_id,
+        ai_system_id=ai_system_id,
+        control_id=action.get("control_id"),
+        title=action["title"],
+        description=action.get("description"),
+        evidence_type=action.get("evidence_type") or "review_follow_up",
+        source="ai_system_review",
+        source_url=None,
+        owner_email=action.get("owner_email"),
+        status="needs_review",
+        collected_at=_now_utc(),
+        review_at=_coerce_datetime(action.get("due_at")),
+        expires_at=None,
+        evidence_hash="pending",
+        hmac_signature="pending",
+        metadata_json=metadata,
+    )
+    _seal_evidence_item(item)
+    db.add(item)
+    db.flush()
+    return item
+
+
+def _materialize_follow_up_placeholder(
+    db: Session,
+    tenant_id: str,
+    ai_system_id: str,
+    event: AiSystemReviewEvent,
+    action: dict,
+    index: int,
+) -> dict:
+    if not action.get("create_placeholder"):
+        return action
+
+    if action["target_type"] == "control" and not action.get("control_id"):
+        control = _create_placeholder_control(db, tenant_id, ai_system_id, event, action, index)
+        return {
+            **action,
+            "control_id": control.id,
+            "created_placeholder_type": "control",
+            "created_placeholder_id": control.id,
+        }
+
+    if action["target_type"] == "evidence" and not action.get("evidence_item_id"):
+        evidence = _create_placeholder_evidence(db, tenant_id, ai_system_id, event, action, index)
+        return {
+            **action,
+            "evidence_item_id": evidence.id,
+            "created_placeholder_type": "evidence",
+            "created_placeholder_id": evidence.id,
+        }
+
+    return action
 
 
 def _create_follow_up_tasks(
@@ -144,6 +294,7 @@ def _create_follow_up_tasks(
             continue
         normalized = _normalize_follow_up_action(action, index)
         _validate_follow_up_links(db, tenant_id, ai_system_id, normalized)
+        normalized = _materialize_follow_up_placeholder(db, tenant_id, ai_system_id, event, normalized, index)
         trigger_reason = f"ai_system_review_follow_up:{event.id}:{index}"
         task = get_or_create_open_review_task(
             db=db,
@@ -162,6 +313,8 @@ def _create_follow_up_tasks(
                 "target_route": normalized["target_route"],
                 "control_id": normalized.get("control_id"),
                 "evidence_item_id": normalized.get("evidence_item_id"),
+                "created_placeholder_type": normalized.get("created_placeholder_type"),
+                "created_placeholder_id": normalized.get("created_placeholder_id"),
                 "owner_email": normalized.get("owner_email"),
                 "due_at": normalized.get("due_at"),
                 "review_type": event.review_type,

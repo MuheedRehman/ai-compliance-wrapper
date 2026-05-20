@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta, timezone
 
-from app.models import AiSystem, Entitlement, Tenant
+from app.models import AiSystem, ComplianceControl, Entitlement, EvidenceItem, ReviewTask, Tenant
 from app.services.website_scanner_service import PageArtifact, WebsiteScannerService
 from tests.conftest import TENANT_ID
 
@@ -181,6 +181,99 @@ def test_ai_system_lifecycle_owners_deadline_and_review_history(client, admin_he
     closed_workspace = client.get(f"/v1/ai-systems/{system_id}/workspace", headers=admin_headers).json()
     assert closed_workspace["metrics"]["follow_up_task_count"] == 1
     assert closed_workspace["metrics"]["open_follow_up_task_count"] == 0
+
+
+def test_ai_system_review_multi_action_plan_creates_control_and_evidence_placeholders(
+    client,
+    admin_headers,
+    db_session,
+):
+    system_response = client.post(
+        "/v1/ai-systems",
+        headers=admin_headers,
+        json={"name": "Action Plan System"},
+    )
+    assert system_response.status_code == 200
+    system_id = system_response.json()["id"]
+    due_at = (datetime.now(timezone.utc) + timedelta(days=21)).isoformat()
+
+    review_response = client.post(
+        f"/v1/ai-systems/{system_id}/reviews",
+        headers=admin_headers,
+        json={
+            "reviewer_email": "owner@example.com",
+            "review_type": "control_review",
+            "status": "needs_follow_up",
+            "actions": [
+                {
+                    "title": "Create bias testing control",
+                    "target_type": "control",
+                    "owner_email": "control.owner@example.com",
+                    "due_at": due_at,
+                    "severity": "critical",
+                    "article": "Article 10",
+                    "evidence_domain": "bias_testing",
+                },
+                {
+                    "title": "Collect model card evidence",
+                    "target_type": "evidence",
+                    "owner_email": "evidence.owner@example.com",
+                    "due_at": due_at,
+                    "severity": "medium",
+                    "evidence_type": "model_card",
+                },
+                {
+                    "title": "Schedule stakeholder review",
+                    "target_type": "general",
+                    "severity": "low",
+                    "create_placeholder": False,
+                },
+            ],
+        },
+    )
+
+    assert review_response.status_code == 200
+    review = review_response.json()
+    actions = review["actions_json"]
+    assert len(actions) == 3
+    assert actions[0]["created_placeholder_type"] == "control"
+    assert actions[1]["created_placeholder_type"] == "evidence"
+    assert "created_placeholder_type" not in actions[2]
+
+    control = db_session.query(ComplianceControl).filter(
+        ComplianceControl.id == actions[0]["control_id"],
+    ).first()
+    assert control is not None
+    assert control.ai_system_id == system_id
+    assert control.article == "Article 10"
+    assert control.evidence_domain == "bias_testing"
+    assert control.owner_email == "control.owner@example.com"
+
+    evidence = db_session.query(EvidenceItem).filter(
+        EvidenceItem.id == actions[1]["evidence_item_id"],
+    ).first()
+    assert evidence is not None
+    assert evidence.ai_system_id == system_id
+    assert evidence.evidence_type == "model_card"
+    assert evidence.status == "needs_review"
+    assert evidence.evidence_hash != "pending"
+
+    tasks = db_session.query(ReviewTask).filter(
+        ReviewTask.ai_system_id == system_id,
+        ReviewTask.review_type == "ai_system_lifecycle_follow_up",
+    ).all()
+    assert len(tasks) == 3
+    task_targets = {task.findings_json["target_type"] for task in tasks}
+    assert task_targets == {"control", "evidence", "general"}
+
+    workspace_response = client.get(f"/v1/ai-systems/{system_id}/workspace", headers=admin_headers)
+    assert workspace_response.status_code == 200
+    workspace = workspace_response.json()
+    assert workspace["metrics"]["follow_up_task_count"] == 3
+    assert workspace["metrics"]["open_follow_up_task_count"] == 3
+    assert workspace["metrics"]["linked_follow_up_task_count"] == 2
+    assert workspace["metrics"]["control_count"] == 1
+    assert workspace["metrics"]["evidence_item_count"] == 1
 
 
 def test_ai_system_review_history_respects_tenant_isolation(client, admin_headers, db_session):

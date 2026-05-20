@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-19
+Last updated: 2026-05-21
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Continue hardening Module 3 now that review follow-up actions are deployed.
+1. Complete and deploy the Module 3 multi-action review plan slice.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 3 Review Follow-Up Actions completed and deployed: review checkpoint follow-up actions become AI-system-linked review tasks, open/closed follow-up task metrics appear in the workspace, targets link to controls/evidence, and follow-up tasks can be closed from the system workspace.
+- Module 3 Multi-Action Review Plans: expand review checkpoints from a single follow-up into multi-action plans, automatically create placeholder controls/evidence items for targeted follow-ups, preserve target metadata in review tasks, and surface created placeholders in the workspace.
 
 ## Mandatory Module Execution Workflow
 
@@ -63,7 +63,7 @@ Current technical baseline:
 | --- | --- | --- | --- |
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, topic-level public evidence profiling, and a deployed Playwright smart-scroller rendered crawl implementation exist. | Add multilingual signal catalogs, rendered screenshot evidence, and scanner queue/progress UI if rendered scans become slow for larger SaaS sites. |
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
-| 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, and deployed review follow-up tasks around one AI system. | Add deeper drill-down actions from each workspace section and expand follow-up task creation into multi-action review plans. |
+| 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, and locally implemented multi-action review plans with control/evidence placeholders around one AI system. | Deploy and verify multi-action review plans, then add deeper drill-down actions from each workspace section. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, and AI system workspace linkage. | Add file/object storage, upload flows, artifact previews, and stronger evidence-to-control attachment workflows. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
@@ -105,6 +105,7 @@ Recovered from repo state:
 - Module 1 smart-scroller deployment note: initial Cloud Build `41c6e5e7-2807-47d1-b5b3-9c3e886261f4` deployed backend/dashboard but failed final live E2E because missing candidate pages such as guessed privacy/terms URLs were being rendered, making the live scanner path too slow. Follow-up commit `8cf3fcf` prevents rendering missing/404 candidate URLs, keeps rendering only for successfully fetched shallow JavaScript pages, adds regression coverage, and deployed successfully through Cloud Build `bcbd4add-0288-489c-9f14-958ccbad2cd0`.
 - Module 3 lifecycle workspace operations completed and deployed: AI systems now support business/technical/legal owners, review status, next-review deadline, lifecycle notes, and a review event timeline through migration `0011`; `/v1/ai-systems/{id}/workspace` now returns governance summary and review metrics; dashboard system detail pages can update lifecycle metadata and record review checkpoints. Deployed through Cloud Build `1fab1f14-e234-4378-ba93-be62ba832ea3` to backend `ai-compliance-backend-00077-xrx` and dashboard `ai-compliance-dashboard-00040-h7d`.
 - Module 3 review follow-up actions completed and deployed: review checkpoint actions now create AI-system-linked `review_tasks` with source review event, action index, target type, control/evidence target metadata, owner, due date, and severity; workspace responses now include follow-up task metrics and `follow_up_tasks`; the dashboard can record a follow-up while saving a review and close follow-up tasks from the system workspace. Deployed through Cloud Build `c113c92c-bde4-40a7-ad4d-29d29eca5e09` to backend `ai-compliance-backend-00079-xm6` and dashboard `ai-compliance-dashboard-00041-xz2`.
+- Module 3 multi-action review plans completed locally: the AI system review checkpoint UI can create up to five follow-up actions; backend review actions can create linked placeholder compliance controls or signed evidence items when target type is Control or Evidence; review tasks store the created placeholder ID/type, owner, due date, severity, and source review event; workspace follow-up cards show created placeholder/owner/due metadata.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -155,6 +156,8 @@ Use this as the next session checklist.
 - [x] Deploy Module 3 lifecycle owner/deadline/review-history workspace slice to GCP staging and update the deployed baseline.
 - [x] Implement Module 3 review follow-up actions linked to controls/evidence tasks.
 - [x] Deploy Module 3 review follow-up actions to GCP staging and update the deployed baseline.
+- [x] Implement Module 3 multi-action review plans with control/evidence placeholders.
+- [ ] Deploy Module 3 multi-action review plans to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

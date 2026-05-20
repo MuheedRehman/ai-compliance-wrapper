@@ -14,6 +14,8 @@ import {
   ClipboardCheck,
   FileSearch,
   FileText,
+  Plus,
+  Trash2,
   ListChecks,
   Scale,
   Save,
@@ -66,6 +68,22 @@ function followUpHref(systemId: string, task: any) {
   return '/reviews';
 }
 
+type FollowUpDraft = {
+  title: string;
+  target_type: string;
+  owner_email: string;
+  due_at: string;
+  severity: string;
+};
+
+const EMPTY_FOLLOW_UP: FollowUpDraft = {
+  title: '',
+  target_type: 'control',
+  owner_email: '',
+  due_at: '',
+  severity: 'medium',
+};
+
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
@@ -90,12 +108,8 @@ export default function SystemDetailPage() {
     status: 'completed',
     next_review_at: '',
     notes: '',
-    follow_up_title: '',
-    follow_up_target_type: 'control',
-    follow_up_owner_email: '',
-    follow_up_due_at: '',
-    follow_up_severity: 'medium',
   });
+  const [followUpActions, setFollowUpActions] = useState<FollowUpDraft[]>([{ ...EMPTY_FOLLOW_UP }]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -168,13 +182,16 @@ export default function SystemDetailPage() {
         status: reviewForm.status,
         next_review_at: fromDateInput(reviewForm.next_review_at),
         notes: reviewForm.notes.trim() || null,
-        actions: reviewForm.follow_up_title.trim() ? [{
-          title: reviewForm.follow_up_title.trim(),
-          target_type: reviewForm.follow_up_target_type,
-          owner_email: reviewForm.follow_up_owner_email.trim() || null,
-          due_at: fromDateInput(reviewForm.follow_up_due_at),
-          severity: reviewForm.follow_up_severity,
-        }] : [],
+        actions: followUpActions
+          .filter((action) => action.title.trim())
+          .map((action) => ({
+            title: action.title.trim(),
+            target_type: action.target_type,
+            owner_email: action.owner_email.trim() || null,
+            due_at: fromDateInput(action.due_at),
+            severity: action.severity,
+            create_placeholder: action.target_type !== 'general',
+          })),
       });
       setReviewForm({
         reviewer_email: '',
@@ -182,18 +199,31 @@ export default function SystemDetailPage() {
         status: 'completed',
         next_review_at: '',
         notes: '',
-        follow_up_title: '',
-        follow_up_target_type: 'control',
-        follow_up_owner_email: '',
-        follow_up_due_at: '',
-        follow_up_severity: 'medium',
       });
+      setFollowUpActions([{ ...EMPTY_FOLLOW_UP }]);
       load();
     } catch (err: any) {
       setError(err.body?.detail || err.message || 'Failed to record review');
     } finally {
       setRecordingReview(false);
     }
+  }
+
+  function updateFollowUp(index: number, patch: Partial<FollowUpDraft>) {
+    setFollowUpActions((current) => current.map((action, actionIndex) => (
+      actionIndex === index ? { ...action, ...patch } : action
+    )));
+  }
+
+  function addFollowUp() {
+    setFollowUpActions((current) => [...current, { ...EMPTY_FOLLOW_UP }].slice(0, 5));
+  }
+
+  function removeFollowUp(index: number) {
+    setFollowUpActions((current) => {
+      const next = current.filter((_, actionIndex) => actionIndex !== index);
+      return next.length ? next : [{ ...EMPTY_FOLLOW_UP }];
+    });
   }
 
   async function handleCloseFollowUp(taskId: string) {
@@ -425,62 +455,93 @@ export default function SystemDetailPage() {
                     className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
                   />
                 </label>
-                <label className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Follow-up action</span>
-                  <input
-                    value={reviewForm.follow_up_title}
-                    onChange={(event) => setReviewForm({ ...reviewForm, follow_up_title: event.target.value })}
-                    placeholder="Attach updated evidence or resolve control gap"
-                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-                  />
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Target</span>
-                    <select
-                      value={reviewForm.follow_up_target_type}
-                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_target_type: event.target.value })}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Follow-up plan</span>
+                    <button
+                      type="button"
+                      onClick={addFollowUp}
+                      disabled={followUpActions.length >= 5}
+                      className="flex items-center gap-1 rounded-lg bg-zinc-900 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800 disabled:opacity-50"
                     >
-                      <option value="control">Control</option>
-                      <option value="evidence">Evidence</option>
-                      <option value="general">General</option>
-                    </select>
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Severity</span>
-                    <select
-                      value={reviewForm.follow_up_severity}
-                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_severity: event.target.value })}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                      <option value="critical">Critical</option>
-                    </select>
-                  </label>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Owner</span>
-                    <input
-                      type="email"
-                      value={reviewForm.follow_up_owner_email}
-                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_owner_email: event.target.value })}
-                      placeholder="owner@example.com"
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-                    />
-                  </label>
-                  <label className="space-y-1">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Due</span>
-                    <input
-                      type="date"
-                      value={reviewForm.follow_up_due_at}
-                      onChange={(event) => setReviewForm({ ...reviewForm, follow_up_due_at: event.target.value })}
-                      className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
-                    />
-                  </label>
+                      <Plus className="h-3.5 w-3.5" />
+                      Add
+                    </button>
+                  </div>
+                  {followUpActions.map((action, index) => (
+                    <div key={index} className="space-y-3 rounded-lg border border-zinc-800 bg-zinc-950 p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Action {index + 1}</span>
+                        {followUpActions.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeFollowUp(index)}
+                            className="rounded-lg bg-zinc-900 p-1.5 text-zinc-500 ring-1 ring-zinc-800 hover:text-red-300"
+                            aria-label={`Remove action ${index + 1}`}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+                      <label className="space-y-1">
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Action</span>
+                        <input
+                          value={action.title}
+                          onChange={(event) => updateFollowUp(index, { title: event.target.value })}
+                          placeholder="Attach evidence or resolve control gap"
+                          className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                        />
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Target</span>
+                          <select
+                            value={action.target_type}
+                            onChange={(event) => updateFollowUp(index, { target_type: event.target.value })}
+                            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                          >
+                            <option value="control">Control</option>
+                            <option value="evidence">Evidence</option>
+                            <option value="general">General</option>
+                          </select>
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Severity</span>
+                          <select
+                            value={action.severity}
+                            onChange={(event) => updateFollowUp(index, { severity: event.target.value })}
+                            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                          >
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                            <option value="critical">Critical</option>
+                          </select>
+                        </label>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Owner</span>
+                          <input
+                            type="email"
+                            value={action.owner_email}
+                            onChange={(event) => updateFollowUp(index, { owner_email: event.target.value })}
+                            placeholder="owner@example.com"
+                            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                          />
+                        </label>
+                        <label className="space-y-1">
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Due</span>
+                          <input
+                            type="date"
+                            value={action.due_at}
+                            onChange={(event) => updateFollowUp(index, { due_at: event.target.value })}
+                            className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
               <button
@@ -736,6 +797,23 @@ export default function SystemDetailPage() {
                     {details.description && (
                       <p className="mt-3 text-xs leading-5 text-zinc-400">{details.description}</p>
                     )}
+                    <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-600">
+                      {details.created_placeholder_type && (
+                        <span className="rounded bg-zinc-900 px-2 py-1 ring-1 ring-zinc-800">
+                          Created {details.created_placeholder_type}
+                        </span>
+                      )}
+                      {details.owner_email && (
+                        <span className="rounded bg-zinc-900 px-2 py-1 ring-1 ring-zinc-800">
+                          {details.owner_email}
+                        </span>
+                      )}
+                      {details.due_at && (
+                        <span className="rounded bg-zinc-900 px-2 py-1 ring-1 ring-zinc-800">
+                          Due {displayDate(details.due_at)}
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                       <Link href={followUpHref(system.id, task)} className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 hover:text-indigo-300">
                         Open Target
