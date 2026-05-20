@@ -112,7 +112,7 @@ Current multi-action review plan slice:
 - Evidence-targeted follow-ups without an existing evidence item create a signed `needs_review` evidence placeholder linked to the AI system.
 - Follow-up review tasks include created placeholder IDs, owner, due date, severity, and source review event metadata.
 
-Deployment checkpoint: multi-action review plan implementation exists locally and is the current deployment checkpoint.
+Deployment checkpoint: multi-action review plans are deployed to staging through Cloud Build `ae655071-d756-4fe7-85cd-7ee2175c8779`, with backend revision `ai-compliance-backend-00081-n6k`, dashboard revision `ai-compliance-dashboard-00042-6sv`, and passing Cloud Build staging Playwright E2E. Next workspace hardening should add deeper drill-down actions from each workspace section.
 
 ### Module 4: Obligation Engine 2.0
 
