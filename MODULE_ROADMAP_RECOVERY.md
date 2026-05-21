@@ -173,7 +173,7 @@ Current evidence upload flow slice:
 - The Evidence Vault API supports artifact upload and authenticated artifact download.
 - The Evidence Vault dashboard supports attaching a file while creating evidence, uploading files onto existing items, and downloading attached artifacts.
 
-Deployment checkpoint: evidence upload flow is implemented locally and is the current deployment checkpoint. Next evidence hardening should add artifact previews, external object-storage backend, and stronger evidence-to-control attachment workflows.
+Deployment checkpoint: evidence upload flow is deployed to staging through Cloud Build `470a39b9-0dbf-44f6-9236-3dd5e40dba18`, with backend revision `ai-compliance-backend-00085-rsx`, dashboard revision `ai-compliance-dashboard-00044-cw5`, and passing Cloud Build staging Playwright E2E. Next evidence hardening should add artifact previews, external object-storage backend, and stronger evidence-to-control attachment workflows.
 
 ### Module 6: Control Management
 
