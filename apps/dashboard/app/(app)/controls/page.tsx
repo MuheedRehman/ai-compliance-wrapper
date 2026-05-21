@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
@@ -14,6 +15,7 @@ import {
   BarChart3,
   CheckCircle2,
   Clock,
+  FileSearch,
   ListChecks,
   Plus,
   RefreshCw,
@@ -25,27 +27,33 @@ const STATUS_OPTIONS = ['not_started', 'in_progress', 'blocked', 'completed', 's
 
 export default function ControlsPage() {
   const searchParams = useSearchParams();
+  const highlightedControlId = searchParams.get('control_id') || '';
   const [systems, setSystems] = useState<any[]>([]);
   const [selectedSystemId, setSelectedSystemId] = useState(searchParams.get('ai_system_id') || '');
   const [controls, setControls] = useState<any[]>([]);
+  const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, { owner_email: string; status: string }>>({});
+  const [attachmentDrafts, setAttachmentDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [systemData, controlData, scoreData] = await Promise.all([
+      const evidenceParams = selectedSystemId ? { ai_system_id: selectedSystemId } : undefined;
+      const [systemData, controlData, scoreData, evidenceData] = await Promise.all([
         api.listSystems().catch(() => []),
         api.listControls(selectedSystemId || undefined),
         api.getScorecard(selectedSystemId || undefined),
+        api.listEvidenceItems(evidenceParams),
       ]);
       setSystems(systemData || []);
       setControls(controlData || []);
       setScorecard(scoreData);
+      setEvidenceItems(evidenceData || []);
       setDrafts(Object.fromEntries((controlData || []).map((control: any) => [
         control.id,
         {
@@ -53,6 +61,7 @@ export default function ControlsPage() {
           status: control.status || 'not_started',
         },
       ])));
+      setAttachmentDrafts(Object.fromEntries((controlData || []).map((control: any) => [control.id, ''])));
     } catch (err: any) {
       setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to load controls');
     } finally {
@@ -68,6 +77,7 @@ export default function ControlsPage() {
   const readyCount = scorecard?.completed_controls || 0;
   const totalCount = scorecard?.total_controls || controls.length;
   const readinessScore = scorecard?.readiness_score || 0;
+  const evidenceLinkCount = controls.reduce((sum, control) => sum + (control.evidence_item_count || 0), 0);
 
   const selectedSystemName = useMemo(() => {
     if (!selectedSystemId) return 'Tenant-wide controls';
@@ -116,6 +126,43 @@ export default function ControlsPage() {
     }));
   }
 
+  function createEvidenceHref(control: any) {
+    const params = new URLSearchParams({
+      create: '1',
+      control_id: control.id,
+      evidence_type: control.evidence_domain || 'policy',
+      source: 'Control register',
+    });
+    const systemId = control.ai_system_id || selectedSystemId;
+    if (systemId) {
+      params.set('ai_system_id', systemId);
+    }
+    return `/evidence?${params.toString()}`;
+  }
+
+  function eligibleEvidenceForControl(control: any) {
+    return evidenceItems.filter((item) => {
+      if (item.control_id && item.control_id !== control.id) return false;
+      if (control.ai_system_id && item.ai_system_id && item.ai_system_id !== control.ai_system_id) return false;
+      return true;
+    });
+  }
+
+  async function attachEvidence(control: any) {
+    const itemId = attachmentDrafts[control.id];
+    if (!itemId) return;
+    setSavingId(`attach-${control.id}`);
+    setError(null);
+    try {
+      await api.attachEvidenceToControl(control.id, itemId);
+      await load();
+    } catch (err: any) {
+      setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to attach evidence to control');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
   if (loading) {
     return (
       <PageShell title="Compliance Controls" subtitle="Control ownership, readiness, and evidence requirements across EU AI Act obligations.">
@@ -143,7 +190,7 @@ export default function ControlsPage() {
       <div className="space-y-6">
         {error && <ErrorState message={error} onRetry={load} />}
 
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-4">
           <Card title="Readiness Score" variant="stat" className="lg:col-span-2">
             <div className="space-y-3">
               <div className="flex items-end gap-3">
@@ -165,6 +212,13 @@ export default function ControlsPage() {
             <div className="flex items-end gap-2">
               <ListChecks className="h-5 w-5 text-indigo-400 mb-1" />
               <span className="text-3xl font-bold tabular-nums">{totalCount}</span>
+            </div>
+          </Card>
+
+          <Card title="Evidence Links" variant="stat">
+            <div className="flex items-end gap-2">
+              <FileSearch className="h-5 w-5 text-sky-400 mb-1" />
+              <span className="text-3xl font-bold tabular-nums text-sky-300">{evidenceLinkCount}</span>
             </div>
           </Card>
 
@@ -230,6 +284,7 @@ export default function ControlsPage() {
                     <th>Control</th>
                     <th>Article</th>
                     <th>Evidence Domain</th>
+                    <th>Evidence</th>
                     <th>Owner</th>
                     <th>Status</th>
                     <th>Due</th>
@@ -239,8 +294,10 @@ export default function ControlsPage() {
                 <tbody>
                   {controls.map((control) => {
                     const draft = drafts[control.id] || { owner_email: control.owner_email || '', status: control.status };
+                    const eligibleEvidence = eligibleEvidenceForControl(control);
+                    const attachmentKey = `attach-${control.id}`;
                     return (
-                      <tr key={control.id}>
+                      <tr key={control.id} className={highlightedControlId === control.id ? 'bg-indigo-950/20' : undefined}>
                         <td className="min-w-[280px]">
                           <div className="space-y-1">
                             <p className="text-sm font-bold text-zinc-200">{control.title}</p>
@@ -253,6 +310,50 @@ export default function ControlsPage() {
                           </span>
                         </td>
                         <td className="text-[10px] font-mono text-zinc-500">{control.evidence_domain}</td>
+                        <td className="min-w-[280px]">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-500">
+                              <span className="inline-flex items-center gap-1 font-bold uppercase tracking-widest text-sky-300">
+                                <FileSearch className="h-3 w-3" />
+                                {control.evidence_item_count || 0} linked
+                              </span>
+                              {(control.needs_review_evidence_count || 0) > 0 && (
+                                <span className="rounded bg-amber-500/10 px-2 py-0.5 font-bold text-amber-300">
+                                  {control.needs_review_evidence_count} review
+                                </span>
+                              )}
+                              {control.latest_evidence_at && (
+                                <span>Latest {new Date(control.latest_evidence_at).toLocaleDateString()}</span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                href={createEvidenceHref(control)}
+                                className="rounded-md bg-zinc-900 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800"
+                              >
+                                New Evidence
+                              </Link>
+                              <select
+                                aria-label={`Attach evidence to ${control.title}`}
+                                value={attachmentDrafts[control.id] || ''}
+                                onChange={(event) => setAttachmentDrafts((current) => ({ ...current, [control.id]: event.target.value }))}
+                                className="max-w-[150px] bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                              >
+                                <option value="">Attach existing</option>
+                                {eligibleEvidence.map((item) => (
+                                  <option key={item.id} value={item.id}>{item.title}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => attachEvidence(control)}
+                                disabled={!attachmentDrafts[control.id] || savingId === attachmentKey}
+                                className="rounded-md bg-zinc-800 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-200 hover:bg-zinc-700 disabled:opacity-50"
+                              >
+                                {savingId === attachmentKey ? 'Linking' : 'Attach'}
+                              </button>
+                            </div>
+                          </div>
+                        </td>
                         <td>
                           <input
                             value={draft.owner_email}

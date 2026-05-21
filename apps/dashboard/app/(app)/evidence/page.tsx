@@ -49,6 +49,7 @@ function toIsoDate(value: string) {
 export default function EvidencePage() {
   const searchParams = useSearchParams();
   const systemFilter = searchParams.get('ai_system_id') || '';
+  const controlFilter = searchParams.get('control_id') || '';
   const createRequested = searchParams.get('create') === '1';
   const requestedEvidenceType = searchParams.get('evidence_type') || 'policy';
   const [logs, setLogs] = useState<any[]>([]);
@@ -69,7 +70,7 @@ export default function EvidencePage() {
   const [form, setForm] = useState({
     ...emptyForm,
     ai_system_id: systemFilter,
-    control_id: searchParams.get('control_id') || '',
+    control_id: controlFilter,
     evidence_type: evidenceTypes.includes(requestedEvidenceType) ? requestedEvidenceType : 'policy',
     source: searchParams.get('source') || '',
   });
@@ -85,6 +86,7 @@ export default function EvidencePage() {
       logParams.ai_system_id = systemFilter;
       itemParams.ai_system_id = systemFilter;
     }
+    if (controlFilter) itemParams.control_id = controlFilter;
     if (statusFilter) itemParams.status = statusFilter;
     if (typeFilter) itemParams.evidence_type = typeFilter;
 
@@ -104,7 +106,7 @@ export default function EvidencePage() {
       })
       .catch((err) => setError(err.body?.detail || err.message || 'Failed to load evidence vault'))
       .finally(() => setLoading(false));
-  }, [riskFilter, decisionFilter, statusFilter, typeFilter, systemFilter]);
+  }, [riskFilter, decisionFilter, statusFilter, typeFilter, systemFilter, controlFilter]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -130,7 +132,13 @@ export default function EvidencePage() {
         await api.uploadEvidenceArtifact(item.id, selectedFile);
       }
       setSelectedFile(null);
-      setForm({ ...emptyForm, ai_system_id: systemFilter });
+      setForm({
+        ...emptyForm,
+        ai_system_id: systemFilter,
+        control_id: controlFilter,
+        evidence_type: evidenceTypes.includes(requestedEvidenceType) ? requestedEvidenceType : 'policy',
+        source: searchParams.get('source') || '',
+      });
       setShowCreate(false);
       load();
     } catch (err: any) {
@@ -240,6 +248,14 @@ export default function EvidencePage() {
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">AI System</label>
                 <div className="text-[10px] font-mono text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded px-3 py-2">
                   {systemFilter}
+                </div>
+              </div>
+            )}
+            {controlFilter && (
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Control</label>
+                <div className="text-[10px] font-mono text-sky-300 bg-sky-500/10 border border-sky-500/20 rounded px-3 py-2">
+                  {controlFilter}
                 </div>
               </div>
             )}

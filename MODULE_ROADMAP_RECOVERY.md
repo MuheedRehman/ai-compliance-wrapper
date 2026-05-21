@@ -175,6 +175,15 @@ Current evidence upload flow slice:
 
 Deployment checkpoint: evidence upload flow is deployed to staging through Cloud Build `470a39b9-0dbf-44f6-9236-3dd5e40dba18`, with backend revision `ai-compliance-backend-00085-rsx`, dashboard revision `ai-compliance-dashboard-00044-cw5`, and passing Cloud Build staging Playwright E2E. Next evidence hardening should add artifact previews, external object-storage backend, and stronger evidence-to-control attachment workflows.
 
+Current evidence-to-control attachment slice:
+- Compliance control responses include evidence coverage fields: linked evidence count, active evidence count, needs-review count, latest evidence date, and status counts.
+- `/v1/compliance/controls/{control_id}/evidence` lists evidence linked to one control.
+- `/v1/compliance/controls/{control_id}/evidence/{item_id}` links an existing evidence item to a control, inherits the control AI system where needed, records attachment metadata, and reseals the evidence hash/signature.
+- The Controls dashboard shows evidence coverage per control, opens prefilled evidence creation for that control, and can attach existing eligible evidence items.
+- The Evidence dashboard honors `control_id` query filters and keeps control/system context when creating evidence from a control.
+
+Deployment checkpoint: implemented locally and verified with focused evidence/control tests, full backend tests, dashboard lint, and dashboard build. Staging deployment is the next gate for this slice.
+
 ### Module 6: Control Management
 
 Add:

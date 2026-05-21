@@ -177,6 +177,50 @@ class EvidenceVaultService:
         return item
 
     @staticmethod
+    def attach_item_to_control(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        control_id: str,
+    ) -> EvidenceItem:
+        control = db.query(ComplianceControl).filter(
+            ComplianceControl.tenant_id == tenant_id,
+            ComplianceControl.id == control_id,
+        ).first()
+        if not control:
+            raise HTTPException(status_code=404, detail="Compliance control not found")
+
+        item = EvidenceVaultService.get_item(db, tenant_id, item_id)
+        if item.ai_system_id and control.ai_system_id and item.ai_system_id != control.ai_system_id:
+            raise HTTPException(status_code=400, detail="Evidence item belongs to a different AI system")
+
+        previous_control_id = item.control_id
+        if control.ai_system_id and not item.ai_system_id:
+            item.ai_system_id = control.ai_system_id
+        item.control_id = control.id
+
+        metadata_json = dict(item.metadata_json or {})
+        attachment_event = {
+            "control_id": control.id,
+            "previous_control_id": previous_control_id,
+            "ai_system_id": item.ai_system_id,
+            "attached_at": _now().isoformat(),
+            "source": "control_evidence_attachment",
+        }
+        history = [
+            entry for entry in metadata_json.get("control_attachment_history", [])
+            if isinstance(entry, dict)
+        ]
+        metadata_json["control_attachment_history"] = [attachment_event, *history][:10]
+        metadata_json["latest_control_attachment"] = attachment_event
+        item.metadata_json = metadata_json
+
+        _seal_item(item)
+        db.commit()
+        db.refresh(item)
+        return item
+
+    @staticmethod
     def update_item(db: Session, tenant_id: str, item_id: str, payload: EvidenceItemUpdate) -> EvidenceItem:
         item = EvidenceVaultService.get_item(db, tenant_id, item_id)
         update_data = payload.model_dump(exclude_unset=True)

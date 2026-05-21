@@ -8,10 +8,12 @@ from app.schemas import (
     ComplianceControlCreate,
     ComplianceControlResponse,
     ComplianceControlUpdate,
+    EvidenceItemResponse,
     ReadinessScorecardResponse,
 )
 from app.services.auth_service import authenticate_api_key
 from app.services.compliance_control_service import ComplianceControlService
+from app.services.evidence_vault_service import EvidenceVaultService
 
 
 router = APIRouter(prefix="/v1/compliance", tags=["Compliance Controls"])
@@ -46,6 +48,28 @@ def update_control(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
     return ComplianceControlService.update_control(db, auth["tenant_id"], control_id, payload)
+
+
+@router.get("/controls/{control_id}/evidence", response_model=List[EvidenceItemResponse])
+def list_control_evidence(
+    control_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    ComplianceControlService.get_control(db, auth["tenant_id"], control_id)
+    return EvidenceVaultService.list_items(db, auth["tenant_id"], control_id=control_id, limit=500)
+
+
+@router.post("/controls/{control_id}/evidence/{item_id}", response_model=EvidenceItemResponse)
+def attach_evidence_to_control(
+    control_id: str,
+    item_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
+    return EvidenceVaultService.attach_item_to_control(db, auth["tenant_id"], item_id, control_id)
 
 
 @router.post("/controls/seed-baseline", response_model=List[ComplianceControlResponse])

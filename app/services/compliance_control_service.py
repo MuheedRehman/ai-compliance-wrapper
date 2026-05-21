@@ -1,11 +1,12 @@
 import uuid
+from collections import Counter
 from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import AiSystem, ComplianceControl
+from app.models import AiSystem, ComplianceControl, EvidenceItem
 from app.schemas import ComplianceControlCreate, ComplianceControlUpdate
 
 
@@ -59,11 +60,53 @@ class ComplianceControlService:
             raise HTTPException(status_code=404, detail="AI system not found for tenant")
 
     @staticmethod
+    def _attach_evidence_metrics(db: Session, tenant_id: str, controls: List[ComplianceControl]) -> List[ComplianceControl]:
+        control_ids = [control.id for control in controls]
+        if not control_ids:
+            return controls
+
+        evidence_by_control: dict[str, list[EvidenceItem]] = {control_id: [] for control_id in control_ids}
+        evidence_items = (
+            db.query(EvidenceItem)
+            .filter(
+                EvidenceItem.tenant_id == tenant_id,
+                EvidenceItem.control_id.in_(control_ids),
+            )
+            .all()
+        )
+        for item in evidence_items:
+            if item.control_id in evidence_by_control:
+                evidence_by_control[item.control_id].append(item)
+
+        for control in controls:
+            linked_items = evidence_by_control.get(control.id, [])
+            status_counts = Counter(item.status for item in linked_items)
+            latest_evidence_at = max((item.collected_at for item in linked_items if item.collected_at), default=None)
+            setattr(control, "evidence_item_count", len(linked_items))
+            setattr(control, "active_evidence_count", status_counts.get("active", 0))
+            setattr(control, "needs_review_evidence_count", status_counts.get("needs_review", 0))
+            setattr(control, "latest_evidence_at", latest_evidence_at)
+            setattr(control, "evidence_status_counts", dict(status_counts))
+        return controls
+
+    @staticmethod
+    def get_control(db: Session, tenant_id: str, control_id: str) -> ComplianceControl:
+        control = db.query(ComplianceControl).filter(
+            ComplianceControl.tenant_id == tenant_id,
+            ComplianceControl.id == control_id,
+        ).first()
+        if not control:
+            raise HTTPException(status_code=404, detail="Compliance control not found")
+        ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
+        return control
+
+    @staticmethod
     def list_controls(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> List[ComplianceControl]:
         query = db.query(ComplianceControl).filter(ComplianceControl.tenant_id == tenant_id)
         if ai_system_id:
             query = query.filter(ComplianceControl.ai_system_id == ai_system_id)
-        return query.order_by(ComplianceControl.article.asc(), ComplianceControl.control_key.asc()).all()
+        controls = query.order_by(ComplianceControl.article.asc(), ComplianceControl.control_key.asc()).all()
+        return ComplianceControlService._attach_evidence_metrics(db, tenant_id, controls)
 
     @staticmethod
     def create_control(db: Session, tenant_id: str, payload: ComplianceControlCreate) -> ComplianceControl:
@@ -84,16 +127,12 @@ class ComplianceControlService:
         db.add(control)
         db.commit()
         db.refresh(control)
+        ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
         return control
 
     @staticmethod
     def update_control(db: Session, tenant_id: str, control_id: str, payload: ComplianceControlUpdate) -> ComplianceControl:
-        control = db.query(ComplianceControl).filter(
-            ComplianceControl.tenant_id == tenant_id,
-            ComplianceControl.id == control_id,
-        ).first()
-        if not control:
-            raise HTTPException(status_code=404, detail="Compliance control not found")
+        control = ComplianceControlService.get_control(db, tenant_id, control_id)
 
         if payload.owner_email is not None:
             control.owner_email = payload.owner_email
@@ -106,6 +145,7 @@ class ComplianceControlService:
 
         db.commit()
         db.refresh(control)
+        ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
         return control
 
     @staticmethod
@@ -135,6 +175,7 @@ class ComplianceControlService:
         db.commit()
         for control in created:
             db.refresh(control)
+        ComplianceControlService._attach_evidence_metrics(db, tenant_id, created)
         return created
 
     @staticmethod
@@ -194,6 +235,7 @@ class ComplianceControlService:
             db.commit()
             for control in created:
                 db.refresh(control)
+            ComplianceControlService._attach_evidence_metrics(db, tenant_id, created)
         return created
 
     @staticmethod

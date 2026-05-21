@@ -414,6 +414,11 @@ class ComplianceControlResponse(BaseModel):
     due_at: Optional[datetime] = None
     evidence_domain: str
     details_json: Dict[str, Any]
+    evidence_item_count: int = 0
+    active_evidence_count: int = 0
+    needs_review_evidence_count: int = 0
+    latest_evidence_at: Optional[datetime] = None
+    evidence_status_counts: Dict[str, int] = Field(default_factory=dict)
     created_at: datetime
     updated_at: datetime
 

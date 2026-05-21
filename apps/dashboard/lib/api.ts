@@ -322,6 +322,12 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  listControlEvidence: (id: string) =>
+    fetchApi<any[]>(`/v1/compliance/controls/${id}/evidence`),
+  attachEvidenceToControl: (controlId: string, itemId: string) =>
+    fetchApi<any>(`/v1/compliance/controls/${controlId}/evidence/${itemId}`, {
+      method: 'POST',
+    }),
   getScorecard: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
     return fetchApi<any>(`/v1/compliance/scorecard${qs}`);

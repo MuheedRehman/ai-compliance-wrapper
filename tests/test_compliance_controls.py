@@ -48,3 +48,98 @@ def test_control_rejects_foreign_system(client: TestClient, admin_headers, db_se
     }
     res = client.post("/v1/compliance/controls", json=payload, headers=admin_headers)
     assert res.status_code == 404
+
+
+def test_control_evidence_attachment_workflow(client: TestClient, admin_headers):
+    system_response = client.post(
+        "/v1/ai-systems",
+        headers=admin_headers,
+        json={"name": "Control Evidence System"},
+    )
+    assert system_response.status_code == 200
+    system_id = system_response.json()["id"]
+
+    control_response = client.post(
+        "/v1/compliance/controls",
+        headers=admin_headers,
+        json={
+            "ai_system_id": system_id,
+            "control_key": "CONTROL_EVIDENCE_LINK",
+            "article": "Article 12",
+            "title": "Logging evidence attached",
+            "evidence_domain": "log_retention",
+        },
+    )
+    assert control_response.status_code == 200
+    control = control_response.json()
+    assert control["evidence_item_count"] == 0
+
+    evidence_response = client.post(
+        "/v1/evidence/items",
+        headers=admin_headers,
+        json={
+            "title": "Log retention policy",
+            "evidence_type": "policy",
+            "source": "Internal policy drive",
+        },
+    )
+    assert evidence_response.status_code == 200
+    evidence = evidence_response.json()
+
+    attach_response = client.post(
+        f"/v1/compliance/controls/{control['id']}/evidence/{evidence['id']}",
+        headers=admin_headers,
+    )
+    assert attach_response.status_code == 200
+    attached = attach_response.json()
+    assert attached["control_id"] == control["id"]
+    assert attached["ai_system_id"] == system_id
+    assert attached["evidence_hash"] != evidence["evidence_hash"]
+    assert attached["metadata_json"]["latest_control_attachment"]["control_id"] == control["id"]
+
+    evidence_list_response = client.get(
+        f"/v1/compliance/controls/{control['id']}/evidence",
+        headers=admin_headers,
+    )
+    assert evidence_list_response.status_code == 200
+    assert [item["id"] for item in evidence_list_response.json()] == [evidence["id"]]
+
+    controls_response = client.get(f"/v1/compliance/controls?ai_system_id={system_id}", headers=admin_headers)
+    assert controls_response.status_code == 200
+    refreshed = controls_response.json()[0]
+    assert refreshed["evidence_item_count"] == 1
+    assert refreshed["active_evidence_count"] == 1
+    assert refreshed["evidence_status_counts"]["active"] == 1
+
+
+def test_control_evidence_attachment_rejects_different_system(client: TestClient, admin_headers):
+    first_system = client.post("/v1/ai-systems", headers=admin_headers, json={"name": "Control System A"}).json()
+    second_system = client.post("/v1/ai-systems", headers=admin_headers, json={"name": "Control System B"}).json()
+
+    control = client.post(
+        "/v1/compliance/controls",
+        headers=admin_headers,
+        json={
+            "ai_system_id": first_system["id"],
+            "control_key": "CONTROL_SYSTEM_A",
+            "article": "Article 14",
+            "title": "Human oversight control",
+            "evidence_domain": "human_oversight",
+        },
+    ).json()
+    evidence = client.post(
+        "/v1/evidence/items",
+        headers=admin_headers,
+        json={
+            "title": "Wrong system evidence",
+            "evidence_type": "policy",
+            "source": "Internal drive",
+            "ai_system_id": second_system["id"],
+        },
+    ).json()
+
+    response = client.post(
+        f"/v1/compliance/controls/{control['id']}/evidence/{evidence['id']}",
+        headers=admin_headers,
+    )
+    assert response.status_code == 400
