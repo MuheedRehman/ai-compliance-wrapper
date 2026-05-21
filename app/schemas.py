@@ -467,6 +467,23 @@ class EvidenceItemUpdate(BaseModel):
     metadata_json: Optional[Dict[str, Any]] = None
 
 
+class EvidenceArtifactResponse(BaseModel):
+    id: str
+    tenant_id: str
+    evidence_item_id: str
+    file_name: str
+    content_type: str
+    size_bytes: int
+    artifact_hash: str
+    hmac_signature: str
+    storage_backend: str
+    storage_key: str
+    metadata_json: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class EvidenceItemResponse(BaseModel):
     id: str
     tenant_id: str
@@ -485,6 +502,7 @@ class EvidenceItemResponse(BaseModel):
     evidence_hash: str
     hmac_signature: str
     metadata_json: Dict[str, Any]
+    artifacts: List[EvidenceArtifactResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

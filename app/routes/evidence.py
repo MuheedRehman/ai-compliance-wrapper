@@ -1,10 +1,11 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, File, Header, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas import (
+    EvidenceArtifactResponse,
     EvidenceItemCreate,
     EvidenceItemResponse,
     EvidenceItemUpdate,
@@ -70,3 +71,42 @@ def update_evidence_item(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="evidence:write")
     return EvidenceVaultService.update_item(db, auth["tenant_id"], item_id, payload)
+
+
+@router.post("/items/{item_id}/artifacts", response_model=EvidenceArtifactResponse)
+async def upload_evidence_artifact(
+    item_id: str,
+    file: UploadFile = File(...),
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="evidence:write")
+    content = await file.read()
+    return EvidenceVaultService.attach_artifact(
+        db,
+        auth["tenant_id"],
+        item_id,
+        file_name=file.filename or "evidence-artifact",
+        content_type=file.content_type,
+        content=content,
+    )
+
+
+@router.get("/items/{item_id}/artifacts/{artifact_id}/download")
+def download_evidence_artifact(
+    item_id: str,
+    artifact_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="evidence:read")
+    artifact = EvidenceVaultService.get_artifact(db, auth["tenant_id"], item_id, artifact_id)
+    return Response(
+        content=artifact.content_bytes,
+        media_type=artifact.content_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="{artifact.file_name}"',
+            "X-Evidence-Artifact-Hash": artifact.artifact_hash,
+            "X-Evidence-Artifact-Signature": artifact.hmac_signature,
+        },
+    )

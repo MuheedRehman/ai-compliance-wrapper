@@ -1,3 +1,4 @@
+import hashlib
 import uuid
 from collections import Counter
 from datetime import datetime, timedelta, timezone
@@ -6,9 +7,12 @@ from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.models import AiSystem, ComplianceControl, EvidenceItem
+from app.models import AiSystem, ComplianceControl, EvidenceArtifact, EvidenceItem
 from app.schemas import EvidenceItemCreate, EvidenceItemUpdate
 from app.services.hashing import hash_object, hmac_signature
+
+
+MAX_ARTIFACT_BYTES = 5 * 1024 * 1024
 
 
 def _now() -> datetime:
@@ -47,6 +51,26 @@ def _seal_item(item: EvidenceItem) -> None:
         "tenant_id": item.tenant_id,
         "evidence_hash": item.evidence_hash,
     })
+
+
+def _clean_file_name(file_name: str | None) -> str:
+    cleaned = (file_name or "evidence-artifact").replace("\\", "/").split("/")[-1].strip()
+    cleaned = cleaned.replace("\r", "").replace("\n", "")
+    cleaned = cleaned.replace('"', "")
+    return cleaned[:180] or "evidence-artifact"
+
+
+def _artifact_summary(artifact: EvidenceArtifact) -> dict:
+    return {
+        "id": artifact.id,
+        "file_name": artifact.file_name,
+        "content_type": artifact.content_type,
+        "size_bytes": artifact.size_bytes,
+        "artifact_hash": artifact.artifact_hash,
+        "storage_backend": artifact.storage_backend,
+        "storage_key": artifact.storage_key,
+        "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
+    }
 
 
 class EvidenceVaultService:
@@ -175,6 +199,84 @@ class EvidenceVaultService:
         db.commit()
         db.refresh(item)
         return item
+
+    @staticmethod
+    def attach_artifact(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        *,
+        file_name: str,
+        content_type: str | None,
+        content: bytes,
+        metadata: Optional[dict] = None,
+    ) -> EvidenceArtifact:
+        item = EvidenceVaultService.get_item(db, tenant_id, item_id)
+        if not content:
+            raise HTTPException(status_code=400, detail="Uploaded evidence artifact is empty")
+        if len(content) > MAX_ARTIFACT_BYTES:
+            raise HTTPException(status_code=413, detail="Evidence artifacts are limited to 5 MB in this staging upload flow")
+
+        artifact_id = f"art-{uuid.uuid4().hex[:10]}"
+        artifact_hash = hashlib.sha256(content).hexdigest()
+        storage_key = f"evidence/{tenant_id}/{item_id}/{artifact_id}/{_clean_file_name(file_name)}"
+        artifact = EvidenceArtifact(
+            id=artifact_id,
+            tenant_id=tenant_id,
+            evidence_item_id=item_id,
+            file_name=_clean_file_name(file_name),
+            content_type=content_type or "application/octet-stream",
+            size_bytes=len(content),
+            artifact_hash=artifact_hash,
+            hmac_signature=hmac_signature({
+                "evidence_artifact_id": artifact_id,
+                "tenant_id": tenant_id,
+                "evidence_item_id": item_id,
+                "artifact_hash": artifact_hash,
+            }),
+            storage_backend="database",
+            storage_key=storage_key,
+            content_bytes=content,
+            metadata_json=metadata or {"source": "evidence_vault_upload"},
+        )
+        db.add(artifact)
+        db.flush()
+
+        metadata_json = dict(item.metadata_json or {})
+        existing_artifacts = [
+            entry for entry in metadata_json.get("artifacts", [])
+            if isinstance(entry, dict) and entry.get("id") != artifact.id
+        ]
+        metadata_json["artifacts"] = [_artifact_summary(artifact), *existing_artifacts]
+        metadata_json["artifact_count"] = len(metadata_json["artifacts"])
+        metadata_json["latest_artifact_hash"] = artifact_hash
+        item.metadata_json = metadata_json
+        _seal_item(item)
+
+        db.commit()
+        db.refresh(artifact)
+        db.refresh(item)
+        return artifact
+
+    @staticmethod
+    def get_artifact(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        artifact_id: str,
+    ) -> EvidenceArtifact:
+        artifact = (
+            db.query(EvidenceArtifact)
+            .filter(
+                EvidenceArtifact.tenant_id == tenant_id,
+                EvidenceArtifact.evidence_item_id == item_id,
+                EvidenceArtifact.id == artifact_id,
+            )
+            .first()
+        )
+        if not artifact:
+            raise HTTPException(status_code=404, detail="Evidence artifact not found")
+        return artifact
 
     @staticmethod
     def summary(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> dict:

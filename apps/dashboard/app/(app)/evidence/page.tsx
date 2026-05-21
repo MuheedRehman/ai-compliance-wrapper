@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertOctagon, CalendarClock, Clock, FileSearch, Hash, Link as LinkIcon, Plus, ShieldCheck } from 'lucide-react';
+import { AlertOctagon, CalendarClock, Clock, Download, FileSearch, Hash, Link as LinkIcon, Plus, ShieldCheck, Upload } from 'lucide-react';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import StatusBadge from '@/components/status-badge';
@@ -58,6 +58,8 @@ export default function EvidencePage() {
   const [controls, setControls] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(createRequested);
   const [error, setError] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState('');
@@ -111,7 +113,7 @@ export default function EvidencePage() {
     setSubmitting(true);
     setError(null);
     try {
-      await api.createEvidenceItem({
+      const item = await api.createEvidenceItem({
         title: form.title,
         evidence_type: form.evidence_type,
         source: form.source,
@@ -124,6 +126,10 @@ export default function EvidencePage() {
         description: form.description || undefined,
         metadata_json: form.description ? { notes: form.description } : {},
       });
+      if (selectedFile) {
+        await api.uploadEvidenceArtifact(item.id, selectedFile);
+      }
+      setSelectedFile(null);
       setForm({ ...emptyForm, ai_system_id: systemFilter });
       setShowCreate(false);
       load();
@@ -137,6 +143,20 @@ export default function EvidencePage() {
   async function updateItemStatus(itemId: string, status: string) {
     const updated = await api.updateEvidenceItem(itemId, { status });
     setItems((current) => current.map((item) => item.id === itemId ? updated : item));
+  }
+
+  async function uploadArtifact(itemId: string, file?: File | null) {
+    if (!file) return;
+    setUploadingItemId(itemId);
+    setError(null);
+    try {
+      await api.uploadEvidenceArtifact(itemId, file);
+      load();
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to upload evidence artifact');
+    } finally {
+      setUploadingItemId(null);
+    }
   }
 
   const blockedCount = logs.filter((log) => log.decision?.toLowerCase() === 'block').length;
@@ -195,6 +215,11 @@ export default function EvidencePage() {
               <input type="url" placeholder="https://source.example/document" value={form.source_url} onChange={(e) => setForm({ ...form, source_url: e.target.value })} />
               <input type="date" value={form.review_at} onChange={(e) => setForm({ ...form, review_at: e.target.value })} />
               <input type="date" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
+              <label className="flex min-h-10 cursor-pointer items-center gap-2 rounded-lg border border-dashed border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400 hover:border-indigo-500/40">
+                <Upload className="h-4 w-4 text-zinc-500" />
+                <span className="truncate">{selectedFile ? selectedFile.name : 'Attach file artifact'}</span>
+                <input type="file" className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+              </label>
               <textarea className="md:col-span-2 xl:col-span-3 min-h-20" placeholder="Notes or evidence description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
               <div className="flex items-end gap-2">
                 <button disabled={submitting} className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
@@ -275,6 +300,7 @@ export default function EvidencePage() {
                         <th>Owner</th>
                         <th>Status</th>
                         <th>Review</th>
+                        <th>File</th>
                         <th>Hash</th>
                       </tr>
                     </thead>
@@ -301,6 +327,26 @@ export default function EvidencePage() {
                           </td>
                           <td className="text-[10px] text-zinc-500 font-bold uppercase whitespace-nowrap">
                             {item.review_at ? new Date(item.review_at).toLocaleDateString() : 'Not set'}
+                          </td>
+                          <td className="min-w-[220px]">
+                            <div className="space-y-2">
+                              {(item.artifacts || []).length > 0 ? (
+                                <a
+                                  href={api.getEvidenceArtifactUrl(item.id, item.artifacts[0].id)}
+                                  className="inline-flex max-w-[220px] items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300"
+                                >
+                                  <Download className="h-3 w-3 shrink-0" />
+                                  <span className="truncate">{item.artifacts[0].file_name}</span>
+                                </a>
+                              ) : (
+                                <span className="text-[10px] text-zinc-600">No file</span>
+                              )}
+                              <label className="flex cursor-pointer items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300">
+                                <Upload className="h-3 w-3" />
+                                {uploadingItemId === item.id ? 'Uploading' : 'Upload'}
+                                <input type="file" className="hidden" onChange={(e) => uploadArtifact(item.id, e.target.files?.[0])} />
+                              </label>
+                            </div>
                           </td>
                           <td className="text-[10px] text-zinc-500 font-mono">
                             <span className="inline-flex items-center gap-1">

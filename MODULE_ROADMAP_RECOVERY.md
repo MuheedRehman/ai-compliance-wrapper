@@ -164,7 +164,16 @@ Each evidence item should have:
 - Related AI system
 - Expiry/review date
 
-Status: first slice deployed. Signed evidence items, source/owner/type/status, related control/system, review/expiry dates, API routes, dashboard vault UI, and workspace linkage exist. File/object storage and stronger evidence-to-control attachment remain to build.
+Status: in progress. Signed evidence items, source/owner/type/status, related control/system, review/expiry dates, API routes, dashboard vault UI, and workspace linkage exist.
+
+Current evidence upload flow slice:
+- Migration `0012` adds `evidence_artifacts` linked to evidence items and tenants.
+- Evidence artifacts store uploaded file bytes in a database-backed object record for this staging slice, with file name, content type, size, storage key, SHA-256 artifact hash, and HMAC signature.
+- Uploading an artifact reseals the parent evidence item metadata/hash so audit records reflect attached files.
+- The Evidence Vault API supports artifact upload and authenticated artifact download.
+- The Evidence Vault dashboard supports attaching a file while creating evidence, uploading files onto existing items, and downloading attached artifacts.
+
+Deployment checkpoint: evidence upload flow is implemented locally and is the current deployment checkpoint. Next evidence hardening should add artifact previews, external object-storage backend, and stronger evidence-to-control attachment workflows.
 
 ### Module 6: Control Management
 

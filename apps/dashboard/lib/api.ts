@@ -110,7 +110,7 @@ export async function fetchApi<T = any>(
     ...(options.headers as Record<string, string> || {}),
   };
 
-  if (options.body && !headers['Content-Type']) {
+  if (options.body && !(options.body instanceof FormData) && !headers['Content-Type']) {
     headers['Content-Type'] = 'application/json';
   }
 
@@ -213,6 +213,16 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  uploadEvidenceArtifact: (itemId: string, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return fetchApi<any>(`/v1/evidence/items/${itemId}/artifacts`, {
+      method: 'POST',
+      body: formData,
+    });
+  },
+  getEvidenceArtifactUrl: (itemId: string, artifactId: string) =>
+    `${API_BASE_URL}/v1/evidence/items/${itemId}/artifacts/${artifactId}/download`,
 
   // Billing
   getSubscription: () => fetchApi<any>('/v1/billing/subscription'),

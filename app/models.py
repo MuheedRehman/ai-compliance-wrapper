@@ -5,11 +5,13 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     JSON,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
     Index,
 )
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db import Base
 
@@ -408,6 +410,34 @@ class EvidenceItem(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    artifacts = relationship(
+        "EvidenceArtifact",
+        back_populates="evidence_item",
+        cascade="all, delete-orphan",
+    )
+
+
+class EvidenceArtifact(Base):
+    __tablename__ = "evidence_artifacts"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    evidence_item_id = Column(String, ForeignKey("evidence_items.id"), nullable=False, index=True)
+
+    file_name = Column(String, nullable=False)
+    content_type = Column(String, nullable=False, default="application/octet-stream")
+    size_bytes = Column(Integer, nullable=False)
+    artifact_hash = Column(String, nullable=False, index=True)
+    hmac_signature = Column(String, nullable=False)
+    storage_backend = Column(String, nullable=False, default="database", index=True)
+    storage_key = Column(String, nullable=False)
+    content_bytes = Column(LargeBinary, nullable=False)
+    metadata_json = Column(JSON, nullable=False, default=dict)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    evidence_item = relationship("EvidenceItem", back_populates="artifacts")
 
 
 class TenantSubscription(Base):

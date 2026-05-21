@@ -822,6 +822,11 @@ export default function SystemDetailPage() {
                       <div>
                         <p className="text-xs font-bold text-zinc-200">{item.title}</p>
                         <p className="mt-1 text-[10px] font-mono text-zinc-600">{item.evidence_type} / {item.evidence_hash.slice(0, 12)}</p>
+                        {(item.artifacts?.length || 0) > 0 && (
+                          <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-indigo-400">
+                            {item.artifacts.length} uploaded file{item.artifacts.length === 1 ? '' : 's'}
+                          </p>
+                        )}
                       </div>
                       <StatusBadge value={item.status} />
                     </div>

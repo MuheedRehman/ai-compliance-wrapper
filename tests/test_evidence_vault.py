@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
-from app.models import AiSystem, ComplianceControl, EvidenceItem, Tenant
+from app.models import AiSystem, ComplianceControl, EvidenceArtifact, EvidenceItem, Tenant
 
 
 def _create_system_and_control(client, admin_headers):
@@ -139,3 +139,55 @@ def test_evidence_item_model_persists_signature(db_session, client, admin_header
     stored = db_session.query(EvidenceItem).filter(EvidenceItem.id == item_id).first()
     assert stored is not None
     assert stored.hmac_signature == response.json()["hmac_signature"]
+
+
+def test_evidence_vault_uploads_signed_artifact_and_downloads_content(client, admin_headers, db_session):
+    system, control = _create_system_and_control(client, admin_headers)
+    create_response = client.post(
+        "/v1/evidence/items",
+        headers=admin_headers,
+        json={
+            "title": "Model card upload",
+            "evidence_type": "model_card",
+            "source": "Evidence Vault upload",
+            "ai_system_id": system["id"],
+            "control_id": control["id"],
+        },
+    )
+    assert create_response.status_code == 200
+    item = create_response.json()
+    original_hash = item["evidence_hash"]
+
+    upload_response = client.post(
+        f"/v1/evidence/items/{item['id']}/artifacts",
+        headers=admin_headers,
+        files={"file": ("model-card.txt", b"model card evidence", "text/plain")},
+    )
+    assert upload_response.status_code == 200
+    artifact = upload_response.json()
+    assert artifact["file_name"] == "model-card.txt"
+    assert artifact["content_type"] == "text/plain"
+    assert artifact["size_bytes"] == len(b"model card evidence")
+    assert len(artifact["artifact_hash"]) == 64
+    assert len(artifact["hmac_signature"]) == 64
+    assert artifact["storage_backend"] == "database"
+
+    stored_artifact = db_session.query(EvidenceArtifact).filter(EvidenceArtifact.id == artifact["id"]).first()
+    assert stored_artifact is not None
+    assert stored_artifact.content_bytes == b"model card evidence"
+
+    list_response = client.get(f"/v1/evidence/items?ai_system_id={system['id']}", headers=admin_headers)
+    assert list_response.status_code == 200
+    uploaded_item = list_response.json()[0]
+    assert uploaded_item["id"] == item["id"]
+    assert uploaded_item["evidence_hash"] != original_hash
+    assert uploaded_item["metadata_json"]["artifact_count"] == 1
+    assert uploaded_item["artifacts"][0]["id"] == artifact["id"]
+
+    download_response = client.get(
+        f"/v1/evidence/items/{item['id']}/artifacts/{artifact['id']}/download",
+        headers=admin_headers,
+    )
+    assert download_response.status_code == 200
+    assert download_response.content == b"model card evidence"
+    assert download_response.headers["x-evidence-artifact-hash"] == artifact["artifact_hash"]
