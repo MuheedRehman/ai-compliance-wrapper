@@ -5,9 +5,12 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.schemas import (
+    ComplianceAuditStatusResponse,
     ComplianceControlCreate,
     ComplianceControlReviewCreate,
     ComplianceControlResponse,
+    ComplianceControlTemplateApplyRequest,
+    ComplianceControlTemplateResponse,
     ComplianceControlUpdate,
     EvidenceItemResponse,
     ReadinessScorecardResponse,
@@ -18,6 +21,16 @@ from app.services.evidence_vault_service import EvidenceVaultService
 
 
 router = APIRouter(prefix="/v1/compliance", tags=["Compliance Controls"])
+
+
+@router.get("/control-templates", response_model=List[ComplianceControlTemplateResponse])
+def list_control_templates(
+    ai_system_id: Optional[str] = Query(default=None),
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    return ComplianceControlService.list_templates(db, auth["tenant_id"], ai_system_id)
 
 
 @router.get("/controls", response_model=List[ComplianceControlResponse])
@@ -38,6 +51,16 @@ def create_control(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
     return ComplianceControlService.create_control(db, auth["tenant_id"], payload)
+
+
+@router.post("/controls/apply-templates", response_model=List[ComplianceControlResponse])
+def apply_control_templates(
+    payload: ComplianceControlTemplateApplyRequest,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
+    return ComplianceControlService.apply_templates(db, auth["tenant_id"], payload)
 
 
 @router.patch("/controls/{control_id}", response_model=ComplianceControlResponse)
@@ -102,3 +125,13 @@ def get_scorecard(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="compliance:read")
     return ComplianceControlService.scorecard(db, auth["tenant_id"], ai_system_id)
+
+
+@router.get("/audit-status", response_model=ComplianceAuditStatusResponse)
+def get_audit_status(
+    ai_system_id: Optional[str] = Query(default=None),
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:read")
+    return ComplianceControlService.audit_status(db, auth["tenant_id"], ai_system_id)

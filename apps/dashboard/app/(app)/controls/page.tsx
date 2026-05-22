@@ -15,7 +15,9 @@ import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
   Clock,
+  Download,
   FileSearch,
   ListChecks,
   MessageSquare,
@@ -63,35 +65,51 @@ function severityClasses(severity?: string) {
   }
 }
 
+function downloadTextFile(fileName: string, content: string) {
+  const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ControlsPage() {
   const searchParams = useSearchParams();
   const highlightedControlId = searchParams.get('control_id') || '';
   const [systems, setSystems] = useState<any[]>([]);
   const [selectedSystemId, setSelectedSystemId] = useState(searchParams.get('ai_system_id') || '');
   const [controls, setControls] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<any[]>([]);
   const [evidenceItems, setEvidenceItems] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
+  const [auditStatus, setAuditStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ControlDraft>>({});
   const [attachmentDrafts, setAttachmentDrafts] = useState<Record<string, string>>({});
+  const [templateDraft, setTemplateDraft] = useState({ template_key: '', owner_email: '', due_at: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const evidenceParams = selectedSystemId ? { ai_system_id: selectedSystemId } : undefined;
-      const [systemData, controlData, scoreData, evidenceData] = await Promise.all([
+      const [systemData, controlData, scoreData, evidenceData, templateData] = await Promise.all([
         api.listSystems().catch(() => []),
         api.listControls(selectedSystemId || undefined),
         api.getScorecard(selectedSystemId || undefined),
         api.listEvidenceItems(evidenceParams),
+        api.listControlTemplates(selectedSystemId || undefined),
       ]);
       setSystems(systemData || []);
       setControls(controlData || []);
       setScorecard(scoreData);
       setEvidenceItems(evidenceData || []);
+      setTemplates(templateData || []);
+      setAuditStatus(null);
       setDrafts(Object.fromEntries((controlData || []).map((control: any) => [
         control.id,
         {
@@ -134,6 +152,42 @@ export default function ControlsPage() {
       await load();
     } catch (err: any) {
       setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to seed baseline controls');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function applyTemplate() {
+    if (!templateDraft.template_key) return;
+    setSavingId('template');
+    setError(null);
+    try {
+      await api.applyControlTemplates({
+        template_keys: [templateDraft.template_key],
+        ai_system_id: selectedSystemId || undefined,
+        owner_email: templateDraft.owner_email || undefined,
+        due_at: fromDateInput(templateDraft.due_at),
+      });
+      setTemplateDraft((current) => ({ ...current, template_key: '' }));
+      await load();
+    } catch (err: any) {
+      setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to apply control template');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function exportAuditStatus() {
+    setSavingId('audit-export');
+    setError(null);
+    try {
+      const status = await api.getControlAuditStatus(selectedSystemId || undefined);
+      setAuditStatus(status);
+      const scope = selectedSystemId || 'tenant';
+      const date = new Date().toISOString().slice(0, 10);
+      downloadTextFile(`control-audit-status-${scope}-${date}.md`, status.markdown || '');
+    } catch (err: any) {
+      setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to export audit status');
     } finally {
       setSavingId(null);
     }
@@ -329,6 +383,83 @@ export default function ControlsPage() {
             </p>
           </div>
         </Card>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <Card title="Control Templates" subtitle="Apply reusable EU AI Act controls into the selected scope.">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_190px_150px_auto] gap-3">
+              <select
+                value={templateDraft.template_key}
+                onChange={(event) => setTemplateDraft((current) => ({ ...current, template_key: event.target.value }))}
+                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              >
+                <option value="">Select template</option>
+                {templates.map((template) => (
+                  <option key={template.template_key} value={template.template_key} disabled={template.applied}>
+                    {template.applied ? 'Applied - ' : ''}{template.title}
+                  </option>
+                ))}
+              </select>
+              <input
+                value={templateDraft.owner_email}
+                onChange={(event) => setTemplateDraft((current) => ({ ...current, owner_email: event.target.value }))}
+                placeholder="owner@company.com"
+                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+              <input
+                type="date"
+                value={templateDraft.due_at}
+                onChange={(event) => setTemplateDraft((current) => ({ ...current, due_at: event.target.value }))}
+                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+              />
+              <button
+                onClick={applyTemplate}
+                disabled={!templateDraft.template_key || savingId === 'template'}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
+              >
+                {savingId === 'template' ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
+                Apply
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {templates.slice(0, 6).map((template) => (
+                <span
+                  key={template.template_key}
+                  className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${template.applied ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-zinc-800 bg-zinc-950 text-zinc-500'}`}
+                >
+                  {template.title}
+                </span>
+              ))}
+            </div>
+          </Card>
+
+          <Card title="Audit Status Export" subtitle="Download an auditor-readable Markdown snapshot for this control scope.">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500">
+                <div>
+                  <p className="font-bold uppercase tracking-widest text-zinc-600">Evidence gaps</p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.evidence_gap_controls ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="font-bold uppercase tracking-widest text-zinc-600">High open</p>
+                  <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.high_severity_open_controls ?? '-'}</p>
+                </div>
+              </div>
+              <button
+                onClick={exportAuditStatus}
+                disabled={savingId === 'audit-export'}
+                className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
+              >
+                {savingId === 'audit-export' ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                Export Audit
+              </button>
+            </div>
+            {auditStatus?.generated_at && (
+              <p className="mt-3 text-[10px] uppercase tracking-widest text-zinc-600">
+                Last export {new Date(auditStatus.generated_at).toLocaleString()}
+              </p>
+            )}
+          </Card>
+        </div>
 
         {controls.length === 0 ? (
           <EmptyState

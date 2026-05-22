@@ -315,10 +315,19 @@ export const api = {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
     return fetchApi<any[]>(`/v1/compliance/controls${qs}`);
   },
+  listControlTemplates: (aiSystemId?: string) => {
+    const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
+    return fetchApi<any[]>(`/v1/compliance/control-templates${qs}`);
+  },
   seedBaselineControls: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
     return fetchApi<any[]>(`/v1/compliance/controls/seed-baseline${qs}`, { method: 'POST' });
   },
+  applyControlTemplates: (body: any) =>
+    fetchApi<any[]>('/v1/compliance/controls/apply-templates', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   updateControl: (id: string, body: any) =>
     fetchApi<any>(`/v1/compliance/controls/${id}`, {
       method: 'PATCH',
@@ -338,6 +347,10 @@ export const api = {
   getScorecard: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
     return fetchApi<any>(`/v1/compliance/scorecard${qs}`);
+  },
+  getControlAuditStatus: (aiSystemId?: string) => {
+    const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
+    return fetchApi<any>(`/v1/compliance/audit-status${qs}`);
   },
 
   // Website / SaaS Scanner

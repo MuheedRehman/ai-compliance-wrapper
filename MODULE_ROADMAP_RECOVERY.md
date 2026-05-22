@@ -215,7 +215,7 @@ Example controls:
 - Data governance reviewed
 - Model limitations documented
 
-Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, and operational lifecycle fields are deployed to staging.
+Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, and audit-status export are implemented locally; lifecycle fields are deployed to staging.
 
 Current control lifecycle operations slice:
 - Control API responses expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata.
@@ -224,6 +224,14 @@ Current control lifecycle operations slice:
 - The Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline from the control register.
 
 Deployment checkpoint: control lifecycle operations are deployed to staging through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6`, with backend revision `ai-compliance-backend-00093-ljz`, dashboard revision `ai-compliance-dashboard-00048-928`, and passing Cloud Build staging Playwright E2E. Next control hardening should add reusable control templates and exportable audit status.
+
+Current control templates and audit-status export slice:
+- `/v1/compliance/control-templates` lists reusable EU AI Act control templates with article, evidence domain, severity, review cadence, suggested evidence, actor roles, risk tiers, and applied-state metadata.
+- `/v1/compliance/controls/apply-templates` materializes selected templates into tenant-wide or AI-system-specific control scopes while skipping existing controls.
+- `/v1/compliance/audit-status` returns an exportable control readiness snapshot with evidence gaps, owner gaps, overdue controls, review-overdue controls, high-severity open controls, row-level audit readiness, and Markdown export content.
+- The Controls dashboard can apply one reusable template at a time and download the Markdown audit status snapshot for the active scope.
+
+Deployment checkpoint: template catalog and audit-status export are implemented locally and release-verified, pending GitHub push and GCP staging deployment. Next control hardening should add reusable-template customization and branded/exportable control status reports.
 
 ### Module 7: FRIA / Risk Assessment Builder
 

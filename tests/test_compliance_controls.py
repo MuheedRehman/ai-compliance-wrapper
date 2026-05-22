@@ -219,3 +219,78 @@ def test_control_lifecycle_metadata_and_review_history(client: TestClient, admin
     listed = list_response.json()[0]
     assert listed["last_review_note"] == "Validated owner, severity, and evidence plan."
     assert listed["review_history"][0]["status"] == "blocked"
+
+
+def test_control_template_catalog_apply_and_audit_status(client: TestClient, admin_headers):
+    system_response = client.post(
+        "/v1/ai-systems",
+        headers=admin_headers,
+        json={"name": "Template Control System"},
+    )
+    assert system_response.status_code == 200
+    system_id = system_response.json()["id"]
+
+    template_response = client.get(f"/v1/compliance/control-templates?ai_system_id={system_id}", headers=admin_headers)
+    assert template_response.status_code == 200
+    templates = template_response.json()
+    assert any(template["template_key"] == "human_oversight_implemented" for template in templates)
+    assert all(template["applied"] is False for template in templates)
+
+    apply_response = client.post(
+        "/v1/compliance/controls/apply-templates",
+        headers=admin_headers,
+        json={
+            "ai_system_id": system_id,
+            "template_keys": ["human_oversight_implemented", "incident_process_documented"],
+            "owner_email": "controls@example.com",
+            "due_at": "2026-09-01T00:00:00Z",
+        },
+    )
+    assert apply_response.status_code == 200
+    controls = apply_response.json()
+    assert len(controls) == 2
+    assert {control["control_key"] for control in controls} == {
+        "human_oversight_implemented",
+        "incident_process_documented",
+    }
+    incident_control = next(control for control in controls if control["control_key"] == "incident_process_documented")
+    assert incident_control["severity"] == "critical"
+    assert incident_control["review_cycle_days"] == 90
+    assert incident_control["owner_email"] == "controls@example.com"
+    assert incident_control["details_json"]["source"] == "control_template_catalog"
+
+    repeat_response = client.post(
+        "/v1/compliance/controls/apply-templates",
+        headers=admin_headers,
+        json={
+            "ai_system_id": system_id,
+            "template_keys": ["human_oversight_implemented"],
+        },
+    )
+    assert repeat_response.status_code == 200
+    assert repeat_response.json()[0]["id"] == next(
+        control["id"] for control in controls if control["control_key"] == "human_oversight_implemented"
+    )
+
+    applied_templates = client.get(f"/v1/compliance/control-templates?ai_system_id={system_id}", headers=admin_headers).json()
+    human_template = next(template for template in applied_templates if template["template_key"] == "human_oversight_implemented")
+    assert human_template["applied"] is True
+    assert human_template["existing_control_id"] is not None
+
+    audit_response = client.get(f"/v1/compliance/audit-status?ai_system_id={system_id}", headers=admin_headers)
+    assert audit_response.status_code == 200
+    audit_status = audit_response.json()
+    assert audit_status["summary"]["total_controls"] == 2
+    assert audit_status["summary"]["evidence_gap_controls"] == 2
+    assert audit_status["summary"]["high_severity_open_controls"] == 2
+    assert "Compliance Control Audit Status" in audit_status["markdown"]
+    assert "Serious incident process documented" in audit_status["markdown"]
+
+
+def test_control_template_apply_rejects_unknown_template(client: TestClient, admin_headers):
+    response = client.post(
+        "/v1/compliance/controls/apply-templates",
+        headers=admin_headers,
+        json={"template_keys": ["unknown_template"]},
+    )
+    assert response.status_code == 404

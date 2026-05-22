@@ -7,7 +7,12 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import AiSystem, ComplianceControl, EvidenceItem
-from app.schemas import ComplianceControlCreate, ComplianceControlReviewCreate, ComplianceControlUpdate
+from app.schemas import (
+    ComplianceControlCreate,
+    ComplianceControlReviewCreate,
+    ComplianceControlTemplateApplyRequest,
+    ComplianceControlUpdate,
+)
 
 
 BASELINE_CONTROLS = [
@@ -57,6 +62,93 @@ BASELINE_LIFECYCLE = {
     "post_market_monitoring": {"severity": "high", "review_cycle_days": 90},
     "serious_incident_reporting": {"severity": "critical", "review_cycle_days": 90},
 }
+
+CONTROL_TEMPLATES = [
+    {
+        "template_key": "human_oversight_implemented",
+        "article": "Article 14",
+        "title": "Human oversight implemented and assigned",
+        "evidence_domain": "human_oversight",
+        "default_severity": "high",
+        "default_review_cycle_days": 180,
+        "description": "Confirm trained human reviewers can monitor, interpret, override, or stop the AI system where required.",
+        "suggested_evidence": ["Oversight procedure", "Reviewer assignment", "Escalation runbook"],
+        "actor_roles": ["provider", "deployer"],
+        "risk_tiers": ["high_risk"],
+    },
+    {
+        "template_key": "logging_monitoring_enabled",
+        "article": "Article 12",
+        "title": "Logging and monitoring enabled",
+        "evidence_domain": "log_retention",
+        "default_severity": "high",
+        "default_review_cycle_days": 180,
+        "description": "Verify logs are captured, retained, monitored, and available for traceability and post-market review.",
+        "suggested_evidence": ["Log retention policy", "Monitoring dashboard", "Sample audit log"],
+        "actor_roles": ["provider", "deployer"],
+        "risk_tiers": ["high_risk", "transparency"],
+    },
+    {
+        "template_key": "user_disclosure_present",
+        "article": "Article 50",
+        "title": "User-facing AI disclosure present",
+        "evidence_domain": "transparency_notice",
+        "default_severity": "medium",
+        "default_review_cycle_days": 365,
+        "description": "Confirm users are clearly informed when they interact with an AI system or AI-generated content.",
+        "suggested_evidence": ["Product disclosure copy", "Screenshot", "Help center notice"],
+        "actor_roles": ["provider", "deployer"],
+        "risk_tiers": ["transparency", "limited_risk"],
+    },
+    {
+        "template_key": "bias_testing_performed",
+        "article": "Article 15",
+        "title": "Bias and performance testing performed",
+        "evidence_domain": "testing_validation",
+        "default_severity": "high",
+        "default_review_cycle_days": 180,
+        "description": "Track accuracy, robustness, bias, and cybersecurity testing evidence for the AI system.",
+        "suggested_evidence": ["Test protocol", "Bias evaluation results", "Remediation log"],
+        "actor_roles": ["provider"],
+        "risk_tiers": ["high_risk"],
+    },
+    {
+        "template_key": "incident_process_documented",
+        "article": "Article 73",
+        "title": "Serious incident process documented",
+        "evidence_domain": "governance_incident",
+        "default_severity": "critical",
+        "default_review_cycle_days": 90,
+        "description": "Confirm serious incident detection, triage, reporting deadlines, and authority notification paths are documented.",
+        "suggested_evidence": ["Incident SOP", "Notification checklist", "Escalation contacts"],
+        "actor_roles": ["provider", "deployer"],
+        "risk_tiers": ["high_risk", "systemic"],
+    },
+    {
+        "template_key": "data_governance_reviewed",
+        "article": "Article 10",
+        "title": "Data governance reviewed",
+        "evidence_domain": "data_governance",
+        "default_severity": "high",
+        "default_review_cycle_days": 180,
+        "description": "Confirm training, validation, and operational data governance controls are reviewed and documented.",
+        "suggested_evidence": ["Dataset lineage", "Data quality review", "Privacy/DPIA linkage"],
+        "actor_roles": ["provider"],
+        "risk_tiers": ["high_risk"],
+    },
+    {
+        "template_key": "model_limitations_documented",
+        "article": "Article 13",
+        "title": "Model limitations documented",
+        "evidence_domain": "model_limitations",
+        "default_severity": "medium",
+        "default_review_cycle_days": 365,
+        "description": "Capture intended purpose, known limitations, misuse boundaries, and instructions for deployers or users.",
+        "suggested_evidence": ["Model card", "Instructions for use", "Known limitation register"],
+        "actor_roles": ["provider"],
+        "risk_tiers": ["high_risk", "gpai"],
+    },
+]
 
 
 class ComplianceControlService:
@@ -135,6 +227,25 @@ class ComplianceControlService:
         return ComplianceControlService._attach_evidence_metrics(db, tenant_id, controls)
 
     @staticmethod
+    def list_templates(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> list[dict[str, Any]]:
+        ComplianceControlService._require_system(db, tenant_id, ai_system_id)
+        existing = (
+            db.query(ComplianceControl)
+            .filter(ComplianceControl.tenant_id == tenant_id, ComplianceControl.ai_system_id == ai_system_id)
+            .all()
+        )
+        existing_by_key = {control.control_key: control.id for control in existing}
+        templates: list[dict[str, Any]] = []
+        for template in CONTROL_TEMPLATES:
+            control_id = existing_by_key.get(template["template_key"])
+            templates.append({
+                **template,
+                "applied": bool(control_id),
+                "existing_control_id": control_id,
+            })
+        return templates
+
+    @staticmethod
     def create_control(db: Session, tenant_id: str, payload: ComplianceControlCreate) -> ComplianceControl:
         ComplianceControlService._require_system(db, tenant_id, payload.ai_system_id)
         details = _normalized_details(payload.details_json)
@@ -162,6 +273,67 @@ class ComplianceControlService:
         db.refresh(control)
         ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
         return control
+
+    @staticmethod
+    def apply_templates(
+        db: Session,
+        tenant_id: str,
+        payload: ComplianceControlTemplateApplyRequest,
+    ) -> List[ComplianceControl]:
+        ComplianceControlService._require_system(db, tenant_id, payload.ai_system_id)
+        if not payload.template_keys:
+            raise HTTPException(status_code=400, detail="At least one control template key is required")
+
+        templates_by_key = {template["template_key"]: template for template in CONTROL_TEMPLATES}
+        unknown = [key for key in payload.template_keys if key not in templates_by_key]
+        if unknown:
+            raise HTTPException(status_code=404, detail=f"Unknown control template: {unknown[0]}")
+
+        controls: list[ComplianceControl] = []
+        seen: set[str] = set()
+        for template_key in payload.template_keys:
+            if template_key in seen:
+                continue
+            seen.add(template_key)
+            template = templates_by_key[template_key]
+            existing = db.query(ComplianceControl).filter(
+                ComplianceControl.tenant_id == tenant_id,
+                ComplianceControl.ai_system_id == payload.ai_system_id,
+                ComplianceControl.control_key == template_key,
+            ).first()
+            if existing:
+                controls.append(existing)
+                continue
+
+            control = ComplianceControl(
+                id=f"ctl-{uuid.uuid4().hex[:8]}",
+                tenant_id=tenant_id,
+                ai_system_id=payload.ai_system_id,
+                control_key=template["template_key"],
+                article=template["article"],
+                title=template["title"],
+                owner_email=payload.owner_email,
+                status="not_started",
+                due_at=payload.due_at,
+                evidence_domain=template["evidence_domain"],
+                details_json={
+                    "source": "control_template_catalog",
+                    "template_key": template["template_key"],
+                    "template_description": template["description"],
+                    "suggested_evidence": template["suggested_evidence"],
+                    "actor_roles": template["actor_roles"],
+                    "risk_tiers": template["risk_tiers"],
+                    "severity": template["default_severity"],
+                    "review_cycle_days": template["default_review_cycle_days"],
+                },
+            )
+            db.add(control)
+            controls.append(control)
+
+        db.commit()
+        for control in controls:
+            db.refresh(control)
+        return ComplianceControlService._attach_evidence_metrics(db, tenant_id, controls)
 
     @staticmethod
     def update_control(db: Session, tenant_id: str, control_id: str, payload: ComplianceControlUpdate) -> ComplianceControl:
@@ -376,6 +548,47 @@ class ComplianceControlService:
             "controls_by_status": by_status,
         }
 
+    @staticmethod
+    def audit_status(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> dict[str, Any]:
+        controls = ComplianceControlService.list_controls(db, tenant_id, ai_system_id)
+        now = datetime.now(timezone.utc)
+        completed_statuses = {"completed", "signed_off"}
+        rows = [_audit_row(control) for control in controls]
+        completed = [row for row in rows if row["status"] in completed_statuses]
+        incomplete = [row for row in rows if row["status"] not in completed_statuses]
+        evidence_gaps = [row for row in rows if row["evidence_required"] and not row["evidence_complete"]]
+        owner_gaps = [row for row in rows if not row["owner_email"]]
+        due_overdue = [
+            row for row in rows
+            if row["due_at"] and row["status"] not in completed_statuses and _parse_datetime(row["due_at"]) and _parse_datetime(row["due_at"]) < now
+        ]
+        review_overdue = [row for row in rows if row["review_overdue"]]
+        high_severity_open = [
+            row for row in rows
+            if row["severity"] in {"high", "critical"} and row["status"] not in completed_statuses
+        ]
+        readiness_score = 0 if not rows else round((len(completed) / len(rows)) * 100)
+        summary = {
+            "total_controls": len(rows),
+            "completed_controls": len(completed),
+            "incomplete_controls": len(incomplete),
+            "readiness_score": readiness_score,
+            "evidence_gap_controls": len(evidence_gaps),
+            "missing_owner_controls": len(owner_gaps),
+            "overdue_controls": len(due_overdue),
+            "review_overdue_controls": len(review_overdue),
+            "high_severity_open_controls": len(high_severity_open),
+        }
+        generated_at = now
+        return {
+            "tenant_id": tenant_id,
+            "ai_system_id": ai_system_id,
+            "generated_at": generated_at,
+            "summary": summary,
+            "controls": rows,
+            "markdown": _render_audit_markdown(tenant_id, ai_system_id, generated_at, summary, rows),
+        }
+
 
 def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
@@ -433,6 +646,74 @@ def _severity_from_obligation(item: dict[str, Any]) -> str:
     if isinstance(max_eur, int) and max_eur >= 15_000_000:
         return "high"
     return "medium"
+
+
+def _audit_row(control: ComplianceControl) -> dict[str, Any]:
+    details = _details(control)
+    evidence_item_count = getattr(control, "evidence_item_count", 0)
+    evidence_complete = bool(getattr(control, "evidence_complete", False))
+    review_overdue = bool(getattr(control, "review_overdue", False))
+    return {
+        "id": control.id,
+        "control_key": control.control_key,
+        "article": control.article,
+        "title": control.title,
+        "owner_email": control.owner_email,
+        "status": control.status,
+        "severity": getattr(control, "severity", _severity_for_control(control, details)),
+        "due_at": _isoformat(control.due_at) if control.due_at else None,
+        "evidence_domain": control.evidence_domain,
+        "evidence_required": bool(getattr(control, "evidence_required", True)),
+        "evidence_complete": evidence_complete,
+        "evidence_item_count": evidence_item_count,
+        "active_evidence_count": getattr(control, "active_evidence_count", 0),
+        "latest_evidence_at": _isoformat(getattr(control, "latest_evidence_at")) if getattr(control, "latest_evidence_at", None) else None,
+        "review_cycle_days": getattr(control, "review_cycle_days", None),
+        "last_reviewed_at": _isoformat(getattr(control, "last_reviewed_at")) if getattr(control, "last_reviewed_at", None) else None,
+        "next_review_at": _isoformat(getattr(control, "next_review_at")) if getattr(control, "next_review_at", None) else None,
+        "review_overdue": review_overdue,
+        "latest_comment": getattr(control, "latest_comment", None),
+        "audit_ready": control.status in {"completed", "signed_off"} and evidence_complete and not review_overdue,
+    }
+
+
+def _render_audit_markdown(
+    tenant_id: str,
+    ai_system_id: Optional[str],
+    generated_at: datetime,
+    summary: dict[str, Any],
+    rows: list[dict[str, Any]],
+) -> str:
+    scope = ai_system_id or "tenant-wide"
+    lines = [
+        "# Compliance Control Audit Status",
+        "",
+        f"- Tenant: `{tenant_id}`",
+        f"- Scope: `{scope}`",
+        f"- Generated: `{generated_at.isoformat()}`",
+        f"- Readiness score: `{summary['readiness_score']}%`",
+        f"- Controls: `{summary['completed_controls']}/{summary['total_controls']} completed`",
+        f"- Evidence gaps: `{summary['evidence_gap_controls']}`",
+        f"- Missing owners: `{summary['missing_owner_controls']}`",
+        f"- Overdue controls: `{summary['overdue_controls']}`",
+        f"- Review overdue: `{summary['review_overdue_controls']}`",
+        "",
+        "| Control | Article | Owner | Status | Severity | Evidence | Due | Review | Audit Ready |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for row in rows:
+        evidence = f"{row['active_evidence_count']}/{row['evidence_item_count']}" if row["evidence_required"] else "not required"
+        review = row["next_review_at"][:10] if row.get("next_review_at") else "not set"
+        due = row["due_at"][:10] if row.get("due_at") else "not set"
+        ready = "yes" if row["audit_ready"] else "no"
+        owner = row["owner_email"] or "unassigned"
+        title = str(row["title"]).replace("|", "\\|")
+        lines.append(
+            f"| {title} | {row['article']} | {owner} | {row['status']} | {row['severity']} | {evidence} | {due} | {review} | {ready} |"
+        )
+    if not rows:
+        lines.append("| No controls in scope | - | - | - | - | - | - | - | no |")
+    return "\n".join(lines) + "\n"
 
 
 def _status_from_obligation(status: Optional[str]) -> str:

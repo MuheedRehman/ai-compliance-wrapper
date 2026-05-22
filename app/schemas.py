@@ -421,6 +421,28 @@ class ComplianceControlReviewCreate(BaseModel):
     next_review_at: Optional[datetime] = None
 
 
+class ComplianceControlTemplateResponse(BaseModel):
+    template_key: str
+    article: str
+    title: str
+    evidence_domain: str
+    default_severity: ControlSeverity
+    default_review_cycle_days: int
+    description: str
+    suggested_evidence: List[str] = Field(default_factory=list)
+    actor_roles: List[str] = Field(default_factory=list)
+    risk_tiers: List[str] = Field(default_factory=list)
+    applied: bool = False
+    existing_control_id: Optional[str] = None
+
+
+class ComplianceControlTemplateApplyRequest(BaseModel):
+    template_keys: List[str] = Field(default_factory=list)
+    ai_system_id: Optional[str] = None
+    owner_email: Optional[str] = None
+    due_at: Optional[datetime] = None
+
+
 class ComplianceControlResponse(BaseModel):
     id: str
     tenant_id: str
@@ -463,6 +485,15 @@ class ReadinessScorecardResponse(BaseModel):
     overdue_controls: int
     readiness_score: int
     controls_by_status: Dict[str, int]
+
+
+class ComplianceAuditStatusResponse(BaseModel):
+    tenant_id: str
+    ai_system_id: Optional[str] = None
+    generated_at: datetime
+    summary: Dict[str, Any]
+    controls: List[Dict[str, Any]]
+    markdown: str
 
 
 # --- Evidence Vault ---

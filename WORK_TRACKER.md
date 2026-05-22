@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-22
+Last updated: 2026-05-23
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 6 Control Management lifecycle operations are deployed to staging; next control hardening should add reusable templates and exportable audit status.
+1. Module 6 Control Templates and Audit Status Export is implemented locally and verified; this is the next customer-readiness deploy target.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements and control coverage.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 6 Control Lifecycle Operations: deployed to staging. Compliance controls now expose risk severity, evidence completeness, review cadence, last/next review dates, review-overdue status, review history, and latest comments. The Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes from the register.
+- Module 6 Control Templates and Audit Status Export: implemented locally and release-verified, pending GitHub push and GCP staging deployment. The control API now exposes reusable EU AI Act control templates, can materialize selected templates into tenant/system scopes, and can export an auditor-readable Markdown control audit status snapshot. The Controls dashboard can apply templates and download the audit status export.
 
 ## Mandatory Module Execution Workflow
 
@@ -66,7 +66,7 @@ Current technical baseline:
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, deployed multi-action review plans with control/evidence placeholders, and deployed workspace drill-down actions around one AI system. | Continue polishing section-specific create/edit flows, or move to Module 5 evidence uploads. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, a deployed evidence-to-control attachment workflow, and a deployed artifact preview workflow. | Add an external object-storage backend. |
-| 6. Control Management | In progress | Compliance controls, readiness scorecard, evidence coverage, evidence attachment, owner/status/due date editing, severity, review cadence, review history, and review comments are deployed to staging. | Add reusable control templates and exportable audit status. |
+| 6. Control Management | In progress | Compliance controls, readiness scorecard, evidence coverage, evidence attachment, owner/status/due date editing, severity, review cadence, review history, review comments, reusable control templates, and audit-status export are implemented locally and verified. | Deploy the template/export slice, then add reusable-template customization and branded/exportable control status reports. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
 | 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete, and scanner-generated reports now include a scanner audit pack with public evidence coverage, found/missing evidence topics, public source excerpts, scanner gap findings, and remediation actions. | Continue polished audit pack work: PDF, evidence bundle packaging, AI system factsheet, and richer remediation plan export. |
 | 9. Runtime Governance SDK | Foundation only | Chat pipeline, feature approvals, provider abstraction, evidence logging exist. | Package policy checks, developer API keys, usage dashboard, and SDK-style docs. |
@@ -111,6 +111,7 @@ Recovered from repo state:
 - Module 5 evidence-to-control attachment workflow completed and deployed: `/v1/compliance/controls` responses now include evidence coverage counts/statuses/latest evidence date; `/v1/compliance/controls/{control_id}/evidence` lists control evidence; `/v1/compliance/controls/{control_id}/evidence/{item_id}` attaches an existing evidence item to a control, inherits the control AI system when needed, records attachment metadata, and reseals the evidence hash. The Controls dashboard now shows evidence coverage, creates evidence prefilled for a selected control, and attaches existing evidence; the Evidence dashboard honors `control_id` filters. Initial Cloud Build `a8e12c87-93a2-4554-8d63-f972ba11dd9a` deployed backend/dashboard but failed the final live E2E gate because the new attachment select changed an existing broad control-status selector. Follow-up commit `48f70e5` added an explicit status select label and fixed the live E2E selector, then deployed successfully through Cloud Build `9711fd2d-227e-420e-b754-75dbd1c0eb3f` to backend `ai-compliance-backend-00089-xkd` and dashboard `ai-compliance-dashboard-00046-vwp`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 5 artifact preview workflow completed and deployed: `/v1/evidence/items/{item_id}/artifacts/{artifact_id}/preview` streams safe previewable artifacts inline with `no-store`, `nosniff`, artifact hash, and artifact signature headers; supported types include `text/*`, JSON, XML, CSV, Markdown, PDF, and images, while unsupported binary artifacts return `415` and remain download-only. The Evidence Vault dashboard now shows a Preview button for supported uploaded artifacts and renders text, image, and PDF previews in a closeable audit panel with file name, content type, size, and hash context. Deployed through Cloud Build `ff197d4a-42e7-4906-8756-e1057e9ae94d` to backend `ai-compliance-backend-00091-vkw` and dashboard `ai-compliance-dashboard-00047-thx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control lifecycle operations completed and deployed: control responses now expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata; `/v1/compliance/controls/{control_id}/reviews` records review notes/history and can update status/severity/cadence; the Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6` to backend `ai-compliance-backend-00093-ljz` and dashboard `ai-compliance-dashboard-00048-928`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
+- Module 6 control template and audit-status export completed locally and release-verified: `/v1/compliance/control-templates` lists reusable EU AI Act templates with applied-state metadata; `/v1/compliance/controls/apply-templates` materializes selected templates into tenant or AI-system scopes; `/v1/compliance/audit-status` returns control readiness summary, evidence/owner/deadline/review gaps, row-level audit readiness, and Markdown export content; the Controls dashboard can apply templates and download the Markdown audit status snapshot. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -173,6 +174,8 @@ Use this as the next session checklist.
 - [x] Deploy Module 5 artifact preview workflow to GCP staging and update the deployed baseline.
 - [x] Implement Module 6 control lifecycle operations.
 - [x] Deploy Module 6 control lifecycle operations to GCP staging and update the deployed baseline.
+- [x] Implement Module 6 control templates and audit-status export.
+- [ ] Deploy Module 6 control templates and audit-status export to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 
