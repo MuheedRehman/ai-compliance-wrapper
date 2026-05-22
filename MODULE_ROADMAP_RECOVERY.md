@@ -215,7 +215,7 @@ Example controls:
 - Data governance reviewed
 - Model limitations documented
 
-Status: in progress. Compliance controls, readiness scorecard, evidence coverage, and evidence attachment exist; operational lifecycle fields are implemented locally and pending staging deployment.
+Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, and operational lifecycle fields are deployed to staging.
 
 Current control lifecycle operations slice:
 - Control API responses expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata.
@@ -223,7 +223,7 @@ Current control lifecycle operations slice:
 - `POST /v1/compliance/controls/{control_id}/reviews` records review notes/history, latest comment metadata, reviewer, outcome, and optional status/severity/cadence changes.
 - The Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline from the control register.
 
-Deployment checkpoint: control lifecycle operations are implemented locally and release-verified, pending GitHub push and GCP staging deployment. Next control hardening should add reusable control templates and exportable audit status.
+Deployment checkpoint: control lifecycle operations are deployed to staging through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6`, with backend revision `ai-compliance-backend-00093-ljz`, dashboard revision `ai-compliance-dashboard-00048-928`, and passing Cloud Build staging Playwright E2E. Next control hardening should add reusable control templates and exportable audit status.
 
 ### Module 7: FRIA / Risk Assessment Builder
 
