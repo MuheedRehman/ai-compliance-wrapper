@@ -191,7 +191,7 @@ Current artifact preview slice:
 - Unsupported binary types return `415` and stay download-only.
 - The Evidence Vault dashboard shows a Preview button only for previewable uploaded artifacts and renders text, image, and PDF content in a closeable audit preview panel with file metadata and hash context.
 
-Deployment checkpoint: implemented locally and verified with focused Evidence Vault tests, full backend tests, dashboard lint, and dashboard build. Staging deployment is the next gate for this slice.
+Deployment checkpoint: artifact previews are deployed to staging through Cloud Build `ff197d4a-42e7-4906-8756-e1057e9ae94d`, with backend revision `ai-compliance-backend-00091-vkw`, dashboard revision `ai-compliance-dashboard-00047-thx`, and passing Cloud Build staging Playwright E2E.
 
 ### Module 6: Control Management
 
