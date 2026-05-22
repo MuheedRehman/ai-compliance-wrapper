@@ -215,7 +215,7 @@ Example controls:
 - Data governance reviewed
 - Model limitations documented
 
-Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, and audit-status export are implemented locally; lifecycle fields are deployed to staging.
+Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, and audit-status export are deployed to staging.
 
 Current control lifecycle operations slice:
 - Control API responses expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata.
@@ -231,7 +231,7 @@ Current control templates and audit-status export slice:
 - `/v1/compliance/audit-status` returns an exportable control readiness snapshot with evidence gaps, owner gaps, overdue controls, review-overdue controls, high-severity open controls, row-level audit readiness, and Markdown export content.
 - The Controls dashboard can apply one reusable template at a time and download the Markdown audit status snapshot for the active scope.
 
-Deployment checkpoint: template catalog and audit-status export are implemented locally and release-verified, pending GitHub push and GCP staging deployment. Next control hardening should add reusable-template customization and branded/exportable control status reports.
+Deployment checkpoint: template catalog and audit-status export are deployed to staging through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40`, with backend revision `ai-compliance-backend-00095-9q7`, dashboard revision `ai-compliance-dashboard-00049-5nw`, and passing Cloud Build staging Playwright E2E. Next control hardening should add reusable-template customization and branded/exportable control status reports.
 
 ### Module 7: FRIA / Risk Assessment Builder
 
