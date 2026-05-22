@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
     ComplianceControlCreate,
+    ComplianceControlReviewCreate,
     ComplianceControlResponse,
     ComplianceControlUpdate,
     EvidenceItemResponse,
@@ -48,6 +49,17 @@ def update_control(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
     return ComplianceControlService.update_control(db, auth["tenant_id"], control_id, payload)
+
+
+@router.post("/controls/{control_id}/reviews", response_model=ComplianceControlResponse)
+def record_control_review(
+    control_id: str,
+    payload: ComplianceControlReviewCreate,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="compliance:write")
+    return ComplianceControlService.record_review(db, auth["tenant_id"], control_id, payload)
 
 
 @router.get("/controls/{control_id}/evidence", response_model=List[EvidenceItemResponse])

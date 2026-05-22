@@ -143,3 +143,79 @@ def test_control_evidence_attachment_rejects_different_system(client: TestClient
         headers=admin_headers,
     )
     assert response.status_code == 400
+
+
+def test_control_lifecycle_metadata_and_review_history(client: TestClient, admin_headers):
+    system_response = client.post(
+        "/v1/ai-systems",
+        headers=admin_headers,
+        json={"name": "Lifecycle Control System"},
+    )
+    assert system_response.status_code == 200
+    system_id = system_response.json()["id"]
+
+    control_response = client.post(
+        "/v1/compliance/controls",
+        headers=admin_headers,
+        json={
+            "ai_system_id": system_id,
+            "control_key": "CONTROL_LIFECYCLE",
+            "article": "Article 14",
+            "title": "Human oversight lifecycle control",
+            "evidence_domain": "human_oversight",
+            "severity": "high",
+            "review_cycle_days": 60,
+        },
+    )
+    assert control_response.status_code == 200
+    control = control_response.json()
+    assert control["severity"] == "high"
+    assert control["review_cycle_days"] == 60
+    assert control["evidence_required"] is True
+    assert control["evidence_complete"] is False
+
+    update_response = client.patch(
+        f"/v1/compliance/controls/{control['id']}",
+        headers=admin_headers,
+        json={
+            "owner_email": "reviewer@example.com",
+            "status": "in_progress",
+            "due_at": "2026-08-01T00:00:00Z",
+            "severity": "critical",
+            "review_cycle_days": 30,
+        },
+    )
+    assert update_response.status_code == 200
+    updated = update_response.json()
+    assert updated["owner_email"] == "reviewer@example.com"
+    assert updated["status"] == "in_progress"
+    assert updated["severity"] == "critical"
+    assert updated["review_cycle_days"] == 30
+
+    review_response = client.post(
+        f"/v1/compliance/controls/{control['id']}/reviews",
+        headers=admin_headers,
+        json={
+            "reviewer_email": "reviewer@example.com",
+            "note": "Validated owner, severity, and evidence plan.",
+            "outcome": "needs_follow_up",
+            "status": "blocked",
+            "review_cycle_days": 45,
+        },
+    )
+    assert review_response.status_code == 200
+    reviewed = review_response.json()
+    assert reviewed["status"] == "blocked"
+    assert reviewed["last_reviewed_at"] is not None
+    assert reviewed["next_review_at"] is not None
+    assert reviewed["last_review_note"] == "Validated owner, severity, and evidence plan."
+    assert reviewed["comment_count"] == 1
+    assert reviewed["latest_comment"] == "Validated owner, severity, and evidence plan."
+    assert reviewed["review_history"][0]["outcome"] == "needs_follow_up"
+    assert reviewed["review_history"][0]["reviewer_email"] == "reviewer@example.com"
+
+    list_response = client.get(f"/v1/compliance/controls?ai_system_id={system_id}", headers=admin_headers)
+    assert list_response.status_code == 200
+    listed = list_response.json()[0]
+    assert listed["last_review_note"] == "Validated owner, severity, and evidence plan."
+    assert listed["review_history"][0]["status"] == "blocked"

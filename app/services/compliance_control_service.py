@@ -1,13 +1,13 @@
 import uuid
 from collections import Counter
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
 from app.models import AiSystem, ComplianceControl, EvidenceItem
-from app.schemas import ComplianceControlCreate, ComplianceControlUpdate
+from app.schemas import ComplianceControlCreate, ComplianceControlReviewCreate, ComplianceControlUpdate
 
 
 BASELINE_CONTROLS = [
@@ -49,6 +49,15 @@ BASELINE_CONTROLS = [
     },
 ]
 
+BASELINE_LIFECYCLE = {
+    "ai_literacy_program": {"severity": "medium", "review_cycle_days": 365},
+    "deployer_log_retention": {"severity": "high", "review_cycle_days": 180},
+    "dpia_linkage": {"severity": "high", "review_cycle_days": 365},
+    "fria_screening": {"severity": "high", "review_cycle_days": 180},
+    "post_market_monitoring": {"severity": "high", "review_cycle_days": 90},
+    "serious_incident_reporting": {"severity": "critical", "review_cycle_days": 90},
+}
+
 
 class ComplianceControlService:
     @staticmethod
@@ -82,11 +91,28 @@ class ComplianceControlService:
             linked_items = evidence_by_control.get(control.id, [])
             status_counts = Counter(item.status for item in linked_items)
             latest_evidence_at = max((item.collected_at for item in linked_items if item.collected_at), default=None)
+            details = _details(control)
+            review_history = details.get("review_history") if isinstance(details.get("review_history"), list) else []
+            comments = details.get("comments") if isinstance(details.get("comments"), list) else []
+            last_reviewed_at = _parse_datetime(details.get("last_reviewed_at"))
+            next_review_at = _parse_datetime(details.get("next_review_at"))
+            now = datetime.now(timezone.utc)
             setattr(control, "evidence_item_count", len(linked_items))
             setattr(control, "active_evidence_count", status_counts.get("active", 0))
             setattr(control, "needs_review_evidence_count", status_counts.get("needs_review", 0))
             setattr(control, "latest_evidence_at", latest_evidence_at)
             setattr(control, "evidence_status_counts", dict(status_counts))
+            setattr(control, "evidence_required", bool(control.evidence_domain))
+            setattr(control, "evidence_complete", status_counts.get("active", 0) > 0)
+            setattr(control, "severity", _severity_for_control(control, details))
+            setattr(control, "review_cycle_days", _coerce_positive_int(details.get("review_cycle_days")))
+            setattr(control, "last_reviewed_at", last_reviewed_at)
+            setattr(control, "next_review_at", next_review_at)
+            setattr(control, "review_overdue", bool(next_review_at and next_review_at < now))
+            setattr(control, "last_review_note", details.get("last_review_note"))
+            setattr(control, "review_history", review_history)
+            setattr(control, "comment_count", len(comments))
+            setattr(control, "latest_comment", comments[0].get("note") if comments and isinstance(comments[0], dict) else None)
         return controls
 
     @staticmethod
@@ -111,6 +137,13 @@ class ComplianceControlService:
     @staticmethod
     def create_control(db: Session, tenant_id: str, payload: ComplianceControlCreate) -> ComplianceControl:
         ComplianceControlService._require_system(db, tenant_id, payload.ai_system_id)
+        details = _normalized_details(payload.details_json)
+        details["severity"] = payload.severity
+        if payload.review_cycle_days is not None:
+            details["review_cycle_days"] = payload.review_cycle_days
+        if payload.next_review_at is not None:
+            details["next_review_at"] = _isoformat(payload.next_review_at)
+
         control = ComplianceControl(
             id=f"ctl-{uuid.uuid4().hex[:8]}",
             tenant_id=tenant_id,
@@ -122,7 +155,7 @@ class ComplianceControlService:
             status=payload.status,
             due_at=payload.due_at,
             evidence_domain=payload.evidence_domain,
-            details_json=payload.details_json,
+            details_json=details,
         )
         db.add(control)
         db.commit()
@@ -133,16 +166,92 @@ class ComplianceControlService:
     @staticmethod
     def update_control(db: Session, tenant_id: str, control_id: str, payload: ComplianceControlUpdate) -> ComplianceControl:
         control = ComplianceControlService.get_control(db, tenant_id, control_id)
+        fields_set = getattr(payload, "model_fields_set", set())
 
-        if payload.owner_email is not None:
+        if "owner_email" in fields_set:
             control.owner_email = payload.owner_email
-        if payload.status is not None:
+        if "status" in fields_set and payload.status is not None:
             control.status = payload.status
-        if payload.due_at is not None:
+        if "due_at" in fields_set:
             control.due_at = payload.due_at
-        if payload.details_json is not None:
-            control.details_json = payload.details_json
 
+        details = _normalized_details(payload.details_json) if "details_json" in fields_set and payload.details_json is not None else _details(control)
+        if "severity" in fields_set:
+            if payload.severity is None:
+                details.pop("severity", None)
+            else:
+                details["severity"] = payload.severity
+        if "review_cycle_days" in fields_set:
+            if payload.review_cycle_days is None:
+                details.pop("review_cycle_days", None)
+            else:
+                details["review_cycle_days"] = payload.review_cycle_days
+        if "next_review_at" in fields_set:
+            if payload.next_review_at is None:
+                details.pop("next_review_at", None)
+            else:
+                details["next_review_at"] = _isoformat(payload.next_review_at)
+        control.details_json = details
+
+        db.commit()
+        db.refresh(control)
+        ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
+        return control
+
+    @staticmethod
+    def record_review(
+        db: Session,
+        tenant_id: str,
+        control_id: str,
+        payload: ComplianceControlReviewCreate,
+    ) -> ComplianceControl:
+        control = ComplianceControlService.get_control(db, tenant_id, control_id)
+        details = _details(control)
+        now = datetime.now(timezone.utc)
+        review_cycle_days = payload.review_cycle_days or _coerce_positive_int(details.get("review_cycle_days"))
+        next_review_at = payload.next_review_at
+        if next_review_at is None and review_cycle_days:
+            next_review_at = now + timedelta(days=review_cycle_days)
+
+        note = (payload.note or "").strip() or None
+        event = {
+            "reviewed_at": now.isoformat(),
+            "reviewer_email": payload.reviewer_email,
+            "outcome": payload.outcome,
+            "note": note,
+            "status": payload.status or control.status,
+            "severity": payload.severity or _severity_for_control(control, details),
+            "next_review_at": _isoformat(next_review_at) if next_review_at else None,
+        }
+
+        review_history = details.get("review_history") if isinstance(details.get("review_history"), list) else []
+        details["review_history"] = [event, *review_history][:25]
+        details["last_reviewed_at"] = now.isoformat()
+        details["last_review_note"] = note
+        details["last_review_outcome"] = payload.outcome
+        if payload.reviewer_email:
+            details["reviewer_email"] = payload.reviewer_email
+        if payload.severity:
+            details["severity"] = payload.severity
+        if review_cycle_days:
+            details["review_cycle_days"] = review_cycle_days
+        if next_review_at:
+            details["next_review_at"] = _isoformat(next_review_at)
+        if note:
+            comments = details.get("comments") if isinstance(details.get("comments"), list) else []
+            details["comments"] = [
+                {
+                    "created_at": now.isoformat(),
+                    "author_email": payload.reviewer_email,
+                    "note": note,
+                    "source": "control_review",
+                },
+                *comments,
+            ][:50]
+        if payload.status:
+            control.status = payload.status
+
+        control.details_json = details
         db.commit()
         db.refresh(control)
         ComplianceControlService._attach_evidence_metrics(db, tenant_id, [control])
@@ -167,7 +276,10 @@ class ComplianceControlService:
                 tenant_id=tenant_id,
                 ai_system_id=ai_system_id,
                 status="not_started",
-                details_json={"source": "baseline_eu_ai_act_controls"},
+                details_json={
+                    "source": "baseline_eu_ai_act_controls",
+                    **BASELINE_LIFECYCLE.get(item["control_key"], {"severity": "medium", "review_cycle_days": 365}),
+                },
                 **item,
             )
             db.add(control)
@@ -225,6 +337,8 @@ class ComplianceControlService:
                     "owner_role": item.get("owner_role"),
                     "summary": item.get("summary"),
                     "penalty_exposure": item.get("penalty_exposure"),
+                    "severity": _severity_from_obligation(item),
+                    "review_cycle_days": 180 if item.get("status") in {"blocking", "review_required"} else 365,
                 },
             )
             db.add(control)
@@ -267,6 +381,58 @@ def _aware(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value
+
+
+def _details(control: ComplianceControl) -> dict[str, Any]:
+    return _normalized_details(control.details_json)
+
+
+def _normalized_details(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
+
+
+def _parse_datetime(value: Any) -> Optional[datetime]:
+    if isinstance(value, datetime):
+        return _aware(value)
+    if isinstance(value, str) and value.strip():
+        try:
+            return _aware(datetime.fromisoformat(value.replace("Z", "+00:00")))
+        except ValueError:
+            return None
+    return None
+
+
+def _isoformat(value: datetime) -> str:
+    return _aware(value).isoformat()
+
+
+def _coerce_positive_int(value: Any) -> Optional[int]:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed if parsed > 0 else None
+
+
+def _severity_for_control(control: ComplianceControl, details: dict[str, Any]) -> str:
+    severity = details.get("severity")
+    if severity in {"low", "medium", "high", "critical"}:
+        return severity
+    return _severity_from_obligation({"status": control.status, "penalty_exposure": details.get("penalty_exposure")})
+
+
+def _severity_from_obligation(item: dict[str, Any]) -> str:
+    penalty = item.get("penalty_exposure") or {}
+    max_eur = penalty.get("max_eur") if isinstance(penalty, dict) else None
+    if item.get("status") == "blocking":
+        return "high"
+    if isinstance(max_eur, int) and max_eur >= 35_000_000:
+        return "critical"
+    if isinstance(max_eur, int) and max_eur >= 15_000_000:
+        return "high"
+    return "medium"
 
 
 def _status_from_obligation(status: Optional[str]) -> str:

@@ -13,10 +13,12 @@ import ErrorState from '@/components/error-state';
 import {
   AlertTriangle,
   BarChart3,
+  CalendarDays,
   CheckCircle2,
   Clock,
   FileSearch,
   ListChecks,
+  MessageSquare,
   Plus,
   RefreshCw,
   Save,
@@ -24,6 +26,42 @@ import {
 } from 'lucide-react';
 
 const STATUS_OPTIONS = ['not_started', 'in_progress', 'blocked', 'completed', 'signed_off'];
+const SEVERITY_OPTIONS = ['low', 'medium', 'high', 'critical'];
+
+type ControlDraft = {
+  owner_email: string;
+  status: string;
+  due_at: string;
+  severity: string;
+  review_cycle_days: string;
+  review_note: string;
+};
+
+function toDateInput(value?: string | null) {
+  if (!value) return '';
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function fromDateInput(value: string) {
+  return value ? `${value}T00:00:00.000Z` : null;
+}
+
+function displayDate(value?: string | null) {
+  return value ? new Date(value).toLocaleDateString() : 'Not set';
+}
+
+function severityClasses(severity?: string) {
+  switch (severity) {
+    case 'critical':
+      return 'border-red-500/30 bg-red-500/10 text-red-300';
+    case 'high':
+      return 'border-orange-500/30 bg-orange-500/10 text-orange-300';
+    case 'low':
+      return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300';
+    default:
+      return 'border-amber-500/30 bg-amber-500/10 text-amber-300';
+  }
+}
 
 export default function ControlsPage() {
   const searchParams = useSearchParams();
@@ -36,7 +74,7 @@ export default function ControlsPage() {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<Record<string, { owner_email: string; status: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, ControlDraft>>({});
   const [attachmentDrafts, setAttachmentDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
@@ -59,6 +97,10 @@ export default function ControlsPage() {
         {
           owner_email: control.owner_email || '',
           status: control.status || 'not_started',
+          due_at: toDateInput(control.due_at),
+          severity: control.severity || control.details_json?.severity || 'medium',
+          review_cycle_days: control.review_cycle_days ? String(control.review_cycle_days) : '',
+          review_note: '',
         },
       ])));
       setAttachmentDrafts(Object.fromEntries((controlData || []).map((control: any) => [control.id, ''])));
@@ -106,6 +148,9 @@ export default function ControlsPage() {
       await api.updateControl(control.id, {
         owner_email: draft.owner_email || null,
         status: draft.status,
+        due_at: fromDateInput(draft.due_at),
+        severity: draft.severity || 'medium',
+        review_cycle_days: draft.review_cycle_days ? Number(draft.review_cycle_days) : null,
       });
       await load();
     } catch (err: any) {
@@ -115,12 +160,38 @@ export default function ControlsPage() {
     }
   }
 
-  function updateDraft(id: string, patch: Partial<{ owner_email: string; status: string }>) {
+  async function recordReview(control: any) {
+    const draft = drafts[control.id];
+    if (!draft || !draft.review_note.trim()) return;
+    const reviewKey = `review-${control.id}`;
+    setSavingId(reviewKey);
+    setError(null);
+    try {
+      await api.recordControlReview(control.id, {
+        reviewer_email: draft.owner_email || undefined,
+        note: draft.review_note.trim(),
+        status: draft.status,
+        severity: draft.severity || 'medium',
+        review_cycle_days: draft.review_cycle_days ? Number(draft.review_cycle_days) : undefined,
+      });
+      await load();
+    } catch (err: any) {
+      setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to record control review');
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  function updateDraft(id: string, patch: Partial<ControlDraft>) {
     setDrafts((current) => ({
       ...current,
       [id]: {
         owner_email: current[id]?.owner_email || '',
         status: current[id]?.status || 'not_started',
+        due_at: current[id]?.due_at || '',
+        severity: current[id]?.severity || 'medium',
+        review_cycle_days: current[id]?.review_cycle_days || '',
+        review_note: current[id]?.review_note || '',
         ...patch,
       },
     }));
@@ -286,22 +357,44 @@ export default function ControlsPage() {
                     <th>Evidence Domain</th>
                     <th>Evidence</th>
                     <th>Owner</th>
-                    <th>Status</th>
-                    <th>Due</th>
+                    <th>Status & Severity</th>
+                    <th>Lifecycle</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   {controls.map((control) => {
-                    const draft = drafts[control.id] || { owner_email: control.owner_email || '', status: control.status };
+                    const draft = drafts[control.id] || {
+                      owner_email: control.owner_email || '',
+                      status: control.status || 'not_started',
+                      due_at: toDateInput(control.due_at),
+                      severity: control.severity || 'medium',
+                      review_cycle_days: control.review_cycle_days ? String(control.review_cycle_days) : '',
+                      review_note: '',
+                    };
                     const eligibleEvidence = eligibleEvidenceForControl(control);
                     const attachmentKey = `attach-${control.id}`;
+                    const reviewKey = `review-${control.id}`;
                     return (
                       <tr key={control.id} className={highlightedControlId === control.id ? 'bg-indigo-950/20' : undefined}>
                         <td className="min-w-[280px]">
                           <div className="space-y-1">
                             <p className="text-sm font-bold text-zinc-200">{control.title}</p>
                             <p className="text-[10px] font-mono text-zinc-600">{control.control_key}</p>
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${severityClasses(control.severity)}`}>
+                                {control.severity || 'medium'}
+                              </span>
+                              {control.evidence_complete ? (
+                                <span className="rounded border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-sky-300">
+                                  Evidence ready
+                                </span>
+                              ) : (
+                                <span className="rounded border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+                                  Evidence needed
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td>
@@ -363,32 +456,96 @@ export default function ControlsPage() {
                           />
                         </td>
                         <td>
-                          <select
-                            aria-label={`Control status for ${control.title}`}
-                            value={draft.status}
-                            onChange={(event) => updateDraft(control.id, { status: event.target.value })}
-                            className="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-                          >
-                            {STATUS_OPTIONS.map((status) => (
-                              <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
-                            ))}
-                          </select>
-                        </td>
-                        <td>
-                          <div className="flex items-center gap-1 text-[10px] text-zinc-500 whitespace-nowrap">
-                            <Clock className="h-3 w-3 text-zinc-600" />
-                            {control.due_at ? new Date(control.due_at).toLocaleDateString() : 'No due date'}
+                          <div className="space-y-2 min-w-[170px]">
+                            <select
+                              aria-label={`Control status for ${control.title}`}
+                              value={draft.status}
+                              onChange={(event) => updateDraft(control.id, { status: event.target.value })}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                              {STATUS_OPTIONS.map((status) => (
+                                <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
+                              ))}
+                            </select>
+                            <select
+                              aria-label={`Control severity for ${control.title}`}
+                              value={draft.severity}
+                              onChange={(event) => updateDraft(control.id, { severity: event.target.value })}
+                              className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            >
+                              {SEVERITY_OPTIONS.map((severity) => (
+                                <option key={severity} value={severity}>{severity}</option>
+                              ))}
+                            </select>
                           </div>
                         </td>
-                        <td className="text-right">
-                          <button
-                            onClick={() => saveControl(control)}
-                            disabled={savingId === control.id}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-200"
-                          >
-                            {savingId === control.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-                            Save
-                          </button>
+                        <td className="min-w-[240px]">
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-[88px_1fr] items-center gap-2 text-[10px] text-zinc-500">
+                              <span className="inline-flex items-center gap-1 uppercase tracking-widest">
+                                <CalendarDays className="h-3 w-3 text-zinc-600" />
+                                Due
+                              </span>
+                              <input
+                                type="date"
+                                value={draft.due_at}
+                                onChange={(event) => updateDraft(control.id, { due_at: event.target.value })}
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                              />
+                              <span className="inline-flex items-center gap-1 uppercase tracking-widest">
+                                <Clock className="h-3 w-3 text-zinc-600" />
+                                Cycle
+                              </span>
+                              <input
+                                aria-label={`Review cycle days for ${control.title}`}
+                                type="number"
+                                min="1"
+                                max="730"
+                                value={draft.review_cycle_days}
+                                onChange={(event) => updateDraft(control.id, { review_cycle_days: event.target.value })}
+                                placeholder="days"
+                                className="w-full bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                              />
+                            </div>
+                            <div className="space-y-1 text-[10px] text-zinc-500">
+                              <p>Last review: {displayDate(control.last_reviewed_at)}</p>
+                              <p className={control.review_overdue ? 'font-bold text-red-300' : undefined}>
+                                Next review: {displayDate(control.next_review_at)}
+                              </p>
+                              {control.last_review_note && (
+                                <p className="line-clamp-2 text-zinc-400">Note: {control.last_review_note}</p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="min-w-[220px] text-right">
+                          <div className="space-y-2">
+                            <textarea
+                              value={draft.review_note}
+                              onChange={(event) => updateDraft(control.id, { review_note: event.target.value })}
+                              placeholder="Review note"
+                              rows={2}
+                              className="w-full resize-none bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => recordReview(control)}
+                                disabled={!draft.review_note.trim() || savingId === reviewKey}
+                                className="inline-flex items-center gap-1.5 rounded-md bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-200"
+                              >
+                                {savingId === reviewKey ? <RefreshCw className="h-3 w-3 animate-spin" /> : <MessageSquare className="h-3 w-3" />}
+                                Record Review
+                              </button>
+                              <button
+                                onClick={() => saveControl(control)}
+                                disabled={savingId === control.id}
+                                className="inline-flex items-center gap-1.5 rounded-md bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-200"
+                              >
+                                {savingId === control.id ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+                                Save
+                              </button>
+                            </div>
+                          </div>
                         </td>
                       </tr>
                     );

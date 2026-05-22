@@ -324,6 +324,11 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+  recordControlReview: (id: string, body: any) =>
+    fetchApi<any>(`/v1/compliance/controls/${id}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
   listControlEvidence: (id: string) =>
     fetchApi<any[]>(`/v1/compliance/controls/${id}/evidence`),
   attachEvidenceToControl: (controlId: string, itemId: string) =>

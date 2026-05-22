@@ -383,6 +383,9 @@ class ReportResponse(BaseModel):
 
 # --- Compliance Control Register ---
 
+ControlSeverity = Literal["low", "medium", "high", "critical"]
+
+
 class ComplianceControlCreate(BaseModel):
     control_key: str
     article: str
@@ -392,6 +395,9 @@ class ComplianceControlCreate(BaseModel):
     status: str = "not_started"
     due_at: Optional[datetime] = None
     evidence_domain: str
+    severity: ControlSeverity = "medium"
+    review_cycle_days: Optional[int] = Field(default=None, ge=1, le=730)
+    next_review_at: Optional[datetime] = None
     details_json: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -399,7 +405,20 @@ class ComplianceControlUpdate(BaseModel):
     owner_email: Optional[str] = None
     status: Optional[str] = None
     due_at: Optional[datetime] = None
+    severity: Optional[ControlSeverity] = None
+    review_cycle_days: Optional[int] = Field(default=None, ge=1, le=730)
+    next_review_at: Optional[datetime] = None
     details_json: Optional[Dict[str, Any]] = None
+
+
+class ComplianceControlReviewCreate(BaseModel):
+    reviewer_email: Optional[str] = None
+    note: Optional[str] = None
+    outcome: Literal["reviewed", "needs_follow_up", "accepted", "rejected"] = "reviewed"
+    status: Optional[str] = None
+    severity: Optional[ControlSeverity] = None
+    review_cycle_days: Optional[int] = Field(default=None, ge=1, le=730)
+    next_review_at: Optional[datetime] = None
 
 
 class ComplianceControlResponse(BaseModel):
@@ -419,6 +438,17 @@ class ComplianceControlResponse(BaseModel):
     needs_review_evidence_count: int = 0
     latest_evidence_at: Optional[datetime] = None
     evidence_status_counts: Dict[str, int] = Field(default_factory=dict)
+    evidence_required: bool = True
+    evidence_complete: bool = False
+    severity: str = "medium"
+    review_cycle_days: Optional[int] = None
+    last_reviewed_at: Optional[datetime] = None
+    next_review_at: Optional[datetime] = None
+    review_overdue: bool = False
+    last_review_note: Optional[str] = None
+    review_history: List[Dict[str, Any]] = Field(default_factory=list)
+    comment_count: int = 0
+    latest_comment: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
