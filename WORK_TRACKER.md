@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 6 Control Templates UI polish is implemented locally and verified; this hotfix makes the template catalog full-width with visible per-template Apply actions.
+1. Module 6 Control Templates UI polish is deployed to staging; next control hardening should add reusable-template customization and branded/exportable control status reports.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements and control coverage.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 6 Control Templates UI Polish: implemented locally and release-verified, pending GitHub push and GCP staging deployment. The Controls dashboard now presents a full-width template catalog with all templates visible, suggested evidence metadata, shared owner/due-date defaults, and a visible Apply action per template.
+- Module 6 Control Templates UI Polish: deployed to staging. The Controls dashboard now presents a full-width template catalog with all templates visible, suggested evidence metadata, shared owner/due-date defaults, and a visible Apply action per template.
 
 ## Mandatory Module Execution Workflow
 
@@ -49,13 +49,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `a3d060d` via Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `bb3495d` via Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00049-5nw`
-  - Backend: `ai-compliance-backend-00095-9q7`
+  - Dashboard: `ai-compliance-dashboard-00050-gvx`
+  - Backend: `ai-compliance-backend-00097-zrb`
 
 ## Module Status Board
 
@@ -66,7 +66,7 @@ Current technical baseline:
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, deployed multi-action review plans with control/evidence placeholders, and deployed workspace drill-down actions around one AI system. | Continue polishing section-specific create/edit flows, or move to Module 5 evidence uploads. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, a deployed evidence-to-control attachment workflow, and a deployed artifact preview workflow. | Add an external object-storage backend. |
-| 6. Control Management | In progress | Compliance controls, readiness scorecard, evidence coverage, evidence attachment, owner/status/due date editing, severity, review cadence, review history, review comments, reusable control templates, audit-status export, and a full-width template catalog UI are implemented locally and verified. | Deploy the template catalog UI polish, then add reusable-template customization and branded/exportable control status reports. |
+| 6. Control Management | In progress | Compliance controls, readiness scorecard, evidence coverage, evidence attachment, owner/status/due date editing, severity, review cadence, review history, review comments, reusable control templates, audit-status export, and a full-width template catalog UI are deployed to staging. | Add reusable-template customization and branded/exportable control status reports. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
 | 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete, and scanner-generated reports now include a scanner audit pack with public evidence coverage, found/missing evidence topics, public source excerpts, scanner gap findings, and remediation actions. | Continue polished audit pack work: PDF, evidence bundle packaging, AI system factsheet, and richer remediation plan export. |
 | 9. Runtime Governance SDK | Foundation only | Chat pipeline, feature approvals, provider abstraction, evidence logging exist. | Package policy checks, developer API keys, usage dashboard, and SDK-style docs. |
@@ -112,7 +112,7 @@ Recovered from repo state:
 - Module 5 artifact preview workflow completed and deployed: `/v1/evidence/items/{item_id}/artifacts/{artifact_id}/preview` streams safe previewable artifacts inline with `no-store`, `nosniff`, artifact hash, and artifact signature headers; supported types include `text/*`, JSON, XML, CSV, Markdown, PDF, and images, while unsupported binary artifacts return `415` and remain download-only. The Evidence Vault dashboard now shows a Preview button for supported uploaded artifacts and renders text, image, and PDF previews in a closeable audit panel with file name, content type, size, and hash context. Deployed through Cloud Build `ff197d4a-42e7-4906-8756-e1057e9ae94d` to backend `ai-compliance-backend-00091-vkw` and dashboard `ai-compliance-dashboard-00047-thx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control lifecycle operations completed and deployed: control responses now expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata; `/v1/compliance/controls/{control_id}/reviews` records review notes/history and can update status/severity/cadence; the Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6` to backend `ai-compliance-backend-00093-ljz` and dashboard `ai-compliance-dashboard-00048-928`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template and audit-status export completed and deployed: `/v1/compliance/control-templates` lists reusable EU AI Act templates with applied-state metadata; `/v1/compliance/controls/apply-templates` materializes selected templates into tenant or AI-system scopes; `/v1/compliance/audit-status` returns control readiness summary, evidence/owner/deadline/review gaps, row-level audit readiness, and Markdown export content; the Controls dashboard can apply templates and download the Markdown audit status snapshot. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40` to backend `ai-compliance-backend-00095-9q7` and dashboard `ai-compliance-dashboard-00049-5nw`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
-- Module 6 control template UI polish completed locally and release-verified: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build.
+- Module 6 control template UI polish completed and deployed: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` to backend `ai-compliance-backend-00097-zrb` and dashboard `ai-compliance-dashboard-00050-gvx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -178,7 +178,7 @@ Use this as the next session checklist.
 - [x] Implement Module 6 control templates and audit-status export.
 - [x] Deploy Module 6 control templates and audit-status export to GCP staging and update the deployed baseline.
 - [x] Implement Module 6 control template catalog UI polish.
-- [ ] Deploy Module 6 control template catalog UI polish to GCP staging and update the deployed baseline.
+- [x] Deploy Module 6 control template catalog UI polish to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

@@ -215,7 +215,7 @@ Example controls:
 - Data governance reviewed
 - Model limitations documented
 
-Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, audit-status export, and a full-width template catalog UI are implemented locally; template/export API work is deployed to staging.
+Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, audit-status export, and a full-width template catalog UI are deployed to staging.
 
 Current control lifecycle operations slice:
 - Control API responses expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata.
@@ -239,7 +239,7 @@ Current template catalog UI polish:
 - Owner and due-date defaults are shared above the catalog and used when applying any template.
 - Live E2E health checks skip Apply buttons so page sweeps do not accidentally mutate control data.
 
-Deployment checkpoint: template catalog UI polish is implemented locally and release-verified, pending GitHub push and GCP staging deployment.
+Deployment checkpoint: template catalog UI polish is deployed to staging through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91`, with backend revision `ai-compliance-backend-00097-zrb`, dashboard revision `ai-compliance-dashboard-00050-gvx`, and passing Cloud Build staging Playwright E2E.
 
 ### Module 7: FRIA / Risk Assessment Builder
 
