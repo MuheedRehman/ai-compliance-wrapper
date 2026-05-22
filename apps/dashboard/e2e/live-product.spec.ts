@@ -129,7 +129,7 @@ test('critical product workflows create records and run governed runtime', async
   const ownerInput = page.locator('input[placeholder="owner@company.com"]').first();
   if (await ownerInput.isVisible()) {
     await ownerInput.fill(`qa-control-${stamp}@example.com`);
-    const statusSelect = page.locator('tbody select').first();
+    const statusSelect = page.locator('select[aria-label^="Control status"]').first();
     if (await statusSelect.isVisible()) {
       await statusSelect.selectOption('in_progress');
     }

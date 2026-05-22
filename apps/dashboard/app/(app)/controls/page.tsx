@@ -364,6 +364,7 @@ export default function ControlsPage() {
                         </td>
                         <td>
                           <select
+                            aria-label={`Control status for ${control.title}`}
                             value={draft.status}
                             onChange={(event) => updateDraft(control.id, { status: event.target.value })}
                             className="bg-zinc-950 border border-zinc-800 rounded-md px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
