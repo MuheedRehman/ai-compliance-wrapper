@@ -215,7 +215,7 @@ Example controls:
 - Data governance reviewed
 - Model limitations documented
 
-Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, and audit-status export are deployed to staging.
+Status: in progress. Compliance controls, readiness scorecard, evidence coverage, evidence attachment, operational lifecycle fields, reusable templates, audit-status export, and a full-width template catalog UI are implemented locally; template/export API work is deployed to staging.
 
 Current control lifecycle operations slice:
 - Control API responses expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata.
@@ -232,6 +232,14 @@ Current control templates and audit-status export slice:
 - The Controls dashboard can apply one reusable template at a time and download the Markdown audit status snapshot for the active scope.
 
 Deployment checkpoint: template catalog and audit-status export are deployed to staging through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40`, with backend revision `ai-compliance-backend-00095-9q7`, dashboard revision `ai-compliance-dashboard-00049-5nw`, and passing Cloud Build staging Playwright E2E. Next control hardening should add reusable-template customization and branded/exportable control status reports.
+
+Current template catalog UI polish:
+- The Controls dashboard template area is now full-width instead of sharing a cramped half-width row with audit export.
+- Every template is visible as a row with title, article, severity, review cadence, suggested evidence, applied state, and its own Apply button.
+- Owner and due-date defaults are shared above the catalog and used when applying any template.
+- Live E2E health checks skip Apply buttons so page sweeps do not accidentally mutate control data.
+
+Deployment checkpoint: template catalog UI polish is implemented locally and release-verified, pending GitHub push and GCP staging deployment.
 
 ### Module 7: FRIA / Risk Assessment Builder
 

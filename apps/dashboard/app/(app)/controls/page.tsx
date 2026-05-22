@@ -90,7 +90,7 @@ export default function ControlsPage() {
   const [error, setError] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Record<string, ControlDraft>>({});
   const [attachmentDrafts, setAttachmentDrafts] = useState<Record<string, string>>({});
-  const [templateDraft, setTemplateDraft] = useState({ template_key: '', owner_email: '', due_at: '' });
+  const [templateDraft, setTemplateDraft] = useState({ owner_email: '', due_at: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -157,18 +157,18 @@ export default function ControlsPage() {
     }
   }
 
-  async function applyTemplate() {
-    if (!templateDraft.template_key) return;
-    setSavingId('template');
+  async function applyTemplate(templateKey: string) {
+    if (!templateKey) return;
+    const savingKey = `template-${templateKey}`;
+    setSavingId(savingKey);
     setError(null);
     try {
       await api.applyControlTemplates({
-        template_keys: [templateDraft.template_key],
+        template_keys: [templateKey],
         ai_system_id: selectedSystemId || undefined,
         owner_email: templateDraft.owner_email || undefined,
         due_at: fromDateInput(templateDraft.due_at),
       });
-      setTemplateDraft((current) => ({ ...current, template_key: '' }));
       await load();
     } catch (err: any) {
       setError(err.body?.error?.message || err.body?.detail || err.message || 'Failed to apply control template');
@@ -384,82 +384,118 @@ export default function ControlsPage() {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <Card title="Control Templates" subtitle="Apply reusable EU AI Act controls into the selected scope.">
-            <div className="grid grid-cols-1 md:grid-cols-[1fr_190px_150px_auto] gap-3">
-              <select
-                value={templateDraft.template_key}
-                onChange={(event) => setTemplateDraft((current) => ({ ...current, template_key: event.target.value }))}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-              >
-                <option value="">Select template</option>
-                {templates.map((template) => (
-                  <option key={template.template_key} value={template.template_key} disabled={template.applied}>
-                    {template.applied ? 'Applied - ' : ''}{template.title}
-                  </option>
-                ))}
-              </select>
-              <input
-                value={templateDraft.owner_email}
-                onChange={(event) => setTemplateDraft((current) => ({ ...current, owner_email: event.target.value }))}
-                placeholder="owner@company.com"
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-              />
-              <input
-                type="date"
-                value={templateDraft.due_at}
-                onChange={(event) => setTemplateDraft((current) => ({ ...current, due_at: event.target.value }))}
-                className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
-              />
-              <button
-                onClick={applyTemplate}
-                disabled={!templateDraft.template_key || savingId === 'template'}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
-              >
-                {savingId === 'template' ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ClipboardCheck className="h-3.5 w-3.5" />}
-                Apply
-              </button>
+        <Card title="Control Templates" subtitle="Apply reusable EU AI Act controls into the selected scope.">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_190px_150px]">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-zinc-500">
+              <ClipboardCheck className="h-3.5 w-3.5 text-zinc-600" />
+              Template defaults
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {templates.slice(0, 6).map((template) => (
-                <span
-                  key={template.template_key}
-                  className={`rounded border px-2 py-1 text-[10px] font-bold uppercase tracking-widest ${template.applied ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-zinc-800 bg-zinc-950 text-zinc-500'}`}
-                >
-                  {template.title}
-                </span>
-              ))}
-            </div>
-          </Card>
+            <input
+              value={templateDraft.owner_email}
+              onChange={(event) => setTemplateDraft((current) => ({ ...current, owner_email: event.target.value }))}
+              placeholder="owner@company.com"
+              className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            />
+            <input
+              type="date"
+              value={templateDraft.due_at}
+              onChange={(event) => setTemplateDraft((current) => ({ ...current, due_at: event.target.value }))}
+              className="bg-zinc-950 border border-zinc-800 rounded-md px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+            />
+          </div>
 
-          <Card title="Audit Status Export" subtitle="Download an auditor-readable Markdown snapshot for this control scope.">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500">
-                <div>
-                  <p className="font-bold uppercase tracking-widest text-zinc-600">Evidence gaps</p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.evidence_gap_controls ?? '-'}</p>
+          <div className="mt-4 overflow-hidden rounded-lg border border-zinc-900">
+            {templates.map((template) => {
+              const savingTemplate = savingId === `template-${template.template_key}`;
+              return (
+                <div key={template.template_key} className="grid grid-cols-1 gap-4 border-b border-zinc-900 bg-zinc-950/40 p-4 last:border-b-0 xl:grid-cols-[minmax(280px,1fr)_minmax(260px,0.9fr)_auto] xl:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-bold text-zinc-100">{template.title}</p>
+                      {template.applied && (
+                        <span className="rounded border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                          Applied
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-zinc-500">{template.description}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded border border-indigo-500/20 bg-indigo-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-indigo-300">
+                        {template.article}
+                      </span>
+                      <span className={`rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${severityClasses(template.default_severity)}`}>
+                        {template.default_severity}
+                      </span>
+                      <span className="rounded border border-zinc-800 bg-zinc-950 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                        {template.default_review_cycle_days} day review
+                      </span>
+                    </div>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600">Suggested evidence</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(template.suggested_evidence || []).map((item: string) => (
+                        <span key={item} className="rounded bg-zinc-900 px-2 py-1 text-[10px] font-semibold text-zinc-400">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => applyTemplate(template.template_key)}
+                    disabled={template.applied || savingTemplate}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50 xl:w-[150px]"
+                  >
+                    {savingTemplate ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : template.applied ? (
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    ) : (
+                      <ClipboardCheck className="h-3.5 w-3.5" />
+                    )}
+                    {template.applied ? 'Applied' : 'Apply'}
+                  </button>
                 </div>
-                <div>
-                  <p className="font-bold uppercase tracking-widest text-zinc-600">High open</p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.high_severity_open_controls ?? '-'}</p>
-                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        <Card title="Audit Status Export" subtitle="Download an auditor-readable Markdown snapshot for this control scope.">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="grid grid-cols-2 gap-3 text-xs text-zinc-500 md:grid-cols-4">
+              <div>
+                <p className="font-bold uppercase tracking-widest text-zinc-600">Evidence gaps</p>
+                <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.evidence_gap_controls ?? '-'}</p>
               </div>
-              <button
-                onClick={exportAuditStatus}
-                disabled={savingId === 'audit-export'}
-                className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
-              >
-                {savingId === 'audit-export' ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                Export Audit
-              </button>
+              <div>
+                <p className="font-bold uppercase tracking-widest text-zinc-600">High open</p>
+                <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.high_severity_open_controls ?? '-'}</p>
+              </div>
+              <div>
+                <p className="font-bold uppercase tracking-widest text-zinc-600">Missing owners</p>
+                <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.missing_owner_controls ?? '-'}</p>
+              </div>
+              <div>
+                <p className="font-bold uppercase tracking-widest text-zinc-600">Review overdue</p>
+                <p className="mt-1 text-2xl font-bold text-zinc-200 tabular-nums">{auditStatus?.summary?.review_overdue_controls ?? '-'}</p>
+              </div>
             </div>
-            {auditStatus?.generated_at && (
-              <p className="mt-3 text-[10px] uppercase tracking-widest text-zinc-600">
-                Last export {new Date(auditStatus.generated_at).toLocaleString()}
-              </p>
-            )}
-          </Card>
-        </div>
+            <button
+              onClick={exportAuditStatus}
+              disabled={savingId === 'audit-export'}
+              className="inline-flex items-center justify-center gap-2 rounded-md bg-zinc-800 px-4 py-2 text-[11px] font-bold uppercase tracking-widest text-zinc-100 hover:bg-zinc-700 disabled:opacity-50"
+            >
+              {savingId === 'audit-export' ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+              Export Audit
+            </button>
+          </div>
+          {auditStatus?.generated_at && (
+            <p className="mt-3 text-[10px] uppercase tracking-widest text-zinc-600">
+              Last export {new Date(auditStatus.generated_at).toLocaleString()}
+            </p>
+          )}
+        </Card>
 
         {controls.length === 0 ? (
           <EmptyState
