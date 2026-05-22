@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 5 Evidence Vault evidence-to-control attachment workflow is implemented locally and ready for staging deployment; next evidence hardening can add artifact previews and an external object-storage backend.
+1. Module 5 Evidence Vault evidence-to-control attachment workflow is deployed; next evidence hardening can add artifact previews and an external object-storage backend.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 5 Evidence-to-Control Attachment Workflow: implemented locally. Controls now expose linked evidence coverage, control-scoped evidence listing, and a control-centric attach-existing-evidence endpoint that reseals the evidence item hash. The dashboard Controls page can show evidence coverage, create evidence prefilled for a specific control, and attach existing evidence to controls.
+- Module 5 Evidence-to-Control Attachment Workflow: deployed to staging. Controls now expose linked evidence coverage, control-scoped evidence listing, and a control-centric attach-existing-evidence endpoint that reseals the evidence item hash. The dashboard Controls page can show evidence coverage, create evidence prefilled for a specific control, and attach existing evidence to controls.
 
 ## Mandatory Module Execution Workflow
 
@@ -49,13 +49,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `45540a7` via Cloud Build `470a39b9-0dbf-44f6-9236-3dd5e40dba18` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `48f70e5` via Cloud Build `9711fd2d-227e-420e-b754-75dbd1c0eb3f` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00044-cw5`
-  - Backend: `ai-compliance-backend-00085-rsx`
+  - Dashboard: `ai-compliance-dashboard-00046-vwp`
+  - Backend: `ai-compliance-backend-00089-xkd`
 
 ## Module Status Board
 
@@ -65,7 +65,7 @@ Current technical baseline:
 | 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, deployed multi-action review plans with control/evidence placeholders, and deployed workspace drill-down actions around one AI system. | Continue polishing section-specific create/edit flows, or move to Module 5 evidence uploads. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
-| 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, and a local evidence-to-control attachment workflow. | Deploy evidence-to-control attachment workflow, then add artifact previews and an external object-storage backend. |
+| 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, and a deployed evidence-to-control attachment workflow. | Add artifact previews and an external object-storage backend. |
 | 6. Control Management | Started | Compliance controls and readiness scorecard exist. | Add templates, owners, due dates, evidence attachment, review cycle, comments, severity. |
 | 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
 | 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete, and scanner-generated reports now include a scanner audit pack with public evidence coverage, found/missing evidence topics, public source excerpts, scanner gap findings, and remediation actions. | Continue polished audit pack work: PDF, evidence bundle packaging, AI system factsheet, and richer remediation plan export. |
@@ -108,7 +108,7 @@ Recovered from repo state:
 - Module 3 multi-action review plans completed and deployed: the AI system review checkpoint UI can create up to five follow-up actions; backend review actions can create linked placeholder compliance controls or signed evidence items when target type is Control or Evidence; review tasks store the created placeholder ID/type, owner, due date, severity, and source review event; workspace follow-up cards show created placeholder/owner/due metadata. Deployed through Cloud Build `ae655071-d756-4fe7-85cd-7ee2175c8779` to backend `ai-compliance-backend-00081-n6k` and dashboard `ai-compliance-dashboard-00042-6sv`; Cloud Build staging Playwright E2E passed.
 - Module 3 workspace drill-down actions completed and deployed: `/v1/ai-systems/{id}/workspace` now returns `drill_down_actions` for controls, evidence, reports, FRIA, oversight, incidents, and follow-up tasks; the system workspace has action tiles to seed controls, open/prefill evidence, generate readiness reports, start/open FRIA drafts, assign oversight, and report incidents; target pages now honor `ai_system_id` context for scoped lists and prefilled create forms. Deployed through Cloud Build `9f80eded-091c-4d76-8fdd-64fb76e06cd5` to backend `ai-compliance-backend-00083-td5` and dashboard `ai-compliance-dashboard-00043-6gj`; Cloud Build staging Playwright E2E passed.
 - Module 5 evidence upload flow completed and deployed: migration `0012` adds `evidence_artifacts`; `/v1/evidence/items/{item_id}/artifacts` accepts file uploads up to 5 MB and stores content in the database-backed artifact store with SHA-256 artifact hash and HMAC signature; `/download` streams the artifact with hash/signature headers; evidence item metadata and evidence hash are resealed after upload; the Evidence Vault dashboard can attach a file while creating evidence, upload files to existing items, and download uploaded artifacts. Deployed through Cloud Build `470a39b9-0dbf-44f6-9236-3dd5e40dba18` to backend `ai-compliance-backend-00085-rsx` and dashboard `ai-compliance-dashboard-00044-cw5`; Cloud Build staging Playwright E2E passed.
-- Module 5 evidence-to-control attachment workflow implemented locally: `/v1/compliance/controls` responses now include evidence coverage counts/statuses/latest evidence date; `/v1/compliance/controls/{control_id}/evidence` lists control evidence; `/v1/compliance/controls/{control_id}/evidence/{item_id}` attaches an existing evidence item to a control, inherits the control AI system when needed, records attachment metadata, and reseals the evidence hash. The Controls dashboard now shows evidence coverage, creates evidence prefilled for a selected control, and attaches existing evidence; the Evidence dashboard honors `control_id` filters.
+- Module 5 evidence-to-control attachment workflow completed and deployed: `/v1/compliance/controls` responses now include evidence coverage counts/statuses/latest evidence date; `/v1/compliance/controls/{control_id}/evidence` lists control evidence; `/v1/compliance/controls/{control_id}/evidence/{item_id}` attaches an existing evidence item to a control, inherits the control AI system when needed, records attachment metadata, and reseals the evidence hash. The Controls dashboard now shows evidence coverage, creates evidence prefilled for a selected control, and attaches existing evidence; the Evidence dashboard honors `control_id` filters. Initial Cloud Build `a8e12c87-93a2-4554-8d63-f972ba11dd9a` deployed backend/dashboard but failed the final live E2E gate because the new attachment select changed an existing broad control-status selector. Follow-up commit `48f70e5` added an explicit status select label and fixed the live E2E selector, then deployed successfully through Cloud Build `9711fd2d-227e-420e-b754-75dbd1c0eb3f` to backend `ai-compliance-backend-00089-xkd` and dashboard `ai-compliance-dashboard-00046-vwp`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -166,7 +166,7 @@ Use this as the next session checklist.
 - [x] Implement Module 5 Evidence Vault upload flow with signed artifacts.
 - [x] Deploy Module 5 Evidence Vault upload flow to GCP staging and update the deployed baseline.
 - [x] Implement Module 5 evidence-to-control attachment workflow.
-- [ ] Deploy Module 5 evidence-to-control attachment workflow to GCP staging and update the deployed baseline.
+- [x] Deploy Module 5 evidence-to-control attachment workflow to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

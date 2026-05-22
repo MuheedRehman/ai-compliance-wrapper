@@ -182,7 +182,7 @@ Current evidence-to-control attachment slice:
 - The Controls dashboard shows evidence coverage per control, opens prefilled evidence creation for that control, and can attach existing eligible evidence items.
 - The Evidence dashboard honors `control_id` query filters and keeps control/system context when creating evidence from a control.
 
-Deployment checkpoint: implemented locally and verified with focused evidence/control tests, full backend tests, dashboard lint, and dashboard build. Staging deployment is the next gate for this slice.
+Deployment checkpoint: evidence-to-control attachment is deployed to staging through Cloud Build `9711fd2d-227e-420e-b754-75dbd1c0eb3f`, with backend revision `ai-compliance-backend-00089-xkd`, dashboard revision `ai-compliance-dashboard-00046-vwp`, and passing Cloud Build staging Playwright E2E. Initial Cloud Build `a8e12c87-93a2-4554-8d63-f972ba11dd9a` reached deployment but failed final E2E because the new attachment select changed a broad control-status selector; follow-up commit `48f70e5` fixed the selector.
 
 ### Module 6: Control Management
 
