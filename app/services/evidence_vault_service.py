@@ -13,6 +13,14 @@ from app.services.hashing import hash_object, hmac_signature
 
 
 MAX_ARTIFACT_BYTES = 5 * 1024 * 1024
+PREVIEWABLE_EXACT_CONTENT_TYPES = {
+    "application/json",
+    "application/pdf",
+    "application/xml",
+    "text/csv",
+    "text/markdown",
+    "text/plain",
+}
 
 
 def _now() -> datetime:
@@ -71,6 +79,10 @@ def _artifact_summary(artifact: EvidenceArtifact) -> dict:
         "storage_key": artifact.storage_key,
         "created_at": artifact.created_at.isoformat() if artifact.created_at else None,
     }
+
+
+def _base_content_type(content_type: str | None) -> str:
+    return (content_type or "application/octet-stream").split(";", 1)[0].strip().lower()
 
 
 class EvidenceVaultService:
@@ -320,6 +332,23 @@ class EvidenceVaultService:
         )
         if not artifact:
             raise HTTPException(status_code=404, detail="Evidence artifact not found")
+        return artifact
+
+    @staticmethod
+    def get_previewable_artifact(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        artifact_id: str,
+    ) -> EvidenceArtifact:
+        artifact = EvidenceVaultService.get_artifact(db, tenant_id, item_id, artifact_id)
+        base_type = _base_content_type(artifact.content_type)
+        if not (
+            base_type.startswith("image/")
+            or base_type.startswith("text/")
+            or base_type in PREVIEWABLE_EXACT_CONTENT_TYPES
+        ):
+            raise HTTPException(status_code=415, detail="Evidence artifact type is not previewable")
         return artifact
 
     @staticmethod

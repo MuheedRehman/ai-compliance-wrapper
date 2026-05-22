@@ -110,3 +110,25 @@ def download_evidence_artifact(
             "X-Evidence-Artifact-Signature": artifact.hmac_signature,
         },
     )
+
+
+@router.get("/items/{item_id}/artifacts/{artifact_id}/preview")
+def preview_evidence_artifact(
+    item_id: str,
+    artifact_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="evidence:read")
+    artifact = EvidenceVaultService.get_previewable_artifact(db, auth["tenant_id"], item_id, artifact_id)
+    return Response(
+        content=artifact.content_bytes,
+        media_type=artifact.content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{artifact.file_name}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Evidence-Artifact-Hash": artifact.artifact_hash,
+            "X-Evidence-Artifact-Signature": artifact.hmac_signature,
+        },
+    )

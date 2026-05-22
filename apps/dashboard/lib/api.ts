@@ -223,6 +223,8 @@ export const api = {
   },
   getEvidenceArtifactUrl: (itemId: string, artifactId: string) =>
     `${API_BASE_URL}/v1/evidence/items/${itemId}/artifacts/${artifactId}/download`,
+  getEvidenceArtifactPreviewUrl: (itemId: string, artifactId: string) =>
+    `${API_BASE_URL}/v1/evidence/items/${itemId}/artifacts/${artifactId}/preview`,
 
   // Billing
   getSubscription: () => fetchApi<any>('/v1/billing/subscription'),

@@ -184,6 +184,15 @@ Current evidence-to-control attachment slice:
 
 Deployment checkpoint: evidence-to-control attachment is deployed to staging through Cloud Build `9711fd2d-227e-420e-b754-75dbd1c0eb3f`, with backend revision `ai-compliance-backend-00089-xkd`, dashboard revision `ai-compliance-dashboard-00046-vwp`, and passing Cloud Build staging Playwright E2E. Initial Cloud Build `a8e12c87-93a2-4554-8d63-f972ba11dd9a` reached deployment but failed final E2E because the new attachment select changed a broad control-status selector; follow-up commit `48f70e5` fixed the selector.
 
+Current artifact preview slice:
+- `/v1/evidence/items/{item_id}/artifacts/{artifact_id}/preview` streams previewable artifact bytes inline behind `evidence:read` authentication.
+- Preview responses carry `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, artifact hash, and artifact signature headers.
+- Previewable types include `text/*`, JSON, XML, CSV, Markdown, PDF, and images.
+- Unsupported binary types return `415` and stay download-only.
+- The Evidence Vault dashboard shows a Preview button only for previewable uploaded artifacts and renders text, image, and PDF content in a closeable audit preview panel with file metadata and hash context.
+
+Deployment checkpoint: implemented locally and verified with focused Evidence Vault tests, full backend tests, dashboard lint, and dashboard build. Staging deployment is the next gate for this slice.
+
 ### Module 6: Control Management
 
 Add:

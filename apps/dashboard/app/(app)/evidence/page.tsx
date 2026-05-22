@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { AlertOctagon, CalendarClock, Clock, Download, FileSearch, Hash, Link as LinkIcon, Plus, ShieldCheck, Upload } from 'lucide-react';
+import { AlertOctagon, CalendarClock, Clock, Download, Eye, FileSearch, Hash, Link as LinkIcon, Plus, ShieldCheck, Upload, X } from 'lucide-react';
 import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import StatusBadge from '@/components/status-badge';
@@ -46,6 +46,27 @@ function toIsoDate(value: string) {
   return value ? new Date(`${value}T00:00:00.000Z`).toISOString() : undefined;
 }
 
+function artifactBaseType(artifact: any) {
+  return String(artifact?.content_type || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+}
+
+function artifactPreviewKind(artifact: any) {
+  const contentType = artifactBaseType(artifact);
+  if (contentType.startsWith('image/')) return 'image';
+  if (contentType === 'application/pdf') return 'pdf';
+  if (
+    contentType.startsWith('text/') ||
+    ['application/json', 'application/xml', 'text/csv', 'text/markdown'].includes(contentType)
+  ) {
+    return 'text';
+  }
+  return '';
+}
+
+function canPreviewArtifact(artifact: any) {
+  return Boolean(artifactPreviewKind(artifact));
+}
+
 export default function EvidencePage() {
   const searchParams = useSearchParams();
   const systemFilter = searchParams.get('ai_system_id') || '';
@@ -61,6 +82,7 @@ export default function EvidencePage() {
   const [submitting, setSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadingItemId, setUploadingItemId] = useState<string | null>(null);
+  const [artifactPreview, setArtifactPreview] = useState<any | null>(null);
   const [showCreate, setShowCreate] = useState(createRequested);
   const [error, setError] = useState<string | null>(null);
   const [riskFilter, setRiskFilter] = useState('');
@@ -164,6 +186,35 @@ export default function EvidencePage() {
       setError(err.body?.detail || err.message || 'Failed to upload evidence artifact');
     } finally {
       setUploadingItemId(null);
+    }
+  }
+
+  async function openArtifactPreview(item: any, artifact: any) {
+    const kind = artifactPreviewKind(artifact);
+    if (!kind) return;
+
+    const url = api.getEvidenceArtifactPreviewUrl(item.id, artifact.id);
+    setArtifactPreview({ item, artifact, kind, url, loading: kind === 'text', text: '', error: '' });
+
+    if (kind !== 'text') return;
+
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Preview failed with ${response.status}`);
+      }
+      const text = await response.text();
+      setArtifactPreview({ item, artifact, kind, url, loading: false, text, error: '' });
+    } catch (err: any) {
+      setArtifactPreview({
+        item,
+        artifact,
+        kind,
+        url,
+        loading: false,
+        text: '',
+        error: err.message || 'Preview unavailable',
+      });
     }
   }
 
@@ -347,13 +398,25 @@ export default function EvidencePage() {
                           <td className="min-w-[220px]">
                             <div className="space-y-2">
                               {(item.artifacts || []).length > 0 ? (
-                                <a
-                                  href={api.getEvidenceArtifactUrl(item.id, item.artifacts[0].id)}
-                                  className="inline-flex max-w-[220px] items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300"
-                                >
-                                  <Download className="h-3 w-3 shrink-0" />
-                                  <span className="truncate">{item.artifacts[0].file_name}</span>
-                                </a>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <a
+                                    href={api.getEvidenceArtifactUrl(item.id, item.artifacts[0].id)}
+                                    className="inline-flex max-w-[220px] items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300"
+                                  >
+                                    <Download className="h-3 w-3 shrink-0" />
+                                    <span className="truncate">{item.artifacts[0].file_name}</span>
+                                  </a>
+                                  {canPreviewArtifact(item.artifacts[0]) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => openArtifactPreview(item, item.artifacts[0])}
+                                      className="inline-flex items-center gap-1 rounded bg-zinc-900 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-sky-300 ring-1 ring-zinc-800 hover:bg-zinc-800"
+                                    >
+                                      <Eye className="h-3 w-3" />
+                                      Preview
+                                    </button>
+                                  )}
+                                </div>
                               ) : (
                                 <span className="text-[10px] text-zinc-600">No file</span>
                               )}
@@ -377,6 +440,61 @@ export default function EvidencePage() {
                 </div>
               )}
             </Card>
+
+            {artifactPreview && (
+              <Card
+                title="Artifact Preview"
+                subtitle={`${artifactPreview.artifact.file_name} / ${artifactBaseType(artifactPreview.artifact)}`}
+                actions={
+                  <button
+                    type="button"
+                    onClick={() => setArtifactPreview(null)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-zinc-900 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-300 ring-1 ring-zinc-800 hover:bg-zinc-800"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Close
+                  </button>
+                }
+              >
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                    <span className="rounded bg-zinc-900 px-2 py-1 ring-1 ring-zinc-800">{artifactPreview.item.title}</span>
+                    <span className="rounded bg-zinc-900 px-2 py-1 ring-1 ring-zinc-800">{artifactPreview.artifact.size_bytes} bytes</span>
+                    <span className="rounded bg-zinc-900 px-2 py-1 font-mono ring-1 ring-zinc-800">
+                      {artifactPreview.artifact.artifact_hash?.slice(0, 16)}
+                    </span>
+                  </div>
+
+                  {artifactPreview.loading ? (
+                    <div className="rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-8 text-center text-xs font-bold uppercase tracking-widest text-zinc-500">
+                      Loading preview
+                    </div>
+                  ) : artifactPreview.error ? (
+                    <ErrorState message={artifactPreview.error} />
+                  ) : artifactPreview.kind === 'text' ? (
+                    <pre className="max-h-[520px] overflow-auto rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-xs leading-6 text-zinc-200 whitespace-pre-wrap">
+                      {artifactPreview.text || 'No text content'}
+                    </pre>
+                  ) : artifactPreview.kind === 'image' ? (
+                    <object
+                      data={artifactPreview.url}
+                      type={artifactBaseType(artifactPreview.artifact)}
+                      className="h-[620px] w-full rounded-lg border border-zinc-800 bg-zinc-950"
+                    >
+                      <a href={artifactPreview.url} className="text-xs font-bold text-indigo-400 hover:text-indigo-300">
+                        Open preview
+                      </a>
+                    </object>
+                  ) : (
+                    <iframe
+                      title={artifactPreview.artifact.file_name}
+                      src={artifactPreview.url}
+                      className="h-[620px] w-full rounded-lg border border-zinc-800 bg-zinc-950"
+                    />
+                  )}
+                </div>
+              </Card>
+            )}
 
             <Card title={`Immutable Event Logs (${logs.length})`} subtitle="Runtime and compliance events captured by the evidence chain.">
               {logs.length === 0 ? (

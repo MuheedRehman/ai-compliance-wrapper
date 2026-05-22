@@ -191,3 +191,44 @@ def test_evidence_vault_uploads_signed_artifact_and_downloads_content(client, ad
     assert download_response.status_code == 200
     assert download_response.content == b"model card evidence"
     assert download_response.headers["x-evidence-artifact-hash"] == artifact["artifact_hash"]
+
+    preview_response = client.get(
+        f"/v1/evidence/items/{item['id']}/artifacts/{artifact['id']}/preview",
+        headers=admin_headers,
+    )
+    assert preview_response.status_code == 200
+    assert preview_response.content == b"model card evidence"
+    assert preview_response.headers["content-disposition"].startswith("inline;")
+    assert preview_response.headers["x-content-type-options"] == "nosniff"
+    assert preview_response.headers["x-evidence-artifact-hash"] == artifact["artifact_hash"]
+
+
+def test_evidence_vault_preview_rejects_unsupported_artifact_type(client, admin_headers):
+    system, control = _create_system_and_control(client, admin_headers)
+    create_response = client.post(
+        "/v1/evidence/items",
+        headers=admin_headers,
+        json={
+            "title": "Archive upload",
+            "evidence_type": "other",
+            "source": "Evidence Vault upload",
+            "ai_system_id": system["id"],
+            "control_id": control["id"],
+        },
+    )
+    assert create_response.status_code == 200
+    item = create_response.json()
+
+    upload_response = client.post(
+        f"/v1/evidence/items/{item['id']}/artifacts",
+        headers=admin_headers,
+        files={"file": ("archive.zip", b"PK\x03\x04 archive bytes", "application/zip")},
+    )
+    assert upload_response.status_code == 200
+    artifact = upload_response.json()
+
+    preview_response = client.get(
+        f"/v1/evidence/items/{item['id']}/artifacts/{artifact['id']}/preview",
+        headers=admin_headers,
+    )
+    assert preview_response.status_code == 415
