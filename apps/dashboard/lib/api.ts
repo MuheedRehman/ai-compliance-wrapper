@@ -1,3 +1,6 @@
+import type { DashboardPermission, TenantRole } from './session-permissions';
+export type { DashboardPermission, TenantRole } from './session-permissions';
+
 // Central API client for the AI Compliance Dashboard.
 // All backend calls go through this module.
 
@@ -13,7 +16,6 @@ export class ApiError extends Error {
   }
 }
 
-export type TenantRole = 'owner' | 'admin' | 'reviewer' | 'auditor' | 'viewer';
 export type TenantUserStatus = 'active' | 'invited' | 'disabled';
 
 export type TenantUser = {
@@ -98,6 +100,8 @@ export type CurrentSession = {
   tenant_id?: string;
   role?: TenantRole;
   user_id?: string;
+  permissions?: DashboardPermission[];
+  access_label?: string;
 };
 
 export async function fetchApi<T = any>(

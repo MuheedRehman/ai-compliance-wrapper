@@ -1,3 +1,4 @@
+from app.services import tenant_admin_service
 from tests.conftest import TENANT_ID
 
 
@@ -16,6 +17,25 @@ def owner_session_headers(client, admin_headers, email="owner@example.com"):
         "x-dashboard-user-id": user["id"],
         "x-dashboard-tenant-id": TENANT_ID,
     }
+
+
+def test_role_permission_matrix_separates_admin_contributor_and_read_only_access():
+    owner_permissions = tenant_admin_service.permissions_for_role("owner")
+    reviewer_permissions = tenant_admin_service.permissions_for_role("reviewer")
+    auditor_permissions = tenant_admin_service.permissions_for_role("auditor")
+    viewer_permissions = tenant_admin_service.permissions_for_role("viewer")
+
+    assert "tenant:admin" in owner_permissions
+    assert "billing:manage" in owner_permissions
+    assert "governance:write" in reviewer_permissions
+    assert "scanner:run" in reviewer_permissions
+    assert "users:write" not in reviewer_permissions
+    assert "evidence:read" in auditor_permissions
+    assert "reports:write" not in auditor_permissions
+    assert "governance:read" in viewer_permissions
+    assert "governance:write" not in viewer_permissions
+    assert tenant_admin_service.role_has_permission("viewer", "tenant:read") is True
+    assert tenant_admin_service.role_has_permission("viewer", "runtime:execute") is False
 
 
 def test_tenant_admin_summary_bootstraps_policy(client, admin_headers):

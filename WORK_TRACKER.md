@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-23
+Last updated: 2026-05-26
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 6 Control Templates UI polish is deployed to staging; next control hardening should add reusable-template customization and branded/exportable control status reports.
+1. Module 2 customer-ready session and role enforcement is the active hardening slice before the app is treated as customer-ready.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements and control coverage.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 6 Control Templates UI Polish: deployed to staging. The Controls dashboard now presents a full-width template catalog with all templates visible, suggested evidence metadata, shared owner/due-date defaults, and a visible Apply action per template.
+- Module 2 Customer-ready Session and Role Enforcement: implementation in progress. This slice adds an explicit tenant-role permission matrix, dashboard proxy permission checks for non-admin governance workflows, `/api/auth/me` permission visibility, role/access display in the dashboard chrome, and permission-aware controls on Users & Access.
 
 ## Mandatory Module Execution Workflow
 
@@ -62,7 +62,7 @@ Current technical baseline:
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, topic-level public evidence profiling, and a deployed Playwright smart-scroller rendered crawl implementation exist. | Add multilingual signal catalogs, rendered screenshot evidence, and scanner queue/progress UI if rendered scans become slow for larger SaaS sites. |
-| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, and production config guardrails for weak defaults exist. | Continue replacing staging bootstrap assumptions with first-class sessions and broaden role enforcement across non-admin governance workflows. |
+| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, production config guardrails, expanded tenant-role permissions, dashboard proxy permission enforcement for governance/billing/runtime/evidence/report/scanner actions, and role/access visibility in the UI exist. | Add backend route-level dashboard permission dependencies beyond the dashboard proxy and audit actor attribution for non-admin governance mutations. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, deployed multi-action review plans with control/evidence placeholders, and deployed workspace drill-down actions around one AI system. | Continue polishing section-specific create/edit flows, or move to Module 5 evidence uploads. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, a deployed evidence-to-control attachment workflow, and a deployed artifact preview workflow. | Add an external object-storage backend. |
@@ -113,6 +113,7 @@ Recovered from repo state:
 - Module 6 control lifecycle operations completed and deployed: control responses now expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata; `/v1/compliance/controls/{control_id}/reviews` records review notes/history and can update status/severity/cadence; the Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6` to backend `ai-compliance-backend-00093-ljz` and dashboard `ai-compliance-dashboard-00048-928`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template and audit-status export completed and deployed: `/v1/compliance/control-templates` lists reusable EU AI Act templates with applied-state metadata; `/v1/compliance/controls/apply-templates` materializes selected templates into tenant or AI-system scopes; `/v1/compliance/audit-status` returns control readiness summary, evidence/owner/deadline/review gaps, row-level audit readiness, and Markdown export content; the Controls dashboard can apply templates and download the Markdown audit status snapshot. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40` to backend `ai-compliance-backend-00095-9q7` and dashboard `ai-compliance-dashboard-00049-5nw`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template UI polish completed and deployed: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` to backend `ai-compliance-backend-00097-zrb` and dashboard `ai-compliance-dashboard-00050-gvx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
+- Module 2 customer-ready session and role enforcement implemented locally: tenant roles now resolve to an explicit permission matrix; `/api/auth/me` exposes permissions and access labels; the dashboard proxy denies disallowed backend actions by method/path before they reach the API; the sidebar shows the active role/access level and hides billing/runtime links when the session lacks permission; Users & Access uses returned permissions to disable user/policy writes for non-admin roles. Deployment pending.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -179,6 +180,8 @@ Use this as the next session checklist.
 - [x] Deploy Module 6 control templates and audit-status export to GCP staging and update the deployed baseline.
 - [x] Implement Module 6 control template catalog UI polish.
 - [x] Deploy Module 6 control template catalog UI polish to GCP staging and update the deployed baseline.
+- [x] Implement Module 2 customer-ready session and role enforcement.
+- [ ] Deploy Module 2 customer-ready session and role enforcement to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

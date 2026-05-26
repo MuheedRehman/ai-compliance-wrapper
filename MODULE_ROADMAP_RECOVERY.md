@@ -70,7 +70,17 @@ Core requirements:
 - Audit trail for user actions
 - Remove public staging assumptions
 
-Status: started. Tenant users, invitations, auth policies, login audit, Google login resolution, and dashboard user settings exist.
+Status: in progress. Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, active-user-bound dashboard session headers, and dashboard user settings exist.
+
+Current customer-ready session and role enforcement slice:
+- Tenant roles resolve to an explicit permission matrix covering tenant administration, billing, governance, evidence, reports, scanner execution, and runtime execution.
+- `/api/auth/me` exposes the signed session's role, permission list, and access label to the dashboard.
+- The dashboard backend proxy checks the requested backend path and method against the active role before forwarding with the server API key.
+- Owner/Admin keep full tenant/billing/write/runtime access; Reviewer keeps contributor access for governance/evidence/reports/scanner workflows; Auditor and Viewer are read-only for governance/evidence/reports.
+- The sidebar shows the active role/access level and hides billing/runtime navigation when the role lacks permission.
+- Users & Access disables user and auth-policy writes based on returned permissions, while backend tenant-admin checks still validate active tenant users.
+
+Deployment checkpoint: local implementation is ready for verification and GCP staging deployment. Next Module 2 hardening should add backend route-level dashboard permission dependencies beyond the dashboard proxy and audit actor attribution for non-admin governance mutations.
 
 ### Module 3: AI System Lifecycle Workspace
 

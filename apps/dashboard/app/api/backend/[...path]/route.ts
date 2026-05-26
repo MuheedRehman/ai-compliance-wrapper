@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { backendAuthMode, backendUrl, getGoogleIdentityToken, serverApiKey } from '@/lib/backend-service';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/server-session';
+import { decideSessionRequestAccess } from '@/lib/session-permissions';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -18,6 +19,14 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
 
   const path = context.params.path.join('/');
+  const access = decideSessionRequestAccess(session.role, request.method, path);
+  if (!access.allowed) {
+    return NextResponse.json({
+      detail: access.detail || 'Dashboard role is not permitted for this action',
+      required_permission: access.requiredPermission,
+    }, { status: 403 });
+  }
+
   const backendBaseUrl = backendUrl();
   const target = new URL(`/${path}${request.nextUrl.search}`, backendBaseUrl);
   const headers = new Headers(request.headers);

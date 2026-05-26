@@ -21,6 +21,16 @@ import {
   LogOut,
   Users,
 } from 'lucide-react';
+import { accessLabel, hasPermission } from '@/lib/session-permissions';
+import type { CurrentSession } from '@/lib/api';
+import type { DashboardPermission } from '@/lib/session-permissions';
+
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  requiredPermission?: DashboardPermission;
+};
 
 const navSections = [
   {
@@ -59,15 +69,16 @@ const navSections = [
     label: 'Operations',
     items: [
       { href: '/settings/users', label: 'Users & Access', icon: Users },
-      { href: '/billing',  label: 'Subscription',  icon: CreditCard },
-      { href: '/runtime',  label: 'Playground',    icon: Terminal },
+      { href: '/billing',  label: 'Subscription',  icon: CreditCard, requiredPermission: 'billing:manage' },
+      { href: '/runtime',  label: 'Playground',    icon: Terminal, requiredPermission: 'runtime:execute' },
     ],
   },
-];
+] satisfies { label: string; items: NavItem[] }[];
 
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [session, setSession] = useState<CurrentSession | null>(null);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -77,11 +88,34 @@ export default function Sidebar() {
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
 
+  useEffect(() => {
+    let mounted = true;
+    fetch('/api/auth/me', { cache: 'no-store' })
+      .then((res) => res.ok ? res.json() : null)
+      .then((data: CurrentSession | null) => {
+        if (mounted && data?.authenticated) setSession(data);
+      })
+      .catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
+
   // Lock body scroll when mobile nav is open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? 'hidden' : '';
     return () => { document.body.style.overflow = ''; };
   }, [mobileOpen]);
+
+  const visibleSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => {
+        if (!item.requiredPermission || !session?.role) return true;
+        return hasPermission(session.role, item.requiredPermission);
+      }),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const roleLabel = session?.role ? session.role.charAt(0).toUpperCase() + session.role.slice(1) : 'Signed in';
 
   const navContent = (
     <>
@@ -104,7 +138,7 @@ export default function Sidebar() {
 
       {/* Nav Sections */}
       <nav className="flex-1 overflow-y-auto py-5 px-3 space-y-6">
-        {navSections.map((section) => (
+        {visibleSections.map((section) => (
           <div key={section.label}>
             <div className="px-3 mb-2 text-[10px] font-semibold text-zinc-500 uppercase tracking-[0.15em]">
               {section.label}
@@ -146,6 +180,15 @@ export default function Sidebar() {
           <p className="text-[10px] text-zinc-600 mt-1 leading-relaxed font-medium">
             EU AI Act Compliance v0.5.0
           </p>
+          <div className="mt-3 rounded-md border border-zinc-800 bg-zinc-950/70 px-2.5 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Role</span>
+              <span className="truncate text-[10px] font-bold uppercase tracking-wider text-zinc-200">{roleLabel}</span>
+            </div>
+            <p className="mt-1 truncate text-[10px] font-semibold text-zinc-500">
+              {accessLabel(session?.role)}
+            </p>
+          </div>
           <button
             onClick={logout}
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-md border border-zinc-800 px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-200 hover:bg-zinc-900"

@@ -17,11 +17,51 @@ TENANT_USER_STATUSES = {"active", "invited", "disabled"}
 INVITATION_STATUSES = {"pending", "accepted", "revoked", "expired"}
 
 ROLE_PERMISSIONS = {
-    "owner": ["tenant:read", "tenant:admin", "users:write", "policy:write", "governance:write"],
-    "admin": ["tenant:read", "tenant:admin", "users:write", "policy:write", "governance:write"],
-    "reviewer": ["tenant:read", "governance:review", "evidence:read"],
-    "auditor": ["tenant:read", "evidence:read", "reports:read"],
-    "viewer": ["tenant:read"],
+    "owner": [
+        "tenant:read",
+        "tenant:admin",
+        "users:write",
+        "policy:write",
+        "billing:manage",
+        "governance:read",
+        "governance:review",
+        "governance:write",
+        "evidence:read",
+        "evidence:write",
+        "reports:read",
+        "reports:write",
+        "scanner:run",
+        "runtime:execute",
+    ],
+    "admin": [
+        "tenant:read",
+        "tenant:admin",
+        "users:write",
+        "policy:write",
+        "billing:manage",
+        "governance:read",
+        "governance:review",
+        "governance:write",
+        "evidence:read",
+        "evidence:write",
+        "reports:read",
+        "reports:write",
+        "scanner:run",
+        "runtime:execute",
+    ],
+    "reviewer": [
+        "tenant:read",
+        "governance:read",
+        "governance:review",
+        "governance:write",
+        "evidence:read",
+        "evidence:write",
+        "reports:read",
+        "reports:write",
+        "scanner:run",
+    ],
+    "auditor": ["tenant:read", "governance:read", "evidence:read", "reports:read"],
+    "viewer": ["tenant:read", "governance:read", "evidence:read", "reports:read"],
 }
 
 
@@ -51,7 +91,11 @@ def normalize_emails(emails: list[str] | None) -> list[str]:
 
 
 def permissions_for_role(role: str) -> list[str]:
-    return ROLE_PERMISSIONS.get(role, ["tenant:read"])
+    return list(ROLE_PERMISSIONS.get(role, ROLE_PERMISSIONS["viewer"]))
+
+
+def role_has_permission(role: str, permission: str) -> bool:
+    return permission in permissions_for_role(role)
 
 
 def resolve_dashboard_session_user(

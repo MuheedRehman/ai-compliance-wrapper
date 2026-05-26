@@ -12,13 +12,20 @@ Request flow:
 3. The dashboard issues a signed `dashboard_session` cookie using the backend tenant user id, email, and role.
 4. Browser API calls go to `/api/backend/...` on the dashboard service.
 5. The dashboard server verifies the session cookie.
-6. The dashboard server forwards the request to the backend with:
+6. The dashboard server checks the session role against the requested backend path and method.
+7. The dashboard server forwards allowed requests to the backend with:
    - `x-api-key` from server-side `DASHBOARD_API_KEY`
    - `x-dashboard-user-id`, `x-dashboard-user-email`, `x-dashboard-user-role`, and `x-dashboard-tenant-id`
    - Cloud Run identity token when `BACKEND_AUTH_MODE=google_id_token`
 
 The backend only accepts dashboard role headers when they match an active
 tenant user for the API-key tenant.
+
+Dashboard role permissions:
+
+- Owner/Admin: tenant administration, billing, governance writes, evidence writes, reports, scanner runs, and runtime execution.
+- Reviewer: governance/evidence/report contributor access and scanner runs, without tenant administration or billing access.
+- Auditor/Viewer: read-only governance, evidence, and report access.
 
 ## Required Dashboard Runtime Secrets
 

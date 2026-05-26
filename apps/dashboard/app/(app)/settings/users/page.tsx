@@ -79,7 +79,9 @@ export default function TenantUsersPage() {
     };
   }, [summary]);
 
-  const canManage = session?.role === 'owner' || session?.role === 'admin';
+  const permissions = session?.permissions || [];
+  const canManageUsers = permissions.includes('users:write') || session?.role === 'owner' || session?.role === 'admin';
+  const canManagePolicy = permissions.includes('policy:write') || session?.role === 'owner' || session?.role === 'admin';
 
   async function handlePolicySave(event: FormEvent) {
     event.preventDefault();
@@ -212,6 +214,17 @@ export default function TenantUsersPage() {
               <span className="text-3xl font-bold">{stats.actionEvents}</span>
             </div>
           </Card>
+          <Card title="Your Access" variant="stat">
+            <div className="flex items-center gap-3">
+              <ShieldCheck className="h-6 w-6 text-indigo-400" />
+              <div>
+                <span className="block text-xl font-bold capitalize">{session?.role || 'unknown'}</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+                  {session?.access_label || `${permissions.length} permissions`}
+                </span>
+              </div>
+            </div>
+          </Card>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-[1.4fr_0.9fr] gap-6">
@@ -239,7 +252,7 @@ export default function TenantUsersPage() {
                       <td>
                         <select
                           value={user.role}
-                          disabled={!canManage || savingUserId === user.id}
+                          disabled={!canManageUsers || savingUserId === user.id}
                           onChange={(event) => handleUserChange(user, { role: event.target.value as TenantRole })}
                           className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs font-semibold text-zinc-200 outline-none disabled:opacity-50"
                         >
@@ -249,7 +262,7 @@ export default function TenantUsersPage() {
                       <td>
                         <select
                           value={user.status}
-                          disabled={!canManage || savingUserId === user.id}
+                          disabled={!canManageUsers || savingUserId === user.id}
                           onChange={(event) => handleUserChange(user, { status: event.target.value as TenantUser['status'] })}
                           className="rounded-md border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs font-semibold text-zinc-200 outline-none disabled:opacity-50"
                         >
@@ -273,7 +286,7 @@ export default function TenantUsersPage() {
                   type="email"
                   value={inviteEmail}
                   onChange={(event) => setInviteEmail(event.target.value)}
-                  disabled={!canManage || inviting}
+                  disabled={!canManageUsers || inviting}
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50"
                   placeholder="user@company.com"
                   required
@@ -284,14 +297,14 @@ export default function TenantUsersPage() {
                 <select
                   value={inviteRole}
                   onChange={(event) => setInviteRole(event.target.value as TenantRole)}
-                  disabled={!canManage || inviting}
+                  disabled={!canManageUsers || inviting}
                   className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50"
                 >
                   {roles.map((role) => <option key={role} value={role}>{role}</option>)}
                 </select>
               </div>
               <button
-                disabled={!canManage || inviting}
+                disabled={!canManageUsers || inviting}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-white hover:bg-indigo-500 disabled:opacity-50"
               >
                 <UserPlus className="h-4 w-4" />
@@ -308,7 +321,7 @@ export default function TenantUsersPage() {
               <input
                 value={allowedDomains}
                 onChange={(event) => setAllowedDomains(event.target.value)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50"
                 placeholder="company.com, subsidiary.eu"
               />
@@ -318,13 +331,13 @@ export default function TenantUsersPage() {
               <input
                 value={allowedEmails}
                 onChange={(event) => setAllowedEmails(event.target.value)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50"
                 placeholder="owner@company.com, auditor@partner.eu"
               />
             </div>
             <button
-              disabled={!canManage || savingPolicy}
+              disabled={!canManagePolicy || savingPolicy}
               className="flex items-center justify-center gap-2 rounded-lg bg-zinc-100 px-4 py-2.5 text-xs font-bold uppercase tracking-widest text-zinc-950 hover:bg-white disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
@@ -335,7 +348,7 @@ export default function TenantUsersPage() {
                 type="checkbox"
                 checked={googleEnabled}
                 onChange={(event) => setGoogleEnabled(event.target.checked)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="h-4 w-4 accent-indigo-600"
               />
               Google login enabled
@@ -345,7 +358,7 @@ export default function TenantUsersPage() {
                 type="checkbox"
                 checked={passwordEnabled}
                 onChange={(event) => setPasswordEnabled(event.target.checked)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="h-4 w-4 accent-indigo-600"
               />
               Password login enabled
@@ -355,7 +368,7 @@ export default function TenantUsersPage() {
                 type="checkbox"
                 checked={autoProvision}
                 onChange={(event) => setAutoProvision(event.target.checked)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="h-4 w-4 accent-indigo-600"
               />
               Auto-provision Google users
@@ -365,7 +378,7 @@ export default function TenantUsersPage() {
               <select
                 value={defaultRole}
                 onChange={(event) => setDefaultRole(event.target.value as TenantRole)}
-                disabled={!canManage || savingPolicy}
+                disabled={!canManagePolicy || savingPolicy}
                 className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-white outline-none focus:border-indigo-500 disabled:opacity-50"
               >
                 {roles.filter((role) => role !== 'owner').map((role) => <option key={role} value={role}>{role}</option>)}
@@ -398,7 +411,7 @@ export default function TenantUsersPage() {
                         {invite.status === 'pending' && (
                           <button
                             onClick={() => revokeInvitation(invite.id)}
-                            disabled={!canManage}
+                            disabled={!canManageUsers}
                             className="rounded-md border border-zinc-800 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:bg-zinc-900 disabled:opacity-50"
                           >
                             Revoke
