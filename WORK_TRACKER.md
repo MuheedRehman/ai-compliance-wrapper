@@ -14,7 +14,7 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 2 customer-ready session and role enforcement is the active hardening slice before the app is treated as customer-ready.
+1. Module 2 customer-ready session and role enforcement is deployed to staging; next Module 2 hardening should add backend route-level dashboard permission dependencies beyond the dashboard proxy and actor attribution for non-admin governance mutations.
 2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
 3. Keep Module 5 Evidence Vault connected to obligation evidence requirements and control coverage.
 4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
@@ -22,7 +22,7 @@ Current product focus:
 
 Current module slice:
 
-- Module 2 Customer-ready Session and Role Enforcement: implementation in progress. This slice adds an explicit tenant-role permission matrix, dashboard proxy permission checks for non-admin governance workflows, `/api/auth/me` permission visibility, role/access display in the dashboard chrome, and permission-aware controls on Users & Access.
+- Module 2 Customer-ready Session and Role Enforcement: deployed to staging. This slice adds an explicit tenant-role permission matrix, dashboard proxy permission checks for non-admin governance workflows, `/api/auth/me` permission visibility, role/access display in the dashboard chrome, and permission-aware controls on Users & Access.
 
 ## Mandatory Module Execution Workflow
 
@@ -49,13 +49,13 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `bb3495d` via Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `5cffbde` via Cloud Build `900d712d-fe26-4b47-ab1f-037b22df2282` with status `SUCCESS`.
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00050-gvx`
-  - Backend: `ai-compliance-backend-00097-zrb`
+  - Dashboard: `ai-compliance-dashboard-00051-pdj`
+  - Backend: `ai-compliance-backend-00099-g8j`
 
 ## Module Status Board
 
@@ -113,7 +113,7 @@ Recovered from repo state:
 - Module 6 control lifecycle operations completed and deployed: control responses now expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata; `/v1/compliance/controls/{control_id}/reviews` records review notes/history and can update status/severity/cadence; the Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6` to backend `ai-compliance-backend-00093-ljz` and dashboard `ai-compliance-dashboard-00048-928`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template and audit-status export completed and deployed: `/v1/compliance/control-templates` lists reusable EU AI Act templates with applied-state metadata; `/v1/compliance/controls/apply-templates` materializes selected templates into tenant or AI-system scopes; `/v1/compliance/audit-status` returns control readiness summary, evidence/owner/deadline/review gaps, row-level audit readiness, and Markdown export content; the Controls dashboard can apply templates and download the Markdown audit status snapshot. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40` to backend `ai-compliance-backend-00095-9q7` and dashboard `ai-compliance-dashboard-00049-5nw`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template UI polish completed and deployed: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` to backend `ai-compliance-backend-00097-zrb` and dashboard `ai-compliance-dashboard-00050-gvx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
-- Module 2 customer-ready session and role enforcement implemented locally: tenant roles now resolve to an explicit permission matrix; `/api/auth/me` exposes permissions and access labels; the dashboard proxy denies disallowed backend actions by method/path before they reach the API; the sidebar shows the active role/access level and hides billing/runtime links when the session lacks permission; Users & Access uses returned permissions to disable user/policy writes for non-admin roles. Deployment pending.
+- Module 2 customer-ready session and role enforcement completed and deployed: tenant roles now resolve to an explicit permission matrix; `/api/auth/me` exposes permissions and access labels; the dashboard proxy denies disallowed backend actions by method/path before they reach the API; the sidebar shows the active role/access level and hides billing/runtime links when the session lacks permission; Users & Access uses returned permissions to disable user/policy writes for non-admin roles. Local verification passed: `tests/test_tenant_admin.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `900d712d-fe26-4b47-ab1f-037b22df2282` to backend `ai-compliance-backend-00099-g8j` and dashboard `ai-compliance-dashboard-00051-pdj`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -181,7 +181,7 @@ Use this as the next session checklist.
 - [x] Implement Module 6 control template catalog UI polish.
 - [x] Deploy Module 6 control template catalog UI polish to GCP staging and update the deployed baseline.
 - [x] Implement Module 2 customer-ready session and role enforcement.
-- [ ] Deploy Module 2 customer-ready session and role enforcement to GCP staging and update the deployed baseline.
+- [x] Deploy Module 2 customer-ready session and role enforcement to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

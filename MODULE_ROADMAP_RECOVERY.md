@@ -80,7 +80,7 @@ Current customer-ready session and role enforcement slice:
 - The sidebar shows the active role/access level and hides billing/runtime navigation when the role lacks permission.
 - Users & Access disables user and auth-policy writes based on returned permissions, while backend tenant-admin checks still validate active tenant users.
 
-Deployment checkpoint: local implementation is ready for verification and GCP staging deployment. Next Module 2 hardening should add backend route-level dashboard permission dependencies beyond the dashboard proxy and audit actor attribution for non-admin governance mutations.
+Deployment checkpoint: customer-ready session and role enforcement is deployed to staging through Cloud Build `900d712d-fe26-4b47-ab1f-037b22df2282`, with backend revision `ai-compliance-backend-00099-g8j`, dashboard revision `ai-compliance-dashboard-00051-pdj`, and passing Cloud Build staging Playwright E2E. Next Module 2 hardening should add backend route-level dashboard permission dependencies beyond the dashboard proxy and audit actor attribution for non-admin governance mutations.
 
 ### Module 3: AI System Lifecycle Workspace
 
