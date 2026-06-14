@@ -275,7 +275,7 @@ Current FRIA builder slice:
 - Dashboard FRIA detail is a full guided wizard with 6 section tabs, field prompts, section-level save, next/previous navigation, submit modal (email capture), approve/reject modal, and Export Markdown button.
 - Sections can be edited in draft and rejected states; rejected FRIAs can be revised and resubmitted after the status is reset to draft.
 
-Deployment checkpoint: FRIA builder is deployed to staging through Cloud Build `[pending deployment]`. Next hardening should add multi-reviewer approval chains, PDF export, and FRIA status surfaced prominently in the AI system workspace tiles.
+Deployment checkpoint: FRIA builder is deployed to staging through Cloud Build `8d765362-9c39-46d8-8a29-b6898eddbb32`, with backend revision `ai-compliance-backend-00101-nsb`, dashboard revision `ai-compliance-dashboard-00052-h7w`, and passing Cloud Build staging Playwright E2E. Next hardening should add multi-reviewer approval chains, PDF export, and FRIA status surfaced prominently in the AI system workspace tiles.
 
 ### Module 8: Report Builder / Audit Pack
 
