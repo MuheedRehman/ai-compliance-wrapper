@@ -14,14 +14,14 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 7 FRIA Builder: implemented and locally verified; deploy to staging next.
-2. Module 2 hardening: add backend route-level permission checks beyond the dashboard proxy.
-3. Module 8 Report Builder: add PDF export, evidence bundle, AI system factsheet.
-4. Module 5 Evidence Vault: move artifact storage from database bytes to GCS.
+1. Module 2 route-level RBAC: implemented and pushed; Cloud Build `3dec826d` in progress (deployed as of this update).
+2. Module 8 Report Builder: add PDF export, evidence bundle, AI system factsheet.
+3. Module 5 Evidence Vault: move artifact storage from database bytes to GCS.
+4. Module 9 Runtime Governance SDK: package policy checks, developer API keys, usage dashboard.
 
 Current module slice:
 
-- Module 7 FRIA Builder: guided 6-section wizard, section-level save with completion tracking, submit-for-review (draft → in_review), approve/reject workflow (in_review → approved/rejected), Markdown export, and full dashboard wizard are implemented. Migration 0013 adds sections_json, approval_json, completion_percent. Local verification passed: full backend test suite and dashboard lint/build. Pending Cloud Build deploy.
+- Module 2 backend route-level RBAC: `DashboardPermission` dependency factory added to `auth_service.py`; wired onto all 11 route files (ai_systems, compliance, evidence, reports, obligations, features, classification, website_scans, chat, billing, reviews). 18 new RBAC tests in `tests/test_rbac_routes.py` all pass. Full suite 164 passed, 1 skipped. Committed `28c74f2`, pushed to GitHub `main`, Cloud Build `3dec826d` submitted.
 
 ## Mandatory Module Execution Workflow
 
@@ -48,20 +48,20 @@ Current technical baseline:
 - Tests exist for scanner, tenant admin, classification, obligation engine, controls, reports, billing, runtime, migrations, and feature lifecycle.
 - Canonical Git/project root is the nested `backend` folder. The outer duplicate shell has been archived into `_archive_outer_duplicate_2026-05-14`, and the old outer Git repo has been archived into `_archive_outer_git_2026-05-14`.
 - GitHub origin is `https://github.com/MuheedRehman/ai-compliance-wrapper.git`; `main` is the active branch.
-- Latest deployed staging baseline: commit `ee94e0b` via Cloud Build `8d765362-9c39-46d8-8a29-b6898eddbb32` with status `SUCCESS`.
+- Latest deployed staging baseline: commit `28c74f2` via Cloud Build `3dec826d-a57c-4b26-a6e6-ad49a5d9185c` with status `SUCCESS` (Module 2 RBAC route enforcement, all 13 steps passed including live E2E).
 - Live staging URLs:
   - Dashboard: `https://ai-compliance-dashboard-loilav7ubq-ey.a.run.app`
   - Backend: `https://ai-compliance-backend-loilav7ubq-ey.a.run.app`
 - Latest verified Cloud Run revisions:
-  - Dashboard: `ai-compliance-dashboard-00052-h7w`
-  - Backend: `ai-compliance-backend-00101-nsb`
+  - Dashboard: `ai-compliance-dashboard-00053-kcv`
+  - Backend: `ai-compliance-backend-00103-xz2`
 
 ## Module Status Board
 
 | Module | Status | Current State | Next Work |
 | --- | --- | --- | --- |
 | 1. Website / SaaS Compliance Scanner | In progress | Route, service, migration, tests, dashboard scanner pages, scan-to-system conversion, system-specific control materialization, signed conversion evidence, transaction-safe one-click compliance readiness report generation, scanner-to-obligation dimension output, Annex III subcategory match output, penalty exposure on gaps/actions, role-based obligation scenarios, persisted role selection for conversion/report generation, broader compliance-page crawling, topic-level public evidence profiling, and a deployed Playwright smart-scroller rendered crawl implementation exist. | Add multilingual signal catalogs, rendered screenshot evidence, and scanner queue/progress UI if rendered scans become slow for larger SaaS sites. |
-| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, production config guardrails, expanded tenant-role permissions, dashboard proxy permission enforcement for governance/billing/runtime/evidence/report/scanner actions, and role/access visibility in the UI exist. | Add backend route-level dashboard permission dependencies beyond the dashboard proxy and audit actor attribution for non-admin governance mutations. |
+| 2. Real Auth, Tenants, Users, Roles | In progress | Tenant users, invitations, auth policies, login audit, admin action audit, Google/password login resolution, dashboard settings page, active-user-bound dashboard RBAC headers, production config guardrails, expanded tenant-role permissions, dashboard proxy permission enforcement, role/access visibility in the UI, and FastAPI route-level `DashboardPermission` enforcement on all 11 write-route files now exist. | Add audit actor attribution for non-admin governance mutations. |
 | 3. AI System Lifecycle Workspace | In progress | System workspace API and dashboard detail page now aggregate classification, features, controls, evidence, scans, reports, FRIA, oversight, incidents, editable owner/deadline metadata, lifecycle notes, deployed review-history events, deployed review follow-up tasks, deployed multi-action review plans with control/evidence placeholders, and deployed workspace drill-down actions around one AI system. | Continue polishing section-specific create/edit flows, or move to Module 5 evidence uploads. |
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, a deployed evidence-to-control attachment workflow, and a deployed artifact preview workflow. | Add an external object-storage backend. |
@@ -114,6 +114,7 @@ Recovered from repo state:
 - Module 6 control template UI polish completed and deployed: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` to backend `ai-compliance-backend-00097-zrb` and dashboard `ai-compliance-dashboard-00050-gvx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 7 FRIA builder slice completed and deployed: migration `0013` adds sections_json/approval_json/completion_percent to fria_records; new endpoints `/sections`, `/submit`, `/review`, `/export`; guided 6-section dashboard wizard with completion bar, section tabs, save-per-section, submit/approve/reject modals, and Markdown export. Deployed through Cloud Build `8d765362-9c39-46d8-8a29-b6898eddbb32` to backend `ai-compliance-backend-00101-nsb` and dashboard `ai-compliance-dashboard-00052-h7w`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 2 customer-ready session and role enforcement completed and deployed: tenant roles now resolve to an explicit permission matrix; `/api/auth/me` exposes permissions and access labels; the dashboard proxy denies disallowed backend actions by method/path before they reach the API; the sidebar shows the active role/access level and hides billing/runtime links when the session lacks permission; Users & Access uses returned permissions to disable user/policy writes for non-admin roles. Local verification passed: `tests/test_tenant_admin.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `900d712d-fe26-4b47-ab1f-037b22df2282` to backend `ai-compliance-backend-00099-g8j` and dashboard `ai-compliance-dashboard-00051-pdj`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
+- Module 2 route-level RBAC enforcement completed and deploying: `DashboardPermission` dependency factory in `auth_service.py` reads `x-dashboard-user-role` header and enforces the same ROLE_PERMISSIONS matrix used by the dashboard proxy; wired as `dependencies=[DashboardPermission("...")]` on every write endpoint across 11 route files (governance:write → ai_systems/compliance/obligations/features/classification/website_scans/reviews; evidence:write → evidence vault; reports:write → reports/website_scans report; scanner:run → website_scans create; runtime:execute → chat; billing:manage → billing); 18 RBAC tests verify viewer/auditor/reviewer blocked and owner passes; full suite 164 passed 1 skipped. Committed `28c74f2`, Cloud Build `3dec826d` in progress.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
 - Module 8 started: report service and report pages.
@@ -184,6 +185,11 @@ Use this as the next session checklist.
 - [x] Deploy Module 2 customer-ready session and role enforcement to GCP staging and update the deployed baseline.
 - [x] Implement Module 7 FRIA builder guided workflow (sections, submit, approve/reject, export).
 - [x] Deploy Module 7 FRIA builder to GCP staging and update the deployed baseline.
+- [x] Implement Module 2 backend route-level DashboardPermission enforcement on all write routes (11 route files, 18 RBAC tests).
+- [x] Deploy Module 2 RBAC route enforcement to GCP staging and verify revisions (Cloud Build `3dec826d` SUCCESS, backend `00103-xz2`, dashboard `00053-kcv`).
+- [x] Update deployed baseline in tracker after Cloud Build `3dec826d` completes.
+- [ ] Continue Module 8 Report Builder: PDF export, evidence bundle ZIP, AI system factsheet.
+- [ ] Continue Module 5: GCS object storage for evidence artifacts.
 
 ## Tracking Rules Going Forward
 
