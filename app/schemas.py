@@ -277,6 +277,23 @@ class FRIAUpdate(BaseModel):
     signoff_json: Optional[Dict[str, Any]] = None
     status: Optional[str] = None
 
+class FRIASectionsUpdate(BaseModel):
+    """Update one or more FRIA builder sections. Omit a key to leave that section unchanged."""
+    intended_purpose: Optional[Dict[str, Any]] = None
+    affected_persons: Optional[Dict[str, Any]] = None
+    fundamental_rights_risks: Optional[Dict[str, Any]] = None
+    mitigation_measures: Optional[Dict[str, Any]] = None
+    human_oversight: Optional[Dict[str, Any]] = None
+    residual_risk: Optional[Dict[str, Any]] = None
+
+class FRIASubmitRequest(BaseModel):
+    submitted_by: str  # email of the submitter
+
+class FRIAReviewRequest(BaseModel):
+    reviewer_email: str
+    outcome: str  # "approved" | "rejected"
+    notes: Optional[str] = None
+
 class FRIAResponse(BaseModel):
     id: str
     tenant_id: str
@@ -286,6 +303,9 @@ class FRIAResponse(BaseModel):
     legal_basis_json: List[Dict[str, Any]] = Field(default_factory=list)
     dpia_link_json: Dict[str, Any] = Field(default_factory=dict)
     signoff_json: Dict[str, Any] = Field(default_factory=dict)
+    sections_json: Dict[str, Any] = Field(default_factory=dict)
+    approval_json: Dict[str, Any] = Field(default_factory=dict)
+    completion_percent: int = 0
     created_at: datetime
     updated_at: datetime
 

@@ -263,7 +263,19 @@ Sections:
 - Approval workflow
 - Exportable FRIA document
 
-Status: basic FRIA records exist; builder workflow remains to build.
+Status: in progress. Guided 6-section FRIA builder, section-level save with completion tracking, submit-for-review flow (draft → in_review), approve/reject workflow (in_review → approved/rejected), Markdown export endpoint, and full dashboard wizard with section tabs, completion bar, approval modals, and export button are implemented and deployed to staging.
+
+Current FRIA builder slice:
+- Migration `0013` adds `sections_json`, `approval_json`, and `completion_percent` to `fria_records`.
+- `PATCH /v1/obligations/fria/{fria_id}/sections` saves one or more named sections and recomputes completion percent (0–100).
+- `POST /v1/obligations/fria/{fria_id}/submit` transitions draft → in_review and records submitter email and timestamp in `approval_json`.
+- `POST /v1/obligations/fria/{fria_id}/review` transitions in_review → approved/rejected and records reviewer, outcome, and notes in `approval_json`; logs evidence event.
+- `GET /v1/obligations/fria/{fria_id}/export` returns the FRIA as a downloadable Markdown document including all sections, legal basis (Article 27), and approval record.
+- Dashboard FRIA list shows per-FRIA completion bars, status counters, and an inline create panel with AI system picker.
+- Dashboard FRIA detail is a full guided wizard with 6 section tabs, field prompts, section-level save, next/previous navigation, submit modal (email capture), approve/reject modal, and Export Markdown button.
+- Sections can be edited in draft and rejected states; rejected FRIAs can be revised and resubmitted after the status is reset to draft.
+
+Deployment checkpoint: FRIA builder is deployed to staging through Cloud Build `[pending deployment]`. Next hardening should add multi-reviewer approval chains, PDF export, and FRIA status surfaced prominently in the AI system workspace tiles.
 
 ### Module 8: Report Builder / Audit Pack
 

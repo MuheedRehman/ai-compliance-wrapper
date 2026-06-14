@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Response
+from fastapi.responses import PlainTextResponse
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import (
     AnnexIIICategoryResponse,
     ComplianceDimensionResponse,
     FRIACreate, FRIAUpdate, FRIAResponse,
+    FRIASectionsUpdate, FRIASubmitRequest, FRIAReviewRequest,
     OversightCreate, OversightUpdate, OversightResponse,
     IncidentCreate, IncidentUpdate, IncidentResponse,
     ObligationExplanationResponse,
@@ -69,6 +71,31 @@ def update_fria(fria_id: str, payload: FRIAUpdate, x_api_key: str | None = Heade
 def delete_fria(fria_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.delete_fria(db, auth["tenant_id"], fria_id)
+
+@router.patch("/fria/{fria_id}/sections", response_model=FRIAResponse)
+def update_fria_sections(fria_id: str, payload: FRIASectionsUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
+    return ObligationService.update_fria_sections(db, auth["tenant_id"], fria_id, payload)
+
+@router.post("/fria/{fria_id}/submit", response_model=FRIAResponse)
+def submit_fria(fria_id: str, payload: FRIASubmitRequest, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
+    return ObligationService.submit_fria(db, auth["tenant_id"], fria_id, payload)
+
+@router.post("/fria/{fria_id}/review", response_model=FRIAResponse)
+def review_fria(fria_id: str, payload: FRIAReviewRequest, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
+    return ObligationService.review_fria(db, auth["tenant_id"], fria_id, payload)
+
+@router.get("/fria/{fria_id}/export", response_class=PlainTextResponse)
+def export_fria(fria_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
+    auth = authenticate_api_key(db, x_api_key, required_scope="fria:read")
+    markdown = ObligationService.export_fria_markdown(db, auth["tenant_id"], fria_id)
+    return PlainTextResponse(
+        content=markdown,
+        media_type="text/markdown",
+        headers={"Content-Disposition": f'attachment; filename="fria-{fria_id}.md"'},
+    )
 
 
 # --- Oversight ---

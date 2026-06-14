@@ -323,13 +323,19 @@ class FRIARecord(Base):
     id = Column(String, primary_key=True, index=True)
     tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
     ai_system_id = Column(String, ForeignKey("ai_systems.id"), nullable=False, index=True)
-    
+
+    # status: draft | in_review | approved | rejected
     status = Column(String, nullable=False, default="draft")
     assessment_json = Column(JSON, nullable=False, default=dict)
     legal_basis_json = Column(JSON, nullable=False, default=list)
     dpia_link_json = Column(JSON, nullable=False, default=dict)
     signoff_json = Column(JSON, nullable=False, default=dict)
-    
+
+    # FRIA Builder (migration 0013)
+    sections_json = Column(JSON, nullable=False, default=dict)
+    approval_json = Column(JSON, nullable=False, default=dict)
+    completion_percent = Column(Integer, nullable=False, default=0)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

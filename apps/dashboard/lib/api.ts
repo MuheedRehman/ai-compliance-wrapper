@@ -278,6 +278,10 @@ export const api = {
   createFria: (body: any) => fetchApi<any>('/v1/obligations/fria', { method: 'POST', body: JSON.stringify(body) }),
   updateFria: (id: string, body: any) => fetchApi<any>(`/v1/obligations/fria/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteFria: (id: string) => fetchApi<any>(`/v1/obligations/fria/${id}`, { method: 'DELETE' }),
+  updateFriaSections: (id: string, body: any) => fetchApi<any>(`/v1/obligations/fria/${id}/sections`, { method: 'PATCH', body: JSON.stringify(body) }),
+  submitFria: (id: string, body: any) => fetchApi<any>(`/v1/obligations/fria/${id}/submit`, { method: 'POST', body: JSON.stringify(body) }),
+  reviewFria: (id: string, body: any) => fetchApi<any>(`/v1/obligations/fria/${id}/review`, { method: 'POST', body: JSON.stringify(body) }),
+  exportFriaUrl: (id: string) => `/v1/obligations/fria/${id}/export`,
 
   // Oversight
   listOversight: () => fetchApi<any[]>('/v1/obligations/oversight'),

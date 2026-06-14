@@ -1,6 +1,6 @@
 # Work Tracker
 
-Last updated: 2026-05-26
+Last updated: 2026-06-04
 
 This is the working memory for the project. Update it whenever a module is started, completed, paused, or reprioritized.
 
@@ -14,15 +14,14 @@ D:\AI_Compliance\Backend\Sprint6B_Migrations_Postgres_CI
 
 Current product focus:
 
-1. Module 2 customer-ready session and role enforcement is deployed to staging; next Module 2 hardening should add backend route-level dashboard permission dependencies beyond the dashboard proxy and actor attribution for non-admin governance mutations.
-2. Keep Module 1 scanner quality hardened with the deployed rendered SaaS crawl upgrade.
-3. Keep Module 5 Evidence Vault connected to obligation evidence requirements and control coverage.
-4. Keep Module 1 scanner output tightly connected to obligation dimensions and each AI system workspace.
-5. Keep Module 2 auth/tenant work stable because it is already started and security-critical.
+1. Module 7 FRIA Builder: implemented and locally verified; deploy to staging next.
+2. Module 2 hardening: add backend route-level permission checks beyond the dashboard proxy.
+3. Module 8 Report Builder: add PDF export, evidence bundle, AI system factsheet.
+4. Module 5 Evidence Vault: move artifact storage from database bytes to GCS.
 
 Current module slice:
 
-- Module 2 Customer-ready Session and Role Enforcement: deployed to staging. This slice adds an explicit tenant-role permission matrix, dashboard proxy permission checks for non-admin governance workflows, `/api/auth/me` permission visibility, role/access display in the dashboard chrome, and permission-aware controls on Users & Access.
+- Module 7 FRIA Builder: guided 6-section wizard, section-level save with completion tracking, submit-for-review (draft → in_review), approve/reject workflow (in_review → approved/rejected), Markdown export, and full dashboard wizard are implemented. Migration 0013 adds sections_json, approval_json, completion_percent. Local verification passed: full backend test suite and dashboard lint/build. Pending Cloud Build deploy.
 
 ## Mandatory Module Execution Workflow
 
@@ -67,7 +66,7 @@ Current technical baseline:
 | 4. Obligation Engine 2.0 | In progress | Structured compliance-dimension catalog, Annex III subcategory catalog/matcher, EU AI Act penalty exposure catalog, article/effective-date/scanner/evidence/control metadata, enriched intake obligation graphs, scanner-to-dimension scoring/output, scanner provider/deployer/importer scenario branching, persisted scanner role-to-intake selection, `/v1/obligations/dimensions`, `/v1/obligations/annex-iii`, `/v1/obligations/penalties`, `/v1/obligations/explain/intake/{id}`, dashboard intake/scanner dimension display, and tests exist. | Add more effective-date/deadline automation and richer "because you answered X" explanations for scanner-created workspaces. |
 | 5. Evidence Vault | In progress | First-class signed evidence items now exist with source, owner, type, status, hash/signature, related control/system, review/expiry dates, API routes, dashboard vault UI, AI system workspace linkage, deployed database-backed uploaded artifacts with artifact hashes/signatures and download endpoints, a deployed evidence-to-control attachment workflow, and a deployed artifact preview workflow. | Add an external object-storage backend. |
 | 6. Control Management | In progress | Compliance controls, readiness scorecard, evidence coverage, evidence attachment, owner/status/due date editing, severity, review cadence, review history, review comments, reusable control templates, audit-status export, and a full-width template catalog UI are deployed to staging. | Add reusable-template customization and branded/exportable control status reports. |
-| 7. FRIA / Risk Assessment Builder | Basic records only | FRIA endpoints/pages exist. | Build guided FRIA workflow, approval path, and exportable FRIA document. |
+| 7. FRIA / Risk Assessment Builder | In progress | Guided 6-section builder, section save, completion percent, submit-for-review, approve/reject, Markdown export, and full dashboard wizard now exist. | Add multi-reviewer approval chains, PDF export, and FRIA status in system workspace tiles. |
 | 8. Report Builder / Audit Pack | Started | Report service and dashboard report pages exist; report JSON/Markdown now includes penalty exposure bands when controls are missing or incomplete, and scanner-generated reports now include a scanner audit pack with public evidence coverage, found/missing evidence topics, public source excerpts, scanner gap findings, and remediation actions. | Continue polished audit pack work: PDF, evidence bundle packaging, AI system factsheet, and richer remediation plan export. |
 | 9. Runtime Governance SDK | Foundation only | Chat pipeline, feature approvals, provider abstraction, evidence logging exist. | Package policy checks, developer API keys, usage dashboard, and SDK-style docs. |
 | 10. Integrations | Future | Stripe billing/provider foundations exist. | Add Drive/SharePoint, Slack/Teams, Jira/Linear, GitHub, cloud logs after core workflows stabilize. |
@@ -113,6 +112,7 @@ Recovered from repo state:
 - Module 6 control lifecycle operations completed and deployed: control responses now expose severity, evidence-required/evidence-complete, review cadence, last/next review timestamps, review-overdue status, review history, and latest comments from existing control metadata; `/v1/compliance/controls/{control_id}/reviews` records review notes/history and can update status/severity/cadence; the Controls dashboard can edit owner/status/due date/severity/review cadence and record review notes inline. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `60776990-d787-4535-8db6-60e49b9f7ec6` to backend `ai-compliance-backend-00093-ljz` and dashboard `ai-compliance-dashboard-00048-928`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template and audit-status export completed and deployed: `/v1/compliance/control-templates` lists reusable EU AI Act templates with applied-state metadata; `/v1/compliance/controls/apply-templates` materializes selected templates into tenant or AI-system scopes; `/v1/compliance/audit-status` returns control readiness summary, evidence/owner/deadline/review gaps, row-level audit readiness, and Markdown export content; the Controls dashboard can apply templates and download the Markdown audit status snapshot. Local verification passed: `tests/test_compliance_controls.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `47502b9a-2591-41cc-b718-7e84edd2af40` to backend `ai-compliance-backend-00095-9q7` and dashboard `ai-compliance-dashboard-00049-5nw`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 6 control template UI polish completed and deployed: the Controls dashboard replaces the cramped half-width template dropdown with a full-width template catalog, visible Apply buttons on every template row, suggested evidence metadata, shared owner/due-date defaults, and E2E guardrails so health-check button sweeping does not apply templates accidentally. Local verification passed: full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `3e1f3083-237b-4a18-bbc3-6472cfa6fb91` to backend `ai-compliance-backend-00097-zrb` and dashboard `ai-compliance-dashboard-00050-gvx`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
+- Module 7 FRIA builder slice implemented: migration `0013` adds sections_json/approval_json/completion_percent to fria_records; new endpoints `/sections`, `/submit`, `/review`, `/export`; guided 6-section dashboard wizard with completion bar, section tabs, save-per-section, submit/approve/reject modals, and Markdown export. Local verification passed: full backend tests and dashboard lint/build. Pending Cloud Build deploy.
 - Module 2 customer-ready session and role enforcement completed and deployed: tenant roles now resolve to an explicit permission matrix; `/api/auth/me` exposes permissions and access labels; the dashboard proxy denies disallowed backend actions by method/path before they reach the API; the sidebar shows the active role/access level and hides billing/runtime links when the session lacks permission; Users & Access uses returned permissions to disable user/policy writes for non-admin roles. Local verification passed: `tests/test_tenant_admin.py`, full backend `tests`, dashboard lint, and dashboard build. Deployed through Cloud Build `900d712d-fe26-4b47-ab1f-037b22df2282` to backend `ai-compliance-backend-00099-g8j` and dashboard `ai-compliance-dashboard-00051-pdj`; Cloud Build staging Playwright E2E passed and dashboard `/login` returned `200 OK`.
 - Module 2 started: tenant admin/auth policies/users/invitations/login audit/dashboard settings.
 - Module 6 started: compliance controls/readiness scorecard.
@@ -182,6 +182,8 @@ Use this as the next session checklist.
 - [x] Deploy Module 6 control template catalog UI polish to GCP staging and update the deployed baseline.
 - [x] Implement Module 2 customer-ready session and role enforcement.
 - [x] Deploy Module 2 customer-ready session and role enforcement to GCP staging and update the deployed baseline.
+- [x] Implement Module 7 FRIA builder guided workflow (sections, submit, approve/reject, export).
+- [ ] Deploy Module 7 FRIA builder to GCP staging and update the deployed baseline.
 
 ## Tracking Rules Going Forward
 

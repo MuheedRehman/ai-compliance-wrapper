@@ -195,16 +195,195 @@ def test_incident_tenant_isolation(client: TestClient, admin_headers, seeded_sys
     # Ours
     payload = {"ai_system_id": seeded_system.id, "severity": "low", "description": "ours"}
     client.post("/v1/obligations/incidents", json=payload, headers=admin_headers)
-    
+
     # Theirs
     other = IncidentRecord(id="inc-other", tenant_id="other-tenant", ai_system_id="other-sys", severity="high", description="theirs")
     db_session.add(other)
     db_session.commit()
-    
+
     res = client.get("/v1/obligations/incidents", headers=admin_headers)
     assert len(res.json()) == 1
     res = client.get("/v1/obligations/incidents/inc-other", headers=admin_headers)
     assert res.status_code == 404
+
+
+# --- Module 7: FRIA Builder workflow tests ---
+
+def _create_fria(client, system_id, headers):
+    res = client.post("/v1/obligations/fria", json={"ai_system_id": system_id}, headers=headers)
+    assert res.status_code == 200
+    return res.json()["id"]
+
+
+def test_fria_sections_update_and_completion(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+
+    # Initially 0% complete and new response fields present
+    res = client.get(f"/v1/obligations/fria/{fria_id}", headers=admin_headers)
+    data = res.json()
+    assert data["completion_percent"] == 0
+    assert data["sections_json"] == {}
+    assert data["approval_json"] == {}
+
+    # Save two sections
+    sections = {
+        "intended_purpose": {
+            "system_description": "Credit scoring AI for loan applications",
+            "deployment_context": "Retail banking",
+            "intended_users": "Loan officers",
+            "geographic_scope": "EU",
+        },
+        "affected_persons": {
+            "population_description": "Adult loan applicants",
+            "vulnerable_groups": "Low-income individuals",
+            "estimated_scale": "50,000 per year",
+            "interaction_type": "Indirect automated decision",
+        },
+    }
+    res = client.patch(f"/v1/obligations/fria/{fria_id}/sections", json=sections, headers=admin_headers)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["completion_percent"] == round(2 / 6 * 100)
+    assert data["sections_json"]["intended_purpose"]["system_description"] == "Credit scoring AI for loan applications"
+
+    # Saving remaining 4 sections brings completion to 100%
+    remaining = {
+        "fundamental_rights_risks": {
+            "rights_at_risk": "Right to non-discrimination, right to explanation",
+            "risk_descriptions": "Potential bias against protected groups",
+            "severity_assessment": "High",
+            "likelihood_assessment": "Medium",
+        },
+        "mitigation_measures": {
+            "technical_measures": "Bias audits, SHAP explainability",
+            "organizational_measures": "Annual third-party audit",
+            "human_oversight_measures": "Loan officer can override",
+            "monitoring_approach": "Monthly fairness metrics review",
+        },
+        "human_oversight": {
+            "oversight_roles": "Chief Risk Officer, Compliance Manager",
+            "oversight_procedures": "Quarterly review board",
+            "override_capability": "Full manual override by loan officer",
+            "escalation_path": "DPO → Legal → Board",
+        },
+        "residual_risk": {
+            "remaining_risks": "Residual proxy discrimination possible",
+            "risk_acceptance_rationale": "Risk mitigated to acceptable level with controls",
+            "review_schedule": "Annual",
+            "dpo_consulted": "Yes, consulted 2026-01-15",
+        },
+    }
+    res = client.patch(f"/v1/obligations/fria/{fria_id}/sections", json=remaining, headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["completion_percent"] == 100
+
+
+def test_fria_approval_workflow(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+
+    # Submit for review
+    res = client.post(
+        f"/v1/obligations/fria/{fria_id}/submit",
+        json={"submitted_by": "compliance@example.com"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "in_review"
+    assert data["approval_json"]["submitted_by"] == "compliance@example.com"
+    assert data["approval_json"]["outcome"] is None
+
+    # Cannot edit sections while in_review
+    res = client.patch(
+        f"/v1/obligations/fria/{fria_id}/sections",
+        json={"intended_purpose": {"system_description": "blocked"}},
+        headers=admin_headers,
+    )
+    assert res.status_code == 409
+
+    # Cannot submit again
+    res = client.post(
+        f"/v1/obligations/fria/{fria_id}/submit",
+        json={"submitted_by": "compliance@example.com"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 409
+
+    # Approve
+    res = client.post(
+        f"/v1/obligations/fria/{fria_id}/review",
+        json={"reviewer_email": "dpo@example.com", "outcome": "approved", "notes": "Looks good"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "approved"
+    assert data["approval_json"]["reviewed_by"] == "dpo@example.com"
+    assert data["approval_json"]["outcome"] == "approved"
+
+
+def test_fria_rejection_allows_resubmission(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+
+    # Submit then reject
+    client.post(f"/v1/obligations/fria/{fria_id}/submit", json={"submitted_by": "x@x.com"}, headers=admin_headers)
+    res = client.post(
+        f"/v1/obligations/fria/{fria_id}/review",
+        json={"reviewer_email": "dpo@x.com", "outcome": "rejected", "notes": "Needs more detail"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["status"] == "rejected"
+
+    # Rejected FRIAs can have sections edited directly (no need to revert to draft)
+    res = client.patch(
+        f"/v1/obligations/fria/{fria_id}/sections",
+        json={"intended_purpose": {"system_description": "Updated after rejection", "deployment_context": "ctx", "intended_users": "users", "geographic_scope": "EU"}},
+        headers=admin_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["sections_json"]["intended_purpose"]["system_description"] == "Updated after rejection"
+
+    # Patch status back to draft before resubmission
+    res = client.patch(f"/v1/obligations/fria/{fria_id}", json={"status": "draft"}, headers=admin_headers)
+    assert res.status_code == 200
+
+    # Can resubmit after reverting to draft
+    res = client.post(f"/v1/obligations/fria/{fria_id}/submit", json={"submitted_by": "x@x.com"}, headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["status"] == "in_review"
+
+
+def test_fria_review_invalid_outcome(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+    client.post(f"/v1/obligations/fria/{fria_id}/submit", json={"submitted_by": "x@x.com"}, headers=admin_headers)
+    res = client.post(
+        f"/v1/obligations/fria/{fria_id}/review",
+        json={"reviewer_email": "dpo@x.com", "outcome": "pending"},
+        headers=admin_headers,
+    )
+    assert res.status_code == 422
+
+
+def test_fria_export_markdown(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+    client.patch(
+        f"/v1/obligations/fria/{fria_id}/sections",
+        json={
+            "intended_purpose": {
+                "system_description": "Recruitment AI",
+                "deployment_context": "HR",
+                "intended_users": "HR managers",
+                "geographic_scope": "EU",
+            }
+        },
+        headers=admin_headers,
+    )
+    res = client.get(f"/v1/obligations/fria/{fria_id}/export", headers=admin_headers)
+    assert res.status_code == 200
+    assert "Fundamental Rights Impact Assessment" in res.text
+    assert "Recruitment AI" in res.text
+    assert "Article 27" in res.text
 
 def test_evidence_domain_verification(client: TestClient, admin_headers, seeded_system, seeded_entitlements, db_session):
     from app.models import EvidenceLog

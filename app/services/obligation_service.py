@@ -3,7 +3,10 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import FRIARecord, OversightAssignment, IncidentRecord, AiSystem
-from app.schemas import FRIACreate, FRIAUpdate, OversightCreate, OversightUpdate, IncidentCreate, IncidentUpdate
+from app.schemas import (
+    FRIACreate, FRIAUpdate, FRIASectionsUpdate, FRIASubmitRequest, FRIAReviewRequest,
+    OversightCreate, OversightUpdate, IncidentCreate, IncidentUpdate,
+)
 from app.services.entitlement_service import check_entitlement
 from app.services.evidence_service import write_evidence_log
 from app.services.regulatory_knowledge import article_refs, serious_incident_deadline
@@ -94,6 +97,181 @@ class ObligationService:
         db.delete(fria)
         db.commit()
         return {"status": "deleted"}
+
+    # FRIA Builder helpers
+    _FRIA_SECTIONS = [
+        "intended_purpose",
+        "affected_persons",
+        "fundamental_rights_risks",
+        "mitigation_measures",
+        "human_oversight",
+        "residual_risk",
+    ]
+
+    @staticmethod
+    def _compute_completion(sections_json: dict) -> int:
+        complete = sum(
+            1 for s in ObligationService._FRIA_SECTIONS
+            if s in sections_json and any(
+                v for v in sections_json[s].values() if isinstance(v, str) and v.strip()
+            )
+        )
+        return round(complete / len(ObligationService._FRIA_SECTIONS) * 100)
+
+    @staticmethod
+    def update_fria_sections(db: Session, tenant_id: str, fria_id: str, payload: FRIASectionsUpdate) -> FRIARecord:
+        fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        if fria.status not in ("draft", "rejected"):
+            raise HTTPException(status_code=409, detail="Sections can only be edited in draft or rejected state")
+        merged = dict(fria.sections_json or {})
+        for section in ObligationService._FRIA_SECTIONS:
+            value = getattr(payload, section)
+            if value is not None:
+                merged[section] = value
+        fria.sections_json = merged
+        fria.completion_percent = ObligationService._compute_completion(merged)
+        db.commit()
+        db.refresh(fria)
+        return fria
+
+    @staticmethod
+    def submit_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIASubmitRequest) -> FRIARecord:
+        fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        if fria.status != "draft":
+            raise HTTPException(status_code=409, detail="Only draft FRIAs can be submitted for review")
+        fria.status = "in_review"
+        import datetime as _dt
+        fria.approval_json = {
+            "submitted_by": payload.submitted_by,
+            "submitted_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+            "reviewed_by": None,
+            "reviewed_at": None,
+            "outcome": None,
+            "notes": None,
+        }
+        write_evidence_log(db, {
+            "tenant_id": tenant_id,
+            "ai_system_id": fria.ai_system_id,
+            "evidence_domain": "governance_fria",
+            "event_type": "fria_submitted",
+            "request_id": f"req-{uuid.uuid4().hex[:8]}",
+            "trace_id": f"trc-{uuid.uuid4().hex[:8]}",
+            "decision": "pending_review",
+            "status": "success",
+            "risk_level": "none",
+            "risk_score": 0,
+            "metadata": {"fria_id": fria_id, "submitted_by": payload.submitted_by},
+        })
+        db.commit()
+        db.refresh(fria)
+        return fria
+
+    @staticmethod
+    def review_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIAReviewRequest) -> FRIARecord:
+        fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        if fria.status != "in_review":
+            raise HTTPException(status_code=409, detail="Only in-review FRIAs can be approved or rejected")
+        if payload.outcome not in ("approved", "rejected"):
+            raise HTTPException(status_code=422, detail="Outcome must be 'approved' or 'rejected'")
+        fria.status = payload.outcome
+        import datetime as _dt
+        fria.approval_json = {
+            **(fria.approval_json or {}),
+            "reviewed_by": payload.reviewer_email,
+            "reviewed_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+            "outcome": payload.outcome,
+            "notes": payload.notes,
+        }
+        write_evidence_log(db, {
+            "tenant_id": tenant_id,
+            "ai_system_id": fria.ai_system_id,
+            "evidence_domain": "governance_fria",
+            "event_type": f"fria_{payload.outcome}",
+            "request_id": f"req-{uuid.uuid4().hex[:8]}",
+            "trace_id": f"trc-{uuid.uuid4().hex[:8]}",
+            "decision": payload.outcome,
+            "status": "success",
+            "risk_level": "none",
+            "risk_score": 0,
+            "metadata": {"fria_id": fria_id, "reviewer": payload.reviewer_email},
+        })
+        db.commit()
+        db.refresh(fria)
+        return fria
+
+    @staticmethod
+    def export_fria_markdown(db: Session, tenant_id: str, fria_id: str) -> str:
+        fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        s = fria.sections_json or {}
+        approval = fria.approval_json or {}
+
+        def section_block(title: str, key: str, fields: list[tuple[str, str]]) -> str:
+            lines = [f"## {title}\n"]
+            data = s.get(key, {})
+            for field_key, label in fields:
+                val = data.get(field_key, "_Not provided_")
+                lines.append(f"**{label}**\n\n{val}\n")
+            return "\n".join(lines)
+
+        parts = [
+            f"# Fundamental Rights Impact Assessment\n",
+            f"**FRIA ID:** {fria.id}  \n**AI System ID:** {fria.ai_system_id}  \n**Status:** {fria.status}  \n**Completion:** {fria.completion_percent}%  \n**Created:** {fria.created_at.date()}  \n",
+            "---\n",
+            section_block("1. Intended Purpose", "intended_purpose", [
+                ("system_description", "System Description"),
+                ("deployment_context", "Deployment Context"),
+                ("intended_users", "Intended Users"),
+                ("geographic_scope", "Geographic Scope"),
+            ]),
+            section_block("2. Affected Persons", "affected_persons", [
+                ("population_description", "Population Description"),
+                ("vulnerable_groups", "Vulnerable Groups"),
+                ("estimated_scale", "Estimated Scale"),
+                ("interaction_type", "Interaction Type"),
+            ]),
+            section_block("3. Fundamental Rights Risks", "fundamental_rights_risks", [
+                ("rights_at_risk", "Rights at Risk"),
+                ("risk_descriptions", "Risk Descriptions"),
+                ("severity_assessment", "Severity Assessment"),
+                ("likelihood_assessment", "Likelihood Assessment"),
+            ]),
+            section_block("4. Mitigation Measures", "mitigation_measures", [
+                ("technical_measures", "Technical Measures"),
+                ("organizational_measures", "Organizational Measures"),
+                ("human_oversight_measures", "Human Oversight Measures"),
+                ("monitoring_approach", "Monitoring Approach"),
+            ]),
+            section_block("5. Human Oversight", "human_oversight", [
+                ("oversight_roles", "Oversight Roles"),
+                ("oversight_procedures", "Oversight Procedures"),
+                ("override_capability", "Override Capability"),
+                ("escalation_path", "Escalation Path"),
+            ]),
+            section_block("6. Residual Risk", "residual_risk", [
+                ("remaining_risks", "Remaining Risks"),
+                ("risk_acceptance_rationale", "Risk Acceptance Rationale"),
+                ("review_schedule", "Review Schedule"),
+                ("dpo_consulted", "DPO Consulted"),
+            ]),
+            "---\n",
+            "## Legal Basis\n",
+        ]
+        for ref in (fria.legal_basis_json or []):
+            parts.append(f"- **{ref.get('article', '')}**: {ref.get('title', '')} ({ref.get('source', '')})\n")
+
+        if approval:
+            parts += [
+                "\n---\n",
+                "## Approval Record\n",
+                f"**Submitted by:** {approval.get('submitted_by', '_—_')}  \n",
+                f"**Submitted at:** {approval.get('submitted_at', '_—_')}  \n",
+                f"**Reviewed by:** {approval.get('reviewed_by', '_Pending_')}  \n",
+                f"**Reviewed at:** {approval.get('reviewed_at', '_Pending_')}  \n",
+                f"**Outcome:** {approval.get('outcome', '_Pending_')}  \n",
+                f"**Notes:** {approval.get('notes') or '_None_'}  \n",
+            ]
+
+        return "\n".join(parts)
 
     # --- Oversight ---
     @staticmethod
