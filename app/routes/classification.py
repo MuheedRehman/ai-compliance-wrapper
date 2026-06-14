@@ -3,13 +3,13 @@ from fastapi import Query
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import ComplianceControlResponse, IntakeCreate, IntakeResponse
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.classification_service import ClassificationService
 from typing import List
 
 router = APIRouter(prefix="/v1/intake", tags=["Classification & Intake"])
 
-@router.post("", response_model=IntakeResponse)
+@router.post("", response_model=IntakeResponse, dependencies=[DashboardPermission("governance:write")])
 def create_intake(
     payload: IntakeCreate, 
     x_api_key: str | None = Header(default=None), 
@@ -36,7 +36,7 @@ def get_intake(
     return ClassificationService.get_intake(db, auth["tenant_id"], intake_id)
 
 
-@router.post("/{intake_id}/control-plan", response_model=List[ComplianceControlResponse])
+@router.post("/{intake_id}/control-plan", response_model=List[ComplianceControlResponse], dependencies=[DashboardPermission("governance:write")])
 def materialize_intake_control_plan(
     intake_id: str,
     ai_system_id: str | None = Query(default=None),

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Header, Response
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.schemas import ReportCreate, ReportResponse
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.report_service import ReportService
 from typing import List
 
@@ -18,7 +18,7 @@ def get_report(report_id: str, x_api_key: str | None = Header(default=None), db:
     auth = authenticate_api_key(db, x_api_key, required_scope="reports:read")
     return ReportService.get_report(db, auth["tenant_id"], report_id)
 
-@router.post("", response_model=ReportResponse)
+@router.post("", response_model=ReportResponse, dependencies=[DashboardPermission("reports:write")])
 def generate_report(payload: ReportCreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="reports:write")
     return ReportService.generate_report(db, auth["tenant_id"], payload)

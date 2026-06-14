@@ -11,7 +11,7 @@ from app.schemas import (
     EvidenceItemUpdate,
     EvidenceVaultSummaryResponse,
 )
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.evidence_vault_service import EvidenceVaultService
 
 
@@ -52,7 +52,7 @@ def get_evidence_summary(
     return EvidenceVaultService.summary(db, auth["tenant_id"], ai_system_id)
 
 
-@router.post("/items", response_model=EvidenceItemResponse)
+@router.post("/items", response_model=EvidenceItemResponse, dependencies=[DashboardPermission("evidence:write")])
 def create_evidence_item(
     payload: EvidenceItemCreate,
     x_api_key: str | None = Header(default=None),
@@ -62,7 +62,7 @@ def create_evidence_item(
     return EvidenceVaultService.create_item(db, auth["tenant_id"], payload)
 
 
-@router.patch("/items/{item_id}", response_model=EvidenceItemResponse)
+@router.patch("/items/{item_id}", response_model=EvidenceItemResponse, dependencies=[DashboardPermission("evidence:write")])
 def update_evidence_item(
     item_id: str,
     payload: EvidenceItemUpdate,
@@ -73,7 +73,7 @@ def update_evidence_item(
     return EvidenceVaultService.update_item(db, auth["tenant_id"], item_id, payload)
 
 
-@router.post("/items/{item_id}/artifacts", response_model=EvidenceArtifactResponse)
+@router.post("/items/{item_id}/artifacts", response_model=EvidenceArtifactResponse, dependencies=[DashboardPermission("evidence:write")])
 async def upload_evidence_artifact(
     item_id: str,
     file: UploadFile = File(...),

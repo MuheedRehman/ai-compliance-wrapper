@@ -4,13 +4,13 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import AiFeature, FeatureVersion
 from app.schemas import FeatureCreate, FeatureUpdate, VersionDecision
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.feature_service import approve_feature_version, reject_feature_version, create_feature as service_create_feature, update_feature as service_update_feature
 
 router = APIRouter()
 
 
-@router.post("/v1/features")
+@router.post("/v1/features", dependencies=[DashboardPermission("governance:write")])
 def create_feature(payload: FeatureCreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     feature = service_create_feature(db, auth["tenant_id"], payload)
@@ -33,7 +33,7 @@ def get_feature(feature_id: str, x_api_key: str | None = Header(default=None), d
     return jsonable_encoder(feature)
 
 
-@router.patch("/v1/features/{feature_id}")
+@router.patch("/v1/features/{feature_id}", dependencies=[DashboardPermission("governance:write")])
 def update_feature(feature_id: str, payload: FeatureUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     feature = service_update_feature(db, auth["tenant_id"], feature_id, payload)
@@ -50,7 +50,7 @@ def list_feature_versions(feature_id: str, x_api_key: str | None = Header(defaul
     return {"feature_id": feature_id, "versions": jsonable_encoder(versions)}
 
 
-@router.post("/v1/features/{feature_id}/versions/{feature_version_id}/approve")
+@router.post("/v1/features/{feature_id}/versions/{feature_version_id}/approve", dependencies=[DashboardPermission("governance:write")])
 def approve_version(feature_id: str, feature_version_id: str, payload: VersionDecision, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     version = approve_feature_version(db, auth["tenant_id"], feature_id, feature_version_id)
@@ -59,7 +59,7 @@ def approve_version(feature_id: str, feature_version_id: str, payload: VersionDe
     return jsonable_encoder(version)
 
 
-@router.post("/v1/features/{feature_id}/versions/{feature_version_id}/reject")
+@router.post("/v1/features/{feature_id}/versions/{feature_version_id}/reject", dependencies=[DashboardPermission("governance:write")])
 def reject_version(feature_id: str, feature_version_id: str, payload: VersionDecision, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="features:write")
     version = reject_feature_version(db, auth["tenant_id"], feature_id, feature_version_id)

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import ReviewTask
 from app.schemas import ReviewClose
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ def list_review_tasks(
     return {"tenant_id": auth["tenant_id"], "review_tasks": jsonable_encoder(tasks)}
 
 
-@router.patch("/v1/review-tasks/{task_id}/close")
+@router.patch("/v1/review-tasks/{task_id}/close", dependencies=[DashboardPermission("governance:write")])
 def close_review_task(task_id: str, payload: ReviewClose, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="reviews:write")
     task = db.query(ReviewTask).filter(ReviewTask.tenant_id == auth["tenant_id"], ReviewTask.review_task_id == task_id).first()

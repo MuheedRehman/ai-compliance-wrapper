@@ -15,7 +15,7 @@ from app.schemas import (
     EvidenceItemResponse,
     ReadinessScorecardResponse,
 )
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.compliance_control_service import ComplianceControlService
 from app.services.evidence_vault_service import EvidenceVaultService
 
@@ -43,7 +43,7 @@ def list_controls(
     return ComplianceControlService.list_controls(db, auth["tenant_id"], ai_system_id)
 
 
-@router.post("/controls", response_model=ComplianceControlResponse)
+@router.post("/controls", response_model=ComplianceControlResponse, dependencies=[DashboardPermission("governance:write")])
 def create_control(
     payload: ComplianceControlCreate,
     x_api_key: str | None = Header(default=None),
@@ -53,7 +53,7 @@ def create_control(
     return ComplianceControlService.create_control(db, auth["tenant_id"], payload)
 
 
-@router.post("/controls/apply-templates", response_model=List[ComplianceControlResponse])
+@router.post("/controls/apply-templates", response_model=List[ComplianceControlResponse], dependencies=[DashboardPermission("governance:write")])
 def apply_control_templates(
     payload: ComplianceControlTemplateApplyRequest,
     x_api_key: str | None = Header(default=None),
@@ -63,7 +63,7 @@ def apply_control_templates(
     return ComplianceControlService.apply_templates(db, auth["tenant_id"], payload)
 
 
-@router.patch("/controls/{control_id}", response_model=ComplianceControlResponse)
+@router.patch("/controls/{control_id}", response_model=ComplianceControlResponse, dependencies=[DashboardPermission("governance:write")])
 def update_control(
     control_id: str,
     payload: ComplianceControlUpdate,
@@ -74,7 +74,7 @@ def update_control(
     return ComplianceControlService.update_control(db, auth["tenant_id"], control_id, payload)
 
 
-@router.post("/controls/{control_id}/reviews", response_model=ComplianceControlResponse)
+@router.post("/controls/{control_id}/reviews", response_model=ComplianceControlResponse, dependencies=[DashboardPermission("governance:write")])
 def record_control_review(
     control_id: str,
     payload: ComplianceControlReviewCreate,
@@ -96,7 +96,7 @@ def list_control_evidence(
     return EvidenceVaultService.list_items(db, auth["tenant_id"], control_id=control_id, limit=500)
 
 
-@router.post("/controls/{control_id}/evidence/{item_id}", response_model=EvidenceItemResponse)
+@router.post("/controls/{control_id}/evidence/{item_id}", response_model=EvidenceItemResponse, dependencies=[DashboardPermission("evidence:write")])
 def attach_evidence_to_control(
     control_id: str,
     item_id: str,
@@ -107,7 +107,7 @@ def attach_evidence_to_control(
     return EvidenceVaultService.attach_item_to_control(db, auth["tenant_id"], item_id, control_id)
 
 
-@router.post("/controls/seed-baseline", response_model=List[ComplianceControlResponse])
+@router.post("/controls/seed-baseline", response_model=List[ComplianceControlResponse], dependencies=[DashboardPermission("governance:write")])
 def seed_baseline_controls(
     ai_system_id: Optional[str] = Query(default=None),
     x_api_key: str | None = Header(default=None),

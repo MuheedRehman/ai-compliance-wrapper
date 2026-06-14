@@ -12,7 +12,7 @@ from app.schemas import (
     ObligationExplanationResponse,
     PenaltyExposureResponse,
 )
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.classification_service import ClassificationService
 from app.services.obligation_service import ObligationService
 from app.services.regulatory_knowledge import list_annex_iii_categories, list_compliance_dimensions, list_penalty_exposures
@@ -57,32 +57,32 @@ def get_fria(fria_id: str, x_api_key: str | None = Header(default=None), db: Ses
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:read")
     return ObligationService.get_fria(db, auth["tenant_id"], fria_id)
 
-@router.post("/fria", response_model=FRIAResponse)
+@router.post("/fria", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def create_fria(payload: FRIACreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.create_fria(db, auth["tenant_id"], payload)
 
-@router.patch("/fria/{fria_id}", response_model=FRIAResponse)
+@router.patch("/fria/{fria_id}", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def update_fria(fria_id: str, payload: FRIAUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.update_fria(db, auth["tenant_id"], fria_id, payload)
 
-@router.delete("/fria/{fria_id}")
+@router.delete("/fria/{fria_id}", dependencies=[DashboardPermission("governance:write")])
 def delete_fria(fria_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.delete_fria(db, auth["tenant_id"], fria_id)
 
-@router.patch("/fria/{fria_id}/sections", response_model=FRIAResponse)
+@router.patch("/fria/{fria_id}/sections", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def update_fria_sections(fria_id: str, payload: FRIASectionsUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.update_fria_sections(db, auth["tenant_id"], fria_id, payload)
 
-@router.post("/fria/{fria_id}/submit", response_model=FRIAResponse)
+@router.post("/fria/{fria_id}/submit", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def submit_fria(fria_id: str, payload: FRIASubmitRequest, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.submit_fria(db, auth["tenant_id"], fria_id, payload)
 
-@router.post("/fria/{fria_id}/review", response_model=FRIAResponse)
+@router.post("/fria/{fria_id}/review", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def review_fria(fria_id: str, payload: FRIAReviewRequest, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:write")
     return ObligationService.review_fria(db, auth["tenant_id"], fria_id, payload)
@@ -104,17 +104,17 @@ def list_oversight(x_api_key: str | None = Header(default=None), db: Session = D
     auth = authenticate_api_key(db, x_api_key, required_scope="oversight:read")
     return ObligationService.list_oversight(db, auth["tenant_id"])
 
-@router.post("/oversight", response_model=OversightResponse)
+@router.post("/oversight", response_model=OversightResponse, dependencies=[DashboardPermission("governance:write")])
 def create_oversight(payload: OversightCreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="oversight:write")
     return ObligationService.create_oversight(db, auth["tenant_id"], payload)
 
-@router.patch("/oversight/{assignment_id}", response_model=OversightResponse)
+@router.patch("/oversight/{assignment_id}", response_model=OversightResponse, dependencies=[DashboardPermission("governance:write")])
 def update_oversight(assignment_id: str, payload: OversightUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="oversight:write")
     return ObligationService.update_oversight(db, auth["tenant_id"], assignment_id, payload)
 
-@router.delete("/oversight/{assignment_id}")
+@router.delete("/oversight/{assignment_id}", dependencies=[DashboardPermission("governance:write")])
 def delete_oversight(assignment_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="oversight:write")
     return ObligationService.delete_oversight(db, auth["tenant_id"], assignment_id)
@@ -131,17 +131,17 @@ def get_incident(incident_id: str, x_api_key: str | None = Header(default=None),
     auth = authenticate_api_key(db, x_api_key, required_scope="incidents:read")
     return ObligationService.get_incident(db, auth["tenant_id"], incident_id)
 
-@router.post("/incidents", response_model=IncidentResponse)
+@router.post("/incidents", response_model=IncidentResponse, dependencies=[DashboardPermission("governance:write")])
 def create_incident(payload: IncidentCreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="incidents:write")
     return ObligationService.create_incident(db, auth["tenant_id"], payload)
 
-@router.patch("/incidents/{incident_id}", response_model=IncidentResponse)
+@router.patch("/incidents/{incident_id}", response_model=IncidentResponse, dependencies=[DashboardPermission("governance:write")])
 def update_incident(incident_id: str, payload: IncidentUpdate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="incidents:write")
     return ObligationService.update_incident(db, auth["tenant_id"], incident_id, payload)
 
-@router.delete("/incidents/{incident_id}")
+@router.delete("/incidents/{incident_id}", dependencies=[DashboardPermission("governance:write")])
 def delete_incident(incident_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="incidents:write")
     return ObligationService.delete_incident(db, auth["tenant_id"], incident_id)

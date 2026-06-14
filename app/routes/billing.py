@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from app.db import get_db
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.schemas import (
     SubscriptionStatusResponse,
     CheckoutSessionRequest,
@@ -30,7 +30,7 @@ def get_tenant_subscription(
         "current_period_end": sub.current_period_end
     }
 
-@router.post("/checkout-session", response_model=CheckoutSessionResponse)
+@router.post("/checkout-session", response_model=CheckoutSessionResponse, dependencies=[DashboardPermission("billing:manage")])
 def create_tenant_checkout_session(
     request: CheckoutSessionRequest,
     x_api_key: str | None = Header(default=None),
@@ -41,7 +41,7 @@ def create_tenant_checkout_session(
     url = create_checkout(db, tenant_id, request.plan_id)
     return {"checkout_url": url}
 
-@router.post("/portal-session", response_model=PortalSessionResponse)
+@router.post("/portal-session", response_model=PortalSessionResponse, dependencies=[DashboardPermission("billing:manage")])
 def create_tenant_portal_session(
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)

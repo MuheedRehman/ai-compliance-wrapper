@@ -12,7 +12,7 @@ from app.schemas import (
     WebsiteScanReportResponse,
     WebsiteScanResponse,
 )
-from app.services.auth_service import authenticate_api_key
+from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.entitlement_service import check_entitlement
 from app.services.report_service import ReportService
 from app.services.website_scanner_service import WebsiteScannerService
@@ -20,7 +20,7 @@ from app.services.website_scanner_service import WebsiteScannerService
 router = APIRouter(prefix="/v1/website-scans", tags=["Website Compliance Scanner"])
 
 
-@router.post("", response_model=WebsiteScanResponse)
+@router.post("", response_model=WebsiteScanResponse, dependencies=[DashboardPermission("scanner:run")])
 async def create_website_scan(
     payload: WebsiteScanCreate,
     x_api_key: str | None = Header(default=None),
@@ -49,7 +49,7 @@ def get_website_scan(
     return WebsiteScannerService.get_scan(db, auth["tenant_id"], scan_id)
 
 
-@router.post("/{scan_id}/convert", response_model=WebsiteScanConvertResponse)
+@router.post("/{scan_id}/convert", response_model=WebsiteScanConvertResponse, dependencies=[DashboardPermission("governance:write")])
 def convert_website_scan(
     scan_id: str,
     payload: WebsiteScanConvertRequest | None = None,
@@ -72,7 +72,7 @@ def convert_website_scan(
     }
 
 
-@router.post("/{scan_id}/report", response_model=WebsiteScanReportResponse)
+@router.post("/{scan_id}/report", response_model=WebsiteScanReportResponse, dependencies=[DashboardPermission("reports:write")])
 def generate_website_scan_report(
     scan_id: str,
     payload: WebsiteScanConvertRequest | None = None,
