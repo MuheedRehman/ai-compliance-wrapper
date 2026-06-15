@@ -16,7 +16,13 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError(
+            "DATABASE_URL environment variable is required for Alembic migrations. "
+            "Set it before running 'alembic upgrade head'."
+        )
+    return url
 
 
 def run_migrations_offline() -> None:

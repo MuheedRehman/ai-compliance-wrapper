@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -12,6 +12,7 @@ from app.schemas import (
     WebsiteScanReportResponse,
     WebsiteScanResponse,
 )
+from app.limiter import limiter
 from app.services.auth_service import authenticate_api_key, DashboardPermission
 from app.services.entitlement_service import check_entitlement
 from app.services.report_service import ReportService
@@ -21,7 +22,9 @@ router = APIRouter(prefix="/v1/website-scans", tags=["Website Compliance Scanner
 
 
 @router.post("", response_model=WebsiteScanResponse, dependencies=[DashboardPermission("scanner:run")])
+@limiter.limit("5/minute")
 async def create_website_scan(
+    request: Request,
     payload: WebsiteScanCreate,
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db),

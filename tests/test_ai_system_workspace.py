@@ -41,7 +41,7 @@ async def test_ai_system_workspace_aggregates_scanner_lifecycle_records(
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "workspacebot.example"},
+        json={"url": "https://workspacebot.example"},
     ).json()
     report_response = client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
     assert report_response.status_code == 200

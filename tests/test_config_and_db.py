@@ -38,14 +38,19 @@ def test_production_config_rejects_mock_and_weak_defaults(monkeypatch):
     monkeypatch.setattr(app.config, "FRONTEND_URL", "*")
     monkeypatch.setattr(app.config, "AI_PROVIDER_MODE", "demo")
 
-    with pytest.raises(RuntimeError, match="Production APP_ENV cannot use a SQLite DATABASE_URL"):
+    with pytest.raises(RuntimeError, match="cannot use a SQLite DATABASE_URL"):
         app.config.validate_runtime_config()
+
+
+# High-entropy secret: 32 unique chars → ~160 bits entropy
+_STRONG_SECRET = "aAbBcCdDeEfF0123456789!@#$%^&*()"
 
 
 def test_production_config_accepts_strong_runtime_settings(monkeypatch):
     monkeypatch.setattr(app.config, "APP_ENV", "production")
     monkeypatch.setattr(app.config, "DATABASE_URL", "postgresql+psycopg2://user:pass@localhost/db")
-    monkeypatch.setattr(app.config, "EVIDENCE_HMAC_SECRET", "x" * 32)
+    monkeypatch.setattr(app.config, "EVIDENCE_HMAC_SECRET", _STRONG_SECRET)
+    monkeypatch.setattr(app.config, "API_KEY_PEPPER", None)
     monkeypatch.setattr(app.config, "STRIPE_API_KEY", "sk_live_real")
     monkeypatch.setattr(app.config, "STRIPE_WEBHOOK_SECRET", "whsec_real")
     monkeypatch.setattr(app.config, "FRONTEND_URL", "https://dashboard.example")

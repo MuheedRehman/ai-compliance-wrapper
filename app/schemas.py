@@ -1,6 +1,17 @@
-from pydantic import BaseModel, Field, ConfigDict
+import ipaddress
+import re
+from urllib.parse import urlparse
+
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Literal
+
+# Private/reserved address ranges that must never be fetched via the scanner
+_SSRF_BLOCKED = re.compile(
+    r"^(localhost|.*\.local)$"
+    r"|^(127\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.|169\.254\.)",
+    re.IGNORECASE,
+)
 
 
 class Message(BaseModel):
@@ -611,6 +622,26 @@ class EvidenceVaultSummaryResponse(BaseModel):
 class WebsiteScanCreate(BaseModel):
     url: str
     max_pages: int = Field(default=6, ge=1, le=12)
+
+    @field_validator("url")
+    @classmethod
+    def validate_no_ssrf(cls, v: str) -> str:
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("URL must use http or https scheme")
+        host = (parsed.hostname or "").lower()
+        if not host:
+            raise ValueError("URL must include a valid hostname")
+        if _SSRF_BLOCKED.match(host):
+            raise ValueError("URL resolves to a private or reserved address")
+        try:
+            addr = ipaddress.ip_address(host)
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+                raise ValueError("URL resolves to a private or reserved address")
+        except ValueError as exc:
+            if "private" in str(exc) or "reserved" in str(exc) or "loopback" in str(exc):
+                raise
+        return v
 
 
 class WebsiteScanConvertRequest(BaseModel):

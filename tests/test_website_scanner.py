@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 
 from app.models import AiSystem, ComplianceControl, Entitlement, EvidenceLog, IntakeAssessment, ReportRecord, WebsiteScan
 from app.services.website_scanner_service import PageArtifact, WebsiteScannerService
@@ -274,7 +274,7 @@ async def test_convert_website_scan_creates_system_and_intake(client, admin_head
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "supportbot.example"},
+        json={"url": "https://supportbot.example"},
     ).json()
 
     response = client.post(f"/v1/website-scans/{scan['id']}/convert", headers=admin_headers)
@@ -312,7 +312,7 @@ async def test_convert_website_scan_uses_selected_role_scenario(client, admin_he
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "hireops.example"},
+        json={"url": "https://hireops.example"},
     ).json()
 
     response = client.post(
@@ -378,7 +378,7 @@ async def test_convert_website_scan_materializes_controls_and_evidence_once(
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "creditscore.example"},
+        json={"url": "https://creditscore.example"},
     ).json()
 
     first = client.post(f"/v1/website-scans/{scan['id']}/convert", headers=admin_headers)
@@ -447,7 +447,7 @@ async def test_generate_website_scan_report_converts_scan_and_links_sources(
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "assistly.example"},
+        json={"url": "https://assistly.example"},
     ).json()
 
     response = client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
@@ -508,7 +508,7 @@ async def test_generate_website_scan_report_requires_report_entitlement(
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "no-entitlement.example"},
+        json={"url": "https://no-entitlement.example"},
     ).json()
 
     response = client.post(f"/v1/website-scans/{scan['id']}/report", headers=admin_headers)
@@ -553,7 +553,7 @@ async def test_generate_website_scan_report_rolls_back_conversion_on_report_fail
     scan = client.post(
         "/v1/website-scans",
         headers=admin_headers,
-        json={"url": "rollback.example"},
+        json={"url": "https://rollback.example"},
     ).json()
 
     with pytest.raises(RuntimeError, match="simulated report failure"):

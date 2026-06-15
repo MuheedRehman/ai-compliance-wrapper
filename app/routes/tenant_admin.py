@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from typing import List
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from fastapi import Query
+
 from app.schemas import (
     TenantAdminSummaryResponse,
     TenantActionAuditResponse,
@@ -19,6 +21,7 @@ from app.schemas import (
     TenantUserResponse,
     TenantUserUpdate,
 )
+from app.limiter import limiter
 from app.services.auth_service import authenticate_api_key
 from app.services import tenant_admin_service
 
@@ -328,7 +331,9 @@ def list_action_audit(
 
 
 @router.post("/login/resolve", response_model=TenantLoginResolveResponse)
+@limiter.limit("10/minute")
 def resolve_login(
+    request: Request,
     payload: TenantLoginResolveRequest,
     x_api_key: str | None = Header(default=None),
     x_forwarded_for: str | None = Header(default=None),
@@ -348,3 +353,23 @@ def resolve_login(
     )
     db.commit()
     return response
+
+
+@router.delete("/data", status_code=204, summary="GDPR Right to Erasure — purge all tenant data")
+def purge_tenant_data(
+    confirm: str = Query(..., description="Must be the string 'DELETE_ALL_DATA' to confirm"),
+    x_api_key: str | None = Header(default=None),
+    dashboard_session: DashboardSessionHeaders = Depends(get_dashboard_session_headers),
+    db: Session = Depends(get_db),
+):
+    """Permanently deletes all data associated with this tenant (GDPR Art. 17).
+    Requires tenant:admin scope and owner/admin dashboard role. Irreversible."""
+    auth = authenticate_api_key(db, x_api_key, required_scope="tenant:admin")
+    require_dashboard_admin(db, auth, dashboard_session)
+    if confirm != "DELETE_ALL_DATA":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail="Confirmation string must be exactly 'DELETE_ALL_DATA'",
+        )
+    tenant_admin_service.purge_tenant(db, auth["tenant_id"])

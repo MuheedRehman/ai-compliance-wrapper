@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Header, Query, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -73,6 +73,9 @@ def update_evidence_item(
     return EvidenceVaultService.update_item(db, auth["tenant_id"], item_id, payload)
 
 
+_MAX_ARTIFACT_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
+
+
 @router.post("/items/{item_id}/artifacts", response_model=EvidenceArtifactResponse, dependencies=[DashboardPermission("evidence:write")])
 async def upload_evidence_artifact(
     item_id: str,
@@ -81,7 +84,22 @@ async def upload_evidence_artifact(
     db: Session = Depends(get_db),
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="evidence:write")
-    content = await file.read()
+    # Read in chunks so oversized files are rejected before filling memory
+    _CHUNK = 65536  # 64 KB
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        chunk = await file.read(_CHUNK)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > _MAX_ARTIFACT_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File exceeds maximum upload size of {_MAX_ARTIFACT_UPLOAD_BYTES // (1024 * 1024)} MB",
+            )
+        chunks.append(chunk)
+    content = b"".join(chunks)
     return EvidenceVaultService.attach_artifact(
         db,
         auth["tenant_id"],

@@ -446,6 +446,14 @@ class EvidenceArtifact(Base):
     evidence_item = relationship("EvidenceItem", back_populates="artifacts")
 
 
+class ProcessedStripeEvent(Base):
+    """Idempotency guard for Stripe webhook events — prevents double-processing on retries."""
+    __tablename__ = "processed_stripe_events"
+
+    stripe_event_id = Column(String, primary_key=True)
+    processed_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
 class TenantSubscription(Base):
     __tablename__ = "tenant_subscriptions"
     

@@ -20,7 +20,7 @@ def get_tenant_subscription(
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)
 ):
-    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing")
+    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing:manage")
     tenant_id = auth_context["tenant_id"]
     sub = get_subscription(db, tenant_id)
     return {
@@ -36,7 +36,7 @@ def create_tenant_checkout_session(
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)
 ):
-    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing")
+    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing:manage")
     tenant_id = auth_context["tenant_id"]
     url = create_checkout(db, tenant_id, request.plan_id)
     return {"checkout_url": url}
@@ -46,7 +46,7 @@ def create_tenant_portal_session(
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)
 ):
-    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing")
+    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing:manage")
     tenant_id = auth_context["tenant_id"]
     url = create_portal(db, tenant_id)
     return {"portal_url": url}
@@ -56,7 +56,7 @@ def get_tenant_entitlements(
     x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)
 ):
-    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing")
+    auth_context = authenticate_api_key(db, x_api_key, required_scope="billing:manage")
     tenant_id = auth_context["tenant_id"]
     entitlements = get_entitlements(db, tenant_id)
     return [

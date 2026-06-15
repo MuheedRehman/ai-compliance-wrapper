@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from fastapi import FastAPI, Request
@@ -7,6 +8,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
+logger = logging.getLogger(__name__)
 
 
 class ErrorDetail(BaseModel):
@@ -117,18 +120,37 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
+        def _safe_errors(errors: list) -> list:
+            """Pydantic v2 puts the raw Exception object in ctx.error — make it JSON-safe."""
+            result = []
+            for err in errors:
+                safe = {k: v for k, v in err.items() if k != "ctx"}
+                if "ctx" in err:
+                    safe["ctx"] = {
+                        ck: str(cv) if isinstance(cv, Exception) else cv
+                        for ck, cv in err["ctx"].items()
+                    }
+                result.append(safe)
+            return result
+
         return JSONResponse(
             status_code=422,
             content=error_payload(
                 code="validation_error",
                 message="Request validation failed",
                 error_type="validation_error",
-                details={"errors": exc.errors()},
+                details={"errors": _safe_errors(exc.errors())},
             ),
         )
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(request: Request, exc: Exception):
+        logger.exception(
+            "Unhandled exception on %s %s",
+            request.method,
+            request.url.path,
+            exc_info=exc,
+        )
         return JSONResponse(
             status_code=500,
             content=error_payload(

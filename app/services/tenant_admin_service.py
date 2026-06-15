@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
+
+from sqlalchemy import text
 
 from app.models import TenantActionAudit, TenantAuthPolicy, TenantInvitation, TenantLoginAudit, TenantUser
 
@@ -367,6 +369,7 @@ def invite_user(
         role=role,
         status="pending",
         invited_by_email=invited_by_email,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
     )
     db.add(invitation)
     db.flush()
@@ -530,9 +533,14 @@ def resolve_login_identity(
 
     invitation = _find_pending_invitation(db, tenant_id, email)
     if invitation:
-        if invitation.expires_at and invitation.expires_at < now:
-            invitation.status = "expired"
-            return _failure(db, tenant_id, email, provider, "invitation_expired", ip_address, user_agent)
+        inv_expires = invitation.expires_at
+        if inv_expires:
+            # SQLite returns naive datetimes; Postgres returns aware — normalize before compare
+            if inv_expires.tzinfo is None:
+                inv_expires = inv_expires.replace(tzinfo=timezone.utc)
+            if inv_expires < now:
+                invitation.status = "expired"
+                return _failure(db, tenant_id, email, provider, "invitation_expired", ip_address, user_agent)
         user = TenantUser(
             id=f"usr_{uuid4().hex}",
             tenant_id=tenant_id,
@@ -584,3 +592,52 @@ def resolve_login_identity(
         "user": user,
         "permissions": permissions_for_role(user.role),
     }
+
+
+def purge_tenant(db: Session, tenant_id: str) -> dict:
+    """GDPR Right to Erasure — hard-deletes all data belonging to a tenant.
+    Deletes in FK-dependency order so no constraint violations occur.
+    This operation is irreversible."""
+    tables_in_order = [
+        # Leaf tables first (no dependants)
+        "evidence_artifacts",
+        "evidence_items",
+        "evidence_logs",
+        "control_review_events",
+        "compliance_controls",
+        "ai_system_review_events",
+        "fria_records",
+        "oversight_assignments",
+        "incidents",
+        "website_scans",
+        "ai_system_intakes",
+        "reports",
+        "ai_feature_versions",
+        "ai_features",
+        "ai_systems",
+        "usage_meters",
+        "entitlements",
+        "tenant_subscriptions",
+        "tenant_action_audit",
+        "tenant_login_audit",
+        "tenant_invitations",
+        "tenant_users",
+        "tenant_auth_policies",
+        "api_keys",
+    ]
+    counts: dict[str, int] = {}
+    for table in tables_in_order:
+        result = db.execute(
+            text(f"DELETE FROM {table} WHERE tenant_id = :tid"),
+            {"tid": tenant_id},
+        )
+        counts[table] = result.rowcount
+
+    # Delete the tenant record last
+    result = db.execute(
+        text("DELETE FROM tenants WHERE tenant_id = :tid"),
+        {"tid": tenant_id},
+    )
+    counts["tenants"] = result.rowcount
+    db.commit()
+    return counts

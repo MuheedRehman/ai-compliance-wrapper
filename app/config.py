@@ -22,6 +22,8 @@ CANDIDATE_VERSION_POLICY = get_secret("CANDIDATE_VERSION_POLICY", "allow_with_wa
 EVIDENCE_CHAIN_MODE = get_secret("EVIDENCE_CHAIN_MODE", "best_effort_tenant_chain")
 EVIDENCE_HMAC_SECRET = get_secret("EVIDENCE_HMAC_SECRET")
 
+API_KEY_PEPPER = get_secret("API_KEY_PEPPER")
+
 FIRECRAWL_API_KEY = get_secret("FIRECRAWL_API_KEY")
 FIRECRAWL_API_URL = get_secret("FIRECRAWL_API_URL", "https://api.firecrawl.dev/v1")
 FIRECRAWL_ALLOWED_DOMAINS = get_secret("FIRECRAWL_ALLOWED_DOMAINS", "")
@@ -49,6 +51,7 @@ VALID_FEATURE_ENFORCEMENT_MODES = {"warn", "quarantine", "block"}
 VALID_CANDIDATE_VERSION_POLICIES = {"allow_with_warning", "quarantine", "block"}
 VALID_AI_PROVIDER_MODES = {"live", "demo"}
 PRODUCTION_ENVS = {"production", "prod"}
+STRICT_ENVS = {"production", "prod", "staging"}  # Envs that get full validation
 
 if FEATURE_ID_ENFORCEMENT not in VALID_FEATURE_ENFORCEMENT_MODES:
     raise RuntimeError(f"Invalid FEATURE_ID_ENFORCEMENT={FEATURE_ID_ENFORCEMENT}")
@@ -59,17 +62,41 @@ if CANDIDATE_VERSION_POLICY not in VALID_CANDIDATE_VERSION_POLICIES:
 if AI_PROVIDER_MODE not in VALID_AI_PROVIDER_MODES:
     raise RuntimeError(f"Invalid AI_PROVIDER_MODE={AI_PROVIDER_MODE}")
 
+def _check_secret_entropy(secret: str, name: str, min_bits: int = 128) -> None:
+    """Reject low-entropy secrets (e.g. all-same-character strings)."""
+    import math, collections
+    if not secret:
+        return
+    counts = collections.Counter(secret)
+    total = len(secret)
+    bits = -sum((c / total) * math.log2(c / total) for c in counts.values()) * total
+    if bits < min_bits:
+        raise RuntimeError(
+            f"{name} has insufficient entropy ({bits:.0f} bits < {min_bits} required). "
+            f"Generate with: python -c \"import secrets; print(secrets.token_hex(32))\""
+        )
+
+
 def validate_runtime_config() -> None:
     if not EVIDENCE_HMAC_SECRET:
         raise RuntimeError("EVIDENCE_HMAC_SECRET is missing. Add it to .env.")
 
-    if APP_ENV not in PRODUCTION_ENVS:
+    if APP_ENV not in STRICT_ENVS:
         return
 
     if DATABASE_URL.startswith("sqlite"):
-        raise RuntimeError("Production APP_ENV cannot use a SQLite DATABASE_URL.")
+        raise RuntimeError(f"APP_ENV={APP_ENV} cannot use a SQLite DATABASE_URL.")
     if len(EVIDENCE_HMAC_SECRET) < 32:
-        raise RuntimeError("Production EVIDENCE_HMAC_SECRET must be at least 32 characters.")
+        raise RuntimeError(f"APP_ENV={APP_ENV} EVIDENCE_HMAC_SECRET must be at least 32 characters.")
+    _check_secret_entropy(EVIDENCE_HMAC_SECRET, "EVIDENCE_HMAC_SECRET")
+    if API_KEY_PEPPER and len(API_KEY_PEPPER) < 32:
+        raise RuntimeError(f"APP_ENV={APP_ENV} API_KEY_PEPPER must be at least 32 characters.")
+    if API_KEY_PEPPER:
+        _check_secret_entropy(API_KEY_PEPPER, "API_KEY_PEPPER")
+
+    if APP_ENV not in PRODUCTION_ENVS:
+        return
+
     if STRIPE_API_KEY == "sk_test_mock":
         raise RuntimeError("Production STRIPE_API_KEY cannot use the mock default.")
     if STRIPE_WEBHOOK_SECRET == "whsec_mock":

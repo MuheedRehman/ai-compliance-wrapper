@@ -2,7 +2,7 @@ import hashlib
 import hmac
 import json
 from typing import Any
-from app.config import EVIDENCE_HMAC_SECRET
+from app.config import API_KEY_PEPPER, EVIDENCE_HMAC_SECRET
 
 
 def stable_json(data: Any) -> str:
@@ -24,4 +24,7 @@ def hmac_signature(data: Any) -> str:
 
 
 def hash_api_key(api_key: str) -> str:
-    return sha256_text(api_key)
+    """HMAC-SHA256 keyed with a server-side pepper to prevent rainbow table attacks.
+    Falls back to EVIDENCE_HMAC_SECRET if API_KEY_PEPPER is not explicitly configured."""
+    pepper = (API_KEY_PEPPER or EVIDENCE_HMAC_SECRET or "").encode("utf-8")
+    return hmac.new(pepper, api_key.encode("utf-8"), hashlib.sha256).hexdigest()
