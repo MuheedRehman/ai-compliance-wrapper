@@ -2,6 +2,8 @@ import re
 from dataclasses import asdict, dataclass
 from typing import Any
 
+_MAX_RISK_INPUT = 4_000  # chars — caps regex scan to bound worst-case runtime
+
 
 @dataclass
 class RuleResult:
@@ -24,9 +26,11 @@ def _severity_score(severity: str) -> int:
 def pii_rules(text: str) -> list[RuleResult]:
     rules = []
     patterns = {
-        "pii.email.detected": ("email", r"[\w\.-]+@[\w\.-]+\.\w+"),
+        # email: domain part uses [\w-]+ (no dot) so the literal \. before TLD is unambiguous
+        "pii.email.detected": ("email", r"[\w.+-]+@[\w-]+\.[\w.]+"),
         "pii.phone.detected": ("phone", r"\+?\d[\d\s\-\(\)]{7,}\d"),
-        "pii.credit_card.possible": ("credit card-like number", r"\b(?:\d[ -]*?){13,16}\b"),
+        # credit card: [ -]? (simple optional) instead of [ -]*? (lazy) avoids exponential backtracking
+        "pii.credit_card.possible": ("credit card-like number", r"\b\d(?:[ -]?\d){12,15}\b"),
         "pii.iban.possible": ("IBAN-like identifier", r"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b"),
     }
     for rule_id, (label, pattern) in patterns.items():
@@ -65,6 +69,7 @@ def regulated_domain_rules(text: str, policy_context: dict[str, Any] | None = No
 
 
 def assess_risk(text: str, policy_context: dict[str, Any] | None = None) -> dict:
+    text = text[:_MAX_RISK_INPUT]
     results = pii_rules(text) + secret_rules(text) + regulated_domain_rules(text, policy_context)
     score = min(sum({"low": 10, "medium": 25, "high": 40, "critical": 60}.get(r.severity, 10) for r in results), 100)
     risk_level = "high" if score >= 60 else "medium" if score >= 25 else "low"
