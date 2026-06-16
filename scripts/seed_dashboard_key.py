@@ -106,7 +106,8 @@ def _seed_once():
                 ))
                 print(f"Created tenant owner user: {DASHBOARD_OWNER_EMAIL}")
 
-        # Upsert API key
+        # Upsert API key — always re-hash so the stored digest stays in sync
+        # with the current hashing algorithm (e.g. after a SHA-256 → HMAC migration).
         key_hash = hash_api_key(raw_api_key)
         existing = db.query(ApiKey).filter(ApiKey.key_id == KEY_ID).first()
         if not existing:
@@ -125,7 +126,8 @@ def _seed_once():
             else:
                 print(f"Created API key: {KEY_ID}  (hash: {key_hash[:16]}...)")
         else:
-            print(f"API key already exists: {KEY_ID}")
+            existing.key_hash = key_hash  # re-hash with current algorithm on every seed
+            print(f"Updated API key hash: {KEY_ID}  (hash: {key_hash[:16]}...)")
 
         for feature_key in ENTITLEMENTS:
             entitlement = db.query(Entitlement).filter(
