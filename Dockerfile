@@ -15,11 +15,12 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install --no-cache-dir psycopg2-binary uvicorn gunicorn
 
-# Playwright: install browser as the app user so chromium runs without root
+# Playwright: system deps as root, browser binary as appuser (--with-deps requires root)
 RUN useradd --create-home --shell /bin/bash --uid 1001 appuser
+RUN python -m playwright install-deps chromium
 USER appuser
 ENV PLAYWRIGHT_BROWSERS_PATH=/home/appuser/.cache/ms-playwright
-RUN python -m playwright install --with-deps chromium
+RUN python -m playwright install chromium
 USER root
 
 COPY --chown=appuser:appuser . .
