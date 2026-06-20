@@ -55,7 +55,7 @@ def list_frias(x_api_key: str | None = Header(default=None), db: Session = Depen
 @router.get("/fria/{fria_id}", response_model=FRIAResponse)
 def get_fria(fria_id: str, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):
     auth = authenticate_api_key(db, x_api_key, required_scope="fria:read")
-    return ObligationService.get_fria(db, auth["tenant_id"], fria_id)
+    return ObligationService.get_fria_response(db, auth["tenant_id"], fria_id)
 
 @router.post("/fria", response_model=FRIAResponse, dependencies=[DashboardPermission("governance:write")])
 def create_fria(payload: FRIACreate, x_api_key: str | None = Header(default=None), db: Session = Depends(get_db)):

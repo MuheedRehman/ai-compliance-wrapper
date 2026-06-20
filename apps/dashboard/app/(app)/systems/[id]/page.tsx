@@ -449,7 +449,11 @@ export default function SystemDetailPage() {
             <WorkspaceAction
               icon={<ShieldCheck className="h-4 w-4" />}
               label={drillDownActions.fria?.record_id ? 'Open FRIA' : 'Start FRIA'}
-              value={`${drillDownActions.fria?.count || 0} records`}
+              value={
+                drillDownActions.fria?.record_id
+                  ? `${drillDownActions.fria.completion_percent ?? 0}% · ${(drillDownActions.fria.fria_status as string ?? 'draft').replace('_', ' ')}`
+                  : 'Not started'
+              }
               onClick={handleStartFria}
               busy={runningAction === 'fria'}
             />

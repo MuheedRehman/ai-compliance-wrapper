@@ -24,19 +24,44 @@ class ObligationService:
 
     # --- FRIA ---
     @staticmethod
-    def list_frias(db: Session, tenant_id: str) -> List[FRIARecord]:
+    def _enrich_fria(db: Session, fria: FRIARecord) -> dict:
+        """Return FRIA as dict with ai_system_name resolved."""
+        system_name = db.query(AiSystem.name).filter(AiSystem.id == fria.ai_system_id).scalar()
+        return {
+            **{col.name: getattr(fria, col.name) for col in FRIARecord.__table__.columns},
+            "ai_system_name": system_name,
+        }
+
+    @staticmethod
+    def list_frias(db: Session, tenant_id: str) -> list:
         if not check_entitlement(db, tenant_id, "fria_management"):
             raise HTTPException(status_code=403, detail="FRIA management not entitled for this tenant")
-        return db.query(FRIARecord).filter(FRIARecord.tenant_id == tenant_id).all()
+        rows = (
+            db.query(FRIARecord, AiSystem.name.label("sys_name"))
+            .outerjoin(AiSystem, AiSystem.id == FRIARecord.ai_system_id)
+            .filter(FRIARecord.tenant_id == tenant_id)
+            .all()
+        )
+        return [
+            {**{col.name: getattr(fria, col.name) for col in FRIARecord.__table__.columns}, "ai_system_name": sys_name}
+            for fria, sys_name in rows
+        ]
 
     @staticmethod
     def get_fria(db: Session, tenant_id: str, fria_id: str) -> FRIARecord:
+        """Internal helper — returns ORM object for use by other service methods."""
         if not check_entitlement(db, tenant_id, "fria_management"):
             raise HTTPException(status_code=403, detail="FRIA management not entitled for this tenant")
         fria = db.query(FRIARecord).filter(FRIARecord.tenant_id == tenant_id, FRIARecord.id == fria_id).first()
         if not fria:
             raise HTTPException(status_code=404, detail="FRIA record not found")
         return fria
+
+    @staticmethod
+    def get_fria_response(db: Session, tenant_id: str, fria_id: str) -> dict:
+        """Route-facing get — returns enriched dict with ai_system_name."""
+        fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
     def create_fria(db: Session, tenant_id: str, payload: FRIACreate) -> FRIARecord:
@@ -73,10 +98,10 @@ class ObligationService:
         
         db.commit()
         db.refresh(fria)
-        return fria
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
-    def update_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIAUpdate) -> FRIARecord:
+    def update_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIAUpdate) -> dict:
         fria = ObligationService.get_fria(db, tenant_id, fria_id)
         if payload.status is not None:
             fria.status = payload.status
@@ -86,14 +111,16 @@ class ObligationService:
             fria.dpia_link_json = payload.dpia_link_json
         if payload.signoff_json is not None:
             fria.signoff_json = payload.signoff_json
-        
+
         db.commit()
         db.refresh(fria)
-        return fria
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
     def delete_fria(db: Session, tenant_id: str, fria_id: str):
         fria = ObligationService.get_fria(db, tenant_id, fria_id)
+        if fria.status == "approved":
+            raise HTTPException(status_code=409, detail="Approved FRIAs cannot be deleted")
         db.delete(fria)
         db.commit()
         return {"status": "deleted"}
@@ -132,13 +159,13 @@ class ObligationService:
         fria.completion_percent = ObligationService._compute_completion(merged)
         db.commit()
         db.refresh(fria)
-        return fria
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
     def submit_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIASubmitRequest) -> FRIARecord:
         fria = ObligationService.get_fria(db, tenant_id, fria_id)
-        if fria.status != "draft":
-            raise HTTPException(status_code=409, detail="Only draft FRIAs can be submitted for review")
+        if fria.status not in ("draft", "rejected"):
+            raise HTTPException(status_code=409, detail="Only draft or rejected FRIAs can be submitted for review")
         fria.status = "in_review"
         import datetime as _dt
         fria.approval_json = {
@@ -164,7 +191,7 @@ class ObligationService:
         })
         db.commit()
         db.refresh(fria)
-        return fria
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
     def review_fria(db: Session, tenant_id: str, fria_id: str, payload: FRIAReviewRequest) -> FRIARecord:
@@ -197,7 +224,7 @@ class ObligationService:
         })
         db.commit()
         db.refresh(fria)
-        return fria
+        return ObligationService._enrich_fria(db, fria)
 
     @staticmethod
     def export_fria_markdown(db: Session, tenant_id: str, fria_id: str) -> str:

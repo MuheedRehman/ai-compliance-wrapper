@@ -335,7 +335,7 @@ def test_fria_rejection_allows_resubmission(client: TestClient, admin_headers, s
     assert res.status_code == 200
     assert res.json()["status"] == "rejected"
 
-    # Rejected FRIAs can have sections edited directly (no need to revert to draft)
+    # Rejected FRIAs can have sections edited without reverting to draft
     res = client.patch(
         f"/v1/obligations/fria/{fria_id}/sections",
         json={"intended_purpose": {"system_description": "Updated after rejection", "deployment_context": "ctx", "intended_users": "users", "geographic_scope": "EU"}},
@@ -344,14 +344,37 @@ def test_fria_rejection_allows_resubmission(client: TestClient, admin_headers, s
     assert res.status_code == 200
     assert res.json()["sections_json"]["intended_purpose"]["system_description"] == "Updated after rejection"
 
-    # Patch status back to draft before resubmission
-    res = client.patch(f"/v1/obligations/fria/{fria_id}", json={"status": "draft"}, headers=admin_headers)
-    assert res.status_code == 200
-
-    # Can resubmit after reverting to draft
+    # Can resubmit directly from rejected state (no manual draft reset required)
     res = client.post(f"/v1/obligations/fria/{fria_id}/submit", json={"submitted_by": "x@x.com"}, headers=admin_headers)
     assert res.status_code == 200
     assert res.json()["status"] == "in_review"
+
+
+def test_fria_approved_cannot_be_deleted(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+    client.post(f"/v1/obligations/fria/{fria_id}/submit", json={"submitted_by": "x@x.com"}, headers=admin_headers)
+    client.post(
+        f"/v1/obligations/fria/{fria_id}/review",
+        json={"reviewer_email": "dpo@x.com", "outcome": "approved", "notes": ""},
+        headers=admin_headers,
+    )
+    res = client.delete(f"/v1/obligations/fria/{fria_id}", headers=admin_headers)
+    assert res.status_code == 409
+    assert "cannot be deleted" in res.json()["error"]["message"]
+
+
+def test_fria_response_includes_system_name(client: TestClient, admin_headers, seeded_system, seeded_entitlements):
+    fria_id = _create_fria(client, seeded_system.id, admin_headers)
+
+    # Single get
+    res = client.get(f"/v1/obligations/fria/{fria_id}", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()["ai_system_name"] == seeded_system.name
+
+    # List
+    res = client.get("/v1/obligations/fria", headers=admin_headers)
+    assert res.status_code == 200
+    assert res.json()[0]["ai_system_name"] == seeded_system.name
 
 
 def test_fria_review_invalid_outcome(client: TestClient, admin_headers, seeded_system, seeded_entitlements):

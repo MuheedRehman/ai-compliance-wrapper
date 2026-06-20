@@ -415,7 +415,8 @@ export default function FriaDetailPage() {
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">AI System</p>
-                    <p className="text-xs text-zinc-300 font-mono mt-0.5">{fria.ai_system_id}</p>
+                    <p className="text-xs text-zinc-300 font-medium mt-0.5">{fria.ai_system_name || fria.ai_system_id}</p>
+                    <p className="text-[10px] text-zinc-600 font-mono mt-0.5">{fria.ai_system_id}</p>
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">Legal Basis</p>

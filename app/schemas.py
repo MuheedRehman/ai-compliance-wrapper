@@ -309,6 +309,7 @@ class FRIAResponse(BaseModel):
     id: str
     tenant_id: str
     ai_system_id: str
+    ai_system_name: Optional[str] = None
     status: str
     assessment_json: Dict[str, Any]
     legal_basis_json: List[Dict[str, Any]] = Field(default_factory=list)

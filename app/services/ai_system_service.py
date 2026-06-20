@@ -401,6 +401,8 @@ def _build_workspace_drill_down_actions(
             "primary_label": "Open FRIA" if latest_fria else "Start FRIA",
             "next_action": "open_fria" if latest_fria else "start_fria_draft",
             "count": len(fria_records),
+            "fria_status": latest_fria.status if latest_fria else None,
+            "completion_percent": latest_fria.completion_percent if latest_fria else 0,
         },
         "oversight": {
             "href": _workspace_href("/oversight", **system_query),

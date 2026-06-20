@@ -211,7 +211,7 @@ export default function FriaPage() {
                           <h4 className="font-bold text-white tracking-tight text-sm">{fria.id}</h4>
                           <StatusBadge value={fria.status} />
                         </div>
-                        <p className="text-xs text-zinc-500 mt-0.5 font-medium truncate">System: {fria.ai_system_id}</p>
+                        <p className="text-xs text-zinc-500 mt-0.5 font-medium truncate">System: {fria.ai_system_name || fria.ai_system_id}</p>
                         <CompletionBar percent={fria.completion_percent ?? 0} />
                       </div>
                     </div>
