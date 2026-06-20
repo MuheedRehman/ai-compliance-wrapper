@@ -2,14 +2,28 @@ import Sidebar from '@/components/sidebar';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE, verifySessionToken } from '@/lib/server-session';
+import { permissionsForRole, accessLabel } from '@/lib/session-permissions';
+import type { CurrentSession } from '@/lib/api';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const session = verifySessionToken(cookies().get(SESSION_COOKIE)?.value);
   if (!session) redirect('/login');
 
+  const sessionData: CurrentSession = {
+    authenticated: true,
+    email: session.email,
+    name: session.name,
+    provider: session.provider,
+    tenant_id: session.tenant_id,
+    role: session.role,
+    user_id: session.user_id,
+    permissions: permissionsForRole(session.role),
+    access_label: accessLabel(session.role),
+  };
+
   return (
     <div className="min-h-screen bg-zinc-950 flex">
-      <Sidebar />
+      <Sidebar initialSession={sessionData} />
 
       {/* Main Content Area */}
       <main className="flex-1 lg:ml-[260px] min-h-screen flex flex-col">

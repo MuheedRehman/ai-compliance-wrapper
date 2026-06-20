@@ -17,8 +17,15 @@ export type SessionPayload = {
 
 type SessionClaims = Pick<SessionPayload, 'email' | 'name' | 'provider' | 'tenant_id' | 'role' | 'user_id'>;
 
-function sessionSecret() {
-  return process.env.DASHBOARD_SESSION_SECRET || process.env.DASHBOARD_API_KEY || 'dev-session-secret';
+function sessionSecret(): string {
+  const secret = process.env.DASHBOARD_SESSION_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error(
+      'DASHBOARD_SESSION_SECRET must be set to a random string of at least 32 characters. ' +
+      'Generate one with: openssl rand -hex 32',
+    );
+  }
+  return secret;
 }
 
 function base64url(input: string | Buffer) {

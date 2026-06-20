@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (!accessResponse.ok) {
-    console.error('Password login tenant policy failed', accessResponse.status, await accessResponse.text());
+    console.error({ event: 'login_policy_failure', status: accessResponse.status });
     return NextResponse.json({ detail: 'Tenant login policy check failed' }, { status: 403 });
   }
 

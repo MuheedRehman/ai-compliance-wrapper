@@ -268,10 +268,7 @@ export default function FriaDetailPage() {
   };
 
   const handleExport = () => {
-    const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || '';
-    const apiKey = typeof window !== 'undefined' ? (document.cookie.match(/api_key=([^;]+)/)?.[1] || '') : '';
-    // Open in new tab — browser downloads due to Content-Disposition header
-    window.open(`${API_BASE}/v1/obligations/fria/${id}/export`, '_blank');
+    window.open(`/api/fria/${id}/export`, '_blank');
   };
 
   if (loading) return <PageShell title="FRIA Builder" subtitle="Loading…"><Loading /></PageShell>;

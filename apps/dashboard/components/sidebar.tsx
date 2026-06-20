@@ -75,10 +75,10 @@ const navSections = [
   },
 ] satisfies { label: string; items: NavItem[] }[];
 
-export default function Sidebar() {
+export default function Sidebar({ initialSession }: { initialSession: CurrentSession | null }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [session, setSession] = useState<CurrentSession | null>(null);
+  const [session] = useState<CurrentSession | null>(initialSession);
 
   async function logout() {
     await fetch('/api/auth/logout', { method: 'POST' });
@@ -87,17 +87,6 @@ export default function Sidebar() {
 
   // Close mobile nav on route change
   useEffect(() => { setMobileOpen(false); }, [pathname]);
-
-  useEffect(() => {
-    let mounted = true;
-    fetch('/api/auth/me', { cache: 'no-store' })
-      .then((res) => res.ok ? res.json() : null)
-      .then((data: CurrentSession | null) => {
-        if (mounted && data?.authenticated) setSession(data);
-      })
-      .catch(() => undefined);
-    return () => { mounted = false; };
-  }, []);
 
   // Lock body scroll when mobile nav is open
   useEffect(() => {
