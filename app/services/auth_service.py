@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from fastapi import Depends, Header, HTTPException
 from sqlalchemy.orm import Session
+from app.db import get_db
 from app.models import ApiKey
 from app.services.hashing import hash_api_key
 
@@ -59,23 +60,43 @@ _ROLE_PERMISSIONS: dict[str, list[str]] = {
     ],
     "auditor": ["tenant:read", "governance:read", "evidence:read", "reports:read"],
     "viewer":  ["tenant:read", "governance:read", "evidence:read", "reports:read"],
+    # SDK/runtime API keys — can invoke the AI pipeline, nothing else
+    "app":     ["runtime:execute"],
 }
 
 
 def DashboardPermission(required_permission: str):
     """
-    FastAPI dependency factory. When the request carries x-dashboard-user-role
-    (set by the dashboard proxy), verify the role has required_permission.
-    If the header is absent the request is a direct API key call — governed by
-    scopes alone, no additional check applied.
+    FastAPI dependency factory.
+
+    - Dashboard proxy path (x-dashboard-user-role present): verify the role
+      has required_permission.
+    - Direct API key path (header absent): resolve the API key's role from DB
+      and enforce the same permission check. This closes the bypass where
+      direct callers could omit the header and skip role enforcement.
     """
-    def _check(x_dashboard_user_role: str | None = Header(default=None)) -> None:
-        if x_dashboard_user_role is None:
-            return
-        allowed = required_permission in _ROLE_PERMISSIONS.get(x_dashboard_user_role, [])
-        if not allowed:
+    def _check(
+        x_dashboard_user_role: str | None = Header(default=None),
+        x_api_key: str | None = Header(default=None),
+        db: Session = Depends(get_db),
+    ) -> None:
+        if x_dashboard_user_role is not None:
+            role = x_dashboard_user_role
+        elif x_api_key:
+            key_hash = hash_api_key(x_api_key)
+            record = db.query(ApiKey).filter(
+                ApiKey.key_hash == key_hash,
+                ApiKey.revoked == False,  # noqa: E712
+            ).first()
+            if not record:
+                raise HTTPException(status_code=401, detail="Invalid or revoked API key")
+            role = record.role
+        else:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        if required_permission not in _ROLE_PERMISSIONS.get(role, []):
             raise HTTPException(
                 status_code=403,
-                detail=f"Dashboard role '{x_dashboard_user_role}' does not have permission '{required_permission}'",
+                detail=f"Role '{role}' does not have permission '{required_permission}'",
             )
     return Depends(_check)

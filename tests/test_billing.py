@@ -1,13 +1,25 @@
 import pytest
 from fastapi.testclient import TestClient
-from app.models import Tenant, TenantSubscription, Entitlement, UsageMeter
+from app.models import ApiKey, Tenant, TenantSubscription, Entitlement, UsageMeter
+from app.services.hashing import hash_api_key
 from unittest.mock import patch
 import json
+
+BILLING_ADMIN_KEY = "aigw_billing_admin_key_456"
 
 @pytest.fixture
 def tenant_fixture(db_session):
     tenant = Tenant(tenant_id="tenant-123", name="Test Tenant")
     db_session.add(tenant)
+    db_session.add(ApiKey(
+        key_id="billing-admin-key",
+        tenant_id="tenant-123",
+        name="Billing Admin Key",
+        key_hash=hash_api_key(BILLING_ADMIN_KEY),
+        role="admin",
+        scopes=["admin", "billing:manage"],
+        revoked=False,
+    ))
     db_session.commit()
     db_session.refresh(tenant)
     return tenant
@@ -33,8 +45,8 @@ def test_get_subscription(client: TestClient, tenant_fixture, db_session):
     assert data["status"] == "active"
 
 def test_create_checkout_session(client: TestClient, tenant_fixture, db_session):
-    headers = {"Authorization": "Bearer test_api_key"}
-    
+    headers = {"x-api-key": BILLING_ADMIN_KEY}
+
     with patch("app.routes.billing.authenticate_api_key", return_value={"tenant_id": "tenant-123", "role": "admin"}):
         response = client.post(
             "/v1/billing/checkout-session",
@@ -78,8 +90,8 @@ def test_record_usage(client: TestClient, db_session, tenant_fixture):
     assert meter.count == 3
 
 def test_create_portal_session(client: TestClient, tenant_fixture, db_session):
-    headers = {"Authorization": "Bearer test_api_key"}
-    
+    headers = {"x-api-key": BILLING_ADMIN_KEY}
+
     with patch("app.routes.billing.authenticate_api_key", return_value={"tenant_id": "tenant-123", "role": "admin"}):
         response = client.post(
             "/v1/billing/portal-session",
