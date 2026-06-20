@@ -10,6 +10,8 @@ playwright
 python-multipart
 slowapi
 
+fpdf2
+
 pytest
 pytest-asyncio
 httpx

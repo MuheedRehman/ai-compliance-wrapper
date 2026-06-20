@@ -25,14 +25,36 @@ def generate_report(payload: ReportCreate, x_api_key: str | None = Header(defaul
 
 @router.get("/{report_id}/artifacts/{artifact_name}")
 def download_artifact(
-    report_id: str, 
-    artifact_name: str, 
-    x_api_key: str | None = Header(default=None), 
+    report_id: str,
+    artifact_name: str,
+    x_api_key: str | None = Header(default=None),
     db: Session = Depends(get_db)
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="reports:read")
     report = ReportService.get_report(db, auth["tenant_id"], report_id)
     content = ReportService.get_artifact(report, artifact_name)
-    
-    media_type = "application/json" if artifact_name.endswith(".json") else "text/markdown"
+
+    if artifact_name.endswith(".json"):
+        media_type = "application/json"
+    elif artifact_name.endswith(".md"):
+        media_type = "text/markdown"
+    elif artifact_name.endswith(".pdf"):
+        media_type = "application/pdf"
+    else:
+        media_type = "application/octet-stream"
     return Response(content=content, media_type=media_type)
+
+
+@router.get("/{report_id}/bundle")
+def download_bundle(
+    report_id: str,
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db)
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="reports:read")
+    bundle_bytes = ReportService.get_bundle(db, auth["tenant_id"], report_id)
+    return Response(
+        content=bundle_bytes,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{report_id}-bundle.zip"'},
+    )

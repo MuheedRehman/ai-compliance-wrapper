@@ -41,7 +41,7 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
   async function saveArtifact(artifact: string) {
     try {
       const result = await api.downloadArtifact(id, artifact);
-      const blob = new Blob([result.content], { type: result.contentType });
+      const blob = new Blob([result.content as any], { type: result.contentType });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -52,6 +52,23 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
       URL.revokeObjectURL(url);
     } catch (err: any) {
       setError(err.body?.detail || err.body?.error?.message || `Failed to download ${artifact}`);
+    }
+  }
+
+  async function saveBundle() {
+    try {
+      const result = await api.downloadBundle(id);
+      const blob = new Blob([result.content], { type: result.contentType });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${id}-bundle.zip`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.body?.detail || err.body?.error?.message || 'Failed to download bundle');
     }
   }
 
@@ -103,18 +120,30 @@ export default function ReportDetailPage({ params }: { params: { id: string } })
           <ArrowLeft className="h-4 w-4" /> Back to Reports
         </Link>
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           <button
             onClick={() => saveArtifact('report.json')}
-            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-xl text-sm font-bold transition-all"
           >
             <Download className="h-4 w-4" /> JSON
           </button>
           <button
             onClick={() => saveArtifact('report.md')}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
+            className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-2 rounded-xl text-sm font-bold transition-all"
           >
             <Download className="h-4 w-4" /> Markdown
+          </button>
+          <button
+            onClick={() => saveArtifact('report.pdf')}
+            className="flex items-center gap-2 bg-red-700 hover:bg-red-600 text-white px-3 py-2 rounded-xl text-sm font-bold transition-all"
+          >
+            <Download className="h-4 w-4" /> PDF
+          </button>
+          <button
+            onClick={saveBundle}
+            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-600/20 transition-all"
+          >
+            <Download className="h-4 w-4" /> Bundle
           </button>
         </div>
       </div>

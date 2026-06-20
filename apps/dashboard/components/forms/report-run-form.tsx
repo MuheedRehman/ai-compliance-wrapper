@@ -73,23 +73,28 @@ export default function ReportRunForm({
             <option value="compliance_readiness_summary">Compliance Readiness</option>
             <option value="incident_summary">Incident Summary</option>
             <option value="test_session_summary">Test Session Summary</option>
+            <option value="ai_system_factsheet">AI System Factsheet</option>
           </select>
         </div>
 
         <div>
           <label className="block text-[13px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-            AI System (Optional)
+            AI System{formData.report_type === 'ai_system_factsheet' ? ' (Required)' : ' (Optional)'}
           </label>
           <select
             value={formData.ai_system_id}
             onChange={(e) => setFormData({ ...formData, ai_system_id: e.target.value })}
             className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            required={formData.report_type === 'ai_system_factsheet'}
           >
-            <option value="">All Systems / Generic</option>
+            {formData.report_type !== 'ai_system_factsheet' && <option value="">All Systems / Generic</option>}
             {systems.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
+          {formData.report_type === 'ai_system_factsheet' && (
+            <p className="mt-1.5 text-xs text-amber-400/80">Factsheets require an AI system to be selected.</p>
+          )}
         </div>
 
         <div>

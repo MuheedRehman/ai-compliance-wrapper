@@ -328,6 +328,24 @@ export default function SystemDetailPage() {
     }
   }
 
+  async function handleGenerateFactsheet() {
+    if (!system) return;
+    setRunningAction('factsheet');
+    setError(null);
+    try {
+      const report = await api.createReport({
+        report_type: 'ai_system_factsheet',
+        ai_system_id: system.id,
+        title: `${system.name} — AI System Factsheet`,
+      });
+      router.push(`/reports/${report.id}`);
+    } catch (err: any) {
+      setError(err.body?.detail || err.message || 'Failed to generate factsheet');
+    } finally {
+      setRunningAction(null);
+    }
+  }
+
   async function handleStartFria() {
     if (!system) return;
     const existingFria = workspace?.fria_records?.[0];
@@ -445,6 +463,13 @@ export default function SystemDetailPage() {
               value={`${drillDownActions.reports?.count || 0} reports`}
               onClick={handleGenerateReport}
               busy={runningAction === 'reports'}
+            />
+            <WorkspaceAction
+              icon={<FileText className="h-4 w-4" />}
+              label="AI Factsheet"
+              value="System summary card"
+              onClick={handleGenerateFactsheet}
+              busy={runningAction === 'factsheet'}
             />
             <WorkspaceAction
               icon={<ShieldCheck className="h-4 w-4" />}

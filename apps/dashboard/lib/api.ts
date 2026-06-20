@@ -312,10 +312,23 @@ export const api = {
       throw new ApiError(res.status, body);
     }
 
+    const contentType = res.headers.get('content-type') || 'text/plain';
+    const isBinary = contentType.includes('pdf') || contentType.includes('octet-stream') || contentType.includes('zip');
     return {
-      content: await res.text(),
-      contentType: res.headers.get('content-type') || 'text/plain',
+      content: isBinary ? await res.arrayBuffer() : await res.text(),
+      contentType,
+      isBinary,
     };
+  },
+
+  downloadBundle: async (id: string) => {
+    const res = await fetch(`${API_BASE_URL}/v1/reports/${id}/bundle`, { cache: 'no-store' });
+    if (!res.ok) {
+      let body: any;
+      try { body = await res.json(); } catch { body = await res.text(); }
+      throw new ApiError(res.status, body);
+    }
+    return { content: await res.arrayBuffer(), contentType: 'application/zip' };
   },
 
   // Compliance Controls

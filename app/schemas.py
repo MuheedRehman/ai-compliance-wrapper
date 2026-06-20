@@ -388,7 +388,7 @@ class IncidentResponse(BaseModel):
 # --- Phase 4.5: Assessment & Report Engine ---
 
 class ReportCreate(BaseModel):
-    report_type: Literal["assessment_summary", "test_session_summary", "compliance_readiness_summary", "incident_summary"]
+    report_type: Literal["assessment_summary", "test_session_summary", "compliance_readiness_summary", "incident_summary", "ai_system_factsheet"]
     title: Optional[str] = None
     ai_system_id: Optional[str] = None
     feature_id: Optional[str] = None

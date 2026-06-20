@@ -1,13 +1,17 @@
-import uuid
+import io
 import json
+import uuid
+import zipfile
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from fpdf import FPDF
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models import (
     AiFeature,
     AiSystem,
     ComplianceControl,
+    EvidenceItem,
     EvidenceLog,
     FRIARecord,
     IncidentRecord,
@@ -187,7 +191,7 @@ class ReportService:
             if ai_system_id:
                 incidents = incidents.filter(IncidentRecord.ai_system_id == ai_system_id)
             inc_list = incidents.all()
-            
+
             for inc in inc_list:
                 source_refs.append({"type": "incident", "id": inc.id})
                 findings.append({
@@ -197,8 +201,103 @@ class ReportService:
                 })
                 if inc.status != "resolved":
                     remediation_actions.append({"title": f"Resolve Incident {inc.id}", "description": "Conduct root cause analysis and close incident."})
-            
+
             readiness = "ready" if all(inc.status == "resolved" for inc in inc_list) else "needs_attention"
+
+        elif payload.report_type == "ai_system_factsheet":
+            if not system:
+                raise HTTPException(status_code=400, detail="ai_system_id is required for ai_system_factsheet")
+
+            # FRIA status
+            frias = db.query(FRIARecord).filter(
+                FRIARecord.tenant_id == tenant_id,
+                FRIARecord.ai_system_id == ai_system_id,
+            ).order_by(FRIARecord.updated_at.desc()).all()
+            latest_fria = frias[0] if frias else None
+
+            # Compliance controls
+            controls = db.query(ComplianceControl).filter(
+                ComplianceControl.tenant_id == tenant_id,
+                ComplianceControl.ai_system_id == ai_system_id,
+            ).all()
+            completed_statuses = {"completed", "signed_off"}
+            control_score = (
+                round(sum(1 for c in controls if c.status in completed_statuses) / len(controls) * 100)
+                if controls else 0
+            )
+
+            # Oversight
+            oversights = db.query(OversightAssignment).filter(
+                OversightAssignment.tenant_id == tenant_id,
+                OversightAssignment.ai_system_id == ai_system_id,
+            ).all()
+
+            # Open incidents
+            incidents = db.query(IncidentRecord).filter(
+                IncidentRecord.tenant_id == tenant_id,
+                IncidentRecord.ai_system_id == ai_system_id,
+                IncidentRecord.status != "resolved",
+            ).all()
+
+            # Latest scan
+            latest_scan = db.query(WebsiteScan).filter(
+                WebsiteScan.tenant_id == tenant_id,
+                WebsiteScan.ai_system_id == ai_system_id,
+            ).order_by(WebsiteScan.created_at.desc()).first()
+
+            report_data["factsheet"] = {
+                "system": {
+                    "id": system.id,
+                    "name": system.name,
+                    "risk_level": getattr(system, "risk_level", None),
+                    "lifecycle_status": getattr(system, "lifecycle_status", None),
+                    "annex_iii_category": getattr(system, "annex_iii_category", None),
+                },
+                "fria": {
+                    "status": latest_fria.status if latest_fria else "not_started",
+                    "completion_percent": latest_fria.completion_percent if latest_fria else 0,
+                    "fria_id": latest_fria.id if latest_fria else None,
+                    "total_count": len(frias),
+                },
+                "compliance": {
+                    "control_count": len(controls),
+                    "completion_score": control_score,
+                },
+                "oversight": {
+                    "assignment_count": len(oversights),
+                    "roles": [o.role_type for o in oversights] if oversights else [],
+                },
+                "incidents": {
+                    "open_count": len(incidents),
+                    "ids": [i.id for i in incidents[:5]],
+                },
+                "scanner": {
+                    "last_scan_id": latest_scan.id if latest_scan else None,
+                    "last_scan_url": latest_scan.normalized_url if latest_scan else None,
+                    "confidence_score": latest_scan.confidence_score if latest_scan else None,
+                } if latest_scan else None,
+            }
+
+            # Findings driven from factsheet data
+            if not latest_fria:
+                findings.append({"title": "No FRIA recorded", "severity": "high", "description": "An EU AI Act Article 27 impact assessment has not been started."})
+                remediation_actions.append({"title": "Start FRIA", "description": "Create a Fundamental Rights Impact Assessment for this system."})
+            elif latest_fria.status not in ("approved", "completed"):
+                findings.append({"title": f"FRIA {latest_fria.completion_percent}% complete", "severity": "medium", "description": f"The FRIA is in '{latest_fria.status}' state."})
+
+            if control_score < 80:
+                findings.append({"title": f"Control score {control_score}%", "severity": "medium" if control_score >= 40 else "high", "description": f"Only {control_score}% of compliance controls are complete."})
+
+            if not oversights:
+                findings.append({"title": "No human oversight", "severity": "high", "description": "No oversight roles are assigned to this system."})
+
+            for inc in incidents[:3]:
+                findings.append({"title": f"Open incident: {inc.severity.upper()}", "severity": inc.severity, "description": inc.description[:150]})
+
+            readiness = (
+                "ready" if (latest_fria and latest_fria.status in ("approved", "completed") and oversights and control_score >= 80 and not incidents)
+                else ("partially_ready" if (latest_fria or oversights or controls) else "needs_attention")
+            )
 
         # Evidence gathering
         evidence_logs = db.query(EvidenceLog).filter(EvidenceLog.tenant_id == tenant_id)
@@ -235,7 +334,7 @@ class ReportService:
             "source_ref_count": len(source_refs),
             "evidence_ref_count": len(evidence_refs),
             "report_hash": hash_object(report_data),
-            "artifact_formats": ["json", "markdown"],
+            "artifact_formats": ["json", "markdown", "pdf"],
         }
 
         # Persist
@@ -249,7 +348,8 @@ class ReportService:
             source_refs_json=source_refs,
             artifact_metadata={
                 "json": f"{report_id}.json",
-                "markdown": f"{report_id}.md"
+                "markdown": f"{report_id}.md",
+                "pdf": f"{report_id}.pdf",
             },
             legal_basis_json=legal_basis,
             generation_manifest_json=manifest,
@@ -390,11 +490,13 @@ class ReportService:
         }
 
     @staticmethod
-    def get_artifact(report: ReportRecord, artifact_name: str) -> str:
+    def get_artifact(report: ReportRecord, artifact_name: str) -> str | bytes:
         if artifact_name.endswith(".json"):
             return json.dumps(report.report_json, indent=2)
         elif artifact_name.endswith(".md"):
             return ReportService._generate_markdown(report)
+        elif artifact_name.endswith(".pdf"):
+            return ReportService._generate_pdf(report)
         else:
             raise HTTPException(status_code=404, detail="Artifact not found")
 
@@ -481,3 +583,280 @@ class ReportService:
             seen.add(band_id)
             deduped.append(item)
         return deduped
+
+    # ------------------------------------------------------------------
+    # PDF generation (fpdf2)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _generate_pdf(report: ReportRecord) -> bytes:
+        data = report.report_json or {}
+        findings = data.get("findings", [])
+        remediation_actions = data.get("remediation_actions", [])
+        penalty_exposures = data.get("penalty_exposures", [])
+        readiness = data.get("readiness_summary", {}).get("status", "unknown")
+        factsheet = data.get("factsheet")
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.set_margins(20, 15, 20)
+        pdf.add_page()
+
+        # ---- Header bar ----
+        pdf.set_fill_color(45, 45, 55)
+        pdf.rect(0, 0, 210, 28, "F")
+        pdf.set_xy(20, 7)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_text_color(255, 255, 255)
+        pdf.cell(0, 8, "EU AI Act Compliance Platform", ln=True)
+        pdf.set_xy(20, 16)
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(160, 160, 180)
+        pdf.cell(0, 6, f"CONFIDENTIAL — {report.report_type.replace('_', ' ').upper()}", ln=True)
+        pdf.set_text_color(30, 30, 40)
+
+        # ---- Title block ----
+        pdf.set_xy(20, 34)
+        pdf.set_font("Helvetica", "B", 18)
+        pdf.set_text_color(20, 20, 30)
+        pdf.multi_cell(170, 9, report.title)
+        pdf.ln(2)
+
+        # Readiness badge
+        READINESS_COLORS = {
+            "ready": (16, 185, 129),
+            "partially_ready": (245, 158, 11),
+            "needs_attention": (239, 68, 68),
+        }
+        badge_r, badge_g, badge_b = READINESS_COLORS.get(readiness, (100, 100, 120))
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.set_text_color(badge_r, badge_g, badge_b)
+        pdf.cell(0, 6, f"Readiness: {readiness.replace('_', ' ').upper()}", ln=True)
+        pdf.ln(2)
+
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(120, 120, 140)
+        meta = data.get("metadata", {})
+        pdf.cell(0, 5, f"Report ID: {report.id}  |  Generated: {meta.get('generated_at', '')[:19].replace('T', ' ')}", ln=True)
+        pdf.ln(4)
+
+        pdf.set_draw_color(220, 220, 230)
+        pdf.set_line_width(0.3)
+        pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+        pdf.ln(5)
+
+        # ---- Factsheet summary card (if present) ----
+        if factsheet:
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(40, 40, 60)
+            pdf.cell(0, 7, "AI System Factsheet", ln=True)
+            pdf.ln(1)
+            sys_info = factsheet.get("system", {})
+            fria_info = factsheet.get("fria", {})
+            ctrl_info = factsheet.get("compliance", {})
+            ovs_info = factsheet.get("oversight", {})
+            inc_info = factsheet.get("incidents", {})
+            cards = [
+                ("System", sys_info.get("name", "—")),
+                ("Risk Level", sys_info.get("risk_level") or "—"),
+                ("FRIA Status", fria_info.get("status", "—")),
+                ("FRIA Progress", f"{fria_info.get('completion_percent', 0)}%"),
+                ("Controls Done", f"{ctrl_info.get('completion_score', 0)}%"),
+                ("Oversight Roles", str(ovs_info.get("assignment_count", 0))),
+                ("Open Incidents", str(inc_info.get("open_count", 0))),
+            ]
+            col_w = 80
+            row_h = 8
+            for i, (label, value) in enumerate(cards):
+                x = 20 + (i % 2) * col_w
+                y = pdf.get_y() if i % 2 == 0 else pdf.get_y() - row_h
+                if i % 2 == 0 and i > 0:
+                    pdf.ln(0)
+                pdf.set_xy(x, pdf.get_y() if i % 2 == 0 else y)
+                pdf.set_fill_color(248, 248, 252)
+                pdf.rect(x, pdf.get_y(), col_w - 3, row_h, "FD")
+                pdf.set_font("Helvetica", "", 7)
+                pdf.set_text_color(110, 110, 130)
+                pdf.set_xy(x + 2, pdf.get_y() + 1)
+                pdf.cell(col_w - 7, 3, label.upper(), ln=False)
+                pdf.set_xy(x + 2, pdf.get_y() + 3)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_text_color(30, 30, 50)
+                pdf.cell(col_w - 7, 3, str(value)[:25], ln=True if i % 2 == 1 or i == len(cards) - 1 else False)
+                if i % 2 == 0:
+                    pdf.set_xy(20 + col_w, y if i > 0 else pdf.get_y() - row_h)
+            pdf.ln(6)
+            pdf.line(20, pdf.get_y(), 190, pdf.get_y())
+            pdf.ln(5)
+
+        # ---- Executive summary ----
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.set_text_color(40, 40, 60)
+        pdf.cell(0, 7, "Executive Summary", ln=True)
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(60, 60, 80)
+        pdf.multi_cell(170, 5, data.get("executive_summary", ""))
+        pdf.ln(4)
+
+        # ---- Findings ----
+        if findings:
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(40, 40, 60)
+            pdf.cell(0, 7, f"Key Findings ({len(findings)})", ln=True)
+            pdf.ln(1)
+            SEV_COLORS = {"high": (239, 68, 68), "medium": (245, 158, 11), "low": (16, 185, 129)}
+            for f in findings:
+                sev = f.get("severity", "low")
+                cr, cg, cb = SEV_COLORS.get(sev, (100, 100, 120))
+                pdf.set_fill_color(cr, cg, cb)
+                pdf.rect(20, pdf.get_y(), 2, 12, "F")
+                pdf.set_x(24)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(30, 30, 50)
+                pdf.cell(150, 5, f.get("title", "")[:80], ln=True)
+                pdf.set_x(24)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(80, 80, 100)
+                pdf.multi_cell(166, 4, f.get("description", "")[:200])
+                pdf.ln(2)
+
+        # ---- Remediation Actions ----
+        if remediation_actions:
+            pdf.add_page()
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(40, 40, 60)
+            pdf.cell(0, 7, "Required Actions", ln=True)
+            pdf.ln(1)
+            for i, action in enumerate(remediation_actions, 1):
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(80, 80, 200)
+                pdf.cell(8, 5, f"{i}.", ln=False)
+                pdf.set_font("Helvetica", "B", 9)
+                pdf.set_text_color(30, 30, 50)
+                pdf.cell(0, 5, action.get("title", "")[:80], ln=True)
+                pdf.set_x(28)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(80, 80, 100)
+                pdf.multi_cell(162, 4, action.get("description", "")[:200])
+                pdf.ln(2)
+
+        # ---- Penalty Exposure ----
+        if penalty_exposures:
+            pdf.set_font("Helvetica", "B", 11)
+            pdf.set_text_color(40, 40, 60)
+            pdf.cell(0, 7, "Fine Exposure", ln=True)
+            pdf.ln(1)
+            for p in penalty_exposures:
+                pdf.set_fill_color(255, 245, 245)
+                pdf.set_draw_color(239, 68, 68)
+                pdf.set_line_width(0.2)
+                x, y = pdf.get_x(), pdf.get_y()
+                pdf.rect(20, y, 170, 12, "FD")
+                pdf.set_xy(23, y + 1)
+                pdf.set_font("Helvetica", "B", 8)
+                pdf.set_text_color(180, 30, 30)
+                pdf.cell(170, 4, p.get("enforcement_article", ""), ln=True)
+                pdf.set_x(23)
+                pdf.set_font("Helvetica", "", 8)
+                pdf.set_text_color(80, 40, 40)
+                note = (p.get("maximum_text") or p.get("notes") or "")[:100]
+                pdf.cell(167, 4, note, ln=True)
+                pdf.ln(2)
+
+        # ---- Footer ----
+        pdf.set_y(-20)
+        pdf.set_font("Helvetica", "I", 7)
+        pdf.set_text_color(150, 150, 160)
+        pdf.cell(0, 4, "Generated by the EU AI Act Compliance Platform. This report does not constitute legal advice.", align="C", ln=True)
+
+        return bytes(pdf.output())
+
+    # ------------------------------------------------------------------
+    # Evidence bundle (ZIP)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_bundle(db: Session, tenant_id: str, report_id: str) -> bytes:
+        report = ReportService.get_report(db, tenant_id, report_id)
+        buf = io.BytesIO()
+        prefix = report.id
+
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Core report artifacts
+            zf.writestr(f"{prefix}/report.json", json.dumps(report.report_json, indent=2))
+            zf.writestr(f"{prefix}/report.md", ReportService._generate_markdown(report))
+            zf.writestr(f"{prefix}/report.pdf", ReportService._generate_pdf(report))
+
+            # Source references index
+            zf.writestr(f"{prefix}/sources.json", json.dumps(report.source_refs_json or [], indent=2))
+
+            # Evidence items for the report's AI system (if any)
+            ai_system_id = report.ai_system_id
+            if ai_system_id:
+                items = db.query(EvidenceItem).filter(
+                    EvidenceItem.tenant_id == tenant_id,
+                    EvidenceItem.ai_system_id == ai_system_id,
+                ).all()
+                evidence_export = [
+                    {
+                        "id": e.id,
+                        "title": e.title,
+                        "control_domain": e.control_domain,
+                        "status": e.status,
+                        "collected_at": e.collected_at.isoformat() if e.collected_at else None,
+                        "owner_email": e.owner_email,
+                        "notes": e.notes,
+                        "artifact_count": len(e.artifacts) if hasattr(e, "artifacts") else 0,
+                    }
+                    for e in items
+                ]
+                zf.writestr(f"{prefix}/evidence/evidence_items.json", json.dumps(evidence_export, indent=2))
+
+                # FRIA sections for the system
+                frias = db.query(FRIARecord).filter(
+                    FRIARecord.tenant_id == tenant_id,
+                    FRIARecord.ai_system_id == ai_system_id,
+                ).all()
+                if frias:
+                    fria_export = [
+                        {
+                            "id": f.id,
+                            "status": f.status,
+                            "completion_percent": f.completion_percent,
+                            "sections": f.sections_json,
+                            "approval": f.approval_json,
+                        }
+                        for f in frias
+                    ]
+                    zf.writestr(f"{prefix}/evidence/fria_records.json", json.dumps(fria_export, indent=2))
+
+                # Incident records
+                incidents = db.query(IncidentRecord).filter(
+                    IncidentRecord.tenant_id == tenant_id,
+                    IncidentRecord.ai_system_id == ai_system_id,
+                ).all()
+                if incidents:
+                    inc_export = [
+                        {"id": i.id, "severity": i.severity, "status": i.status, "description": i.description}
+                        for i in incidents
+                    ]
+                    zf.writestr(f"{prefix}/evidence/incidents.json", json.dumps(inc_export, indent=2))
+
+            # Manifest
+            manifest = {
+                "bundle_created_at": datetime.now().isoformat(),
+                "report_id": report.id,
+                "report_type": report.report_type,
+                "tenant_id": tenant_id,
+                "ai_system_id": ai_system_id,
+                "files": [
+                    f"{prefix}/report.json",
+                    f"{prefix}/report.md",
+                    f"{prefix}/report.pdf",
+                    f"{prefix}/sources.json",
+                ],
+            }
+            zf.writestr(f"{prefix}/manifest.json", json.dumps(manifest, indent=2))
+
+        buf.seek(0)
+        return buf.read()
