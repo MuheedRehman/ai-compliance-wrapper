@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.models import AiSystem, ComplianceControl, EvidenceArtifact, EvidenceItem
 from app.schemas import EvidenceItemCreate, EvidenceItemUpdate
 from app.services.hashing import hash_object, hmac_signature
+from app.services import gcs_storage
 
 
 MAX_ARTIFACT_BYTES = 5 * 1024 * 1024
@@ -276,12 +277,17 @@ class EvidenceVaultService:
         artifact_id = f"art-{uuid.uuid4().hex[:10]}"
         artifact_hash = hashlib.sha256(content).hexdigest()
         storage_key = f"evidence/{tenant_id}/{item_id}/{artifact_id}/{_clean_file_name(file_name)}"
+        resolved_content_type = content_type or "application/octet-stream"
+        use_gcs = gcs_storage.is_configured()
+        if use_gcs:
+            gcs_storage.upload(storage_key, content, resolved_content_type)
+
         artifact = EvidenceArtifact(
             id=artifact_id,
             tenant_id=tenant_id,
             evidence_item_id=item_id,
             file_name=_clean_file_name(file_name),
-            content_type=content_type or "application/octet-stream",
+            content_type=resolved_content_type,
             size_bytes=len(content),
             artifact_hash=artifact_hash,
             hmac_signature=hmac_signature({
@@ -290,9 +296,9 @@ class EvidenceVaultService:
                 "evidence_item_id": item_id,
                 "artifact_hash": artifact_hash,
             }),
-            storage_backend="database",
+            storage_backend="gcs" if use_gcs else "database",
             storage_key=storage_key,
-            content_bytes=content,
+            content_bytes=None if use_gcs else content,
             metadata_json=metadata or {"source": "evidence_vault_upload"},
         )
         db.add(artifact)
@@ -350,6 +356,35 @@ class EvidenceVaultService:
         ):
             raise HTTPException(status_code=415, detail="Evidence artifact type is not previewable")
         return artifact
+
+    @staticmethod
+    def read_artifact_content(artifact: EvidenceArtifact) -> bytes:
+        if artifact.storage_backend == "gcs":
+            return gcs_storage.download(artifact.storage_key)
+        return artifact.content_bytes or b""
+
+    @staticmethod
+    def download_artifact_bytes(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        artifact_id: str,
+    ) -> bytes:
+        artifact = EvidenceVaultService.get_artifact(db, tenant_id, item_id, artifact_id)
+        return EvidenceVaultService.read_artifact_content(artifact)
+
+    @staticmethod
+    def get_artifact_signed_url(
+        db: Session,
+        tenant_id: str,
+        item_id: str,
+        artifact_id: str,
+        expiry_seconds: int = 3600,
+    ) -> str | None:
+        artifact = EvidenceVaultService.get_artifact(db, tenant_id, item_id, artifact_id)
+        if artifact.storage_backend != "gcs":
+            return None
+        return gcs_storage.signed_url(artifact.storage_key, expiry_seconds)
 
     @staticmethod
     def summary(db: Session, tenant_id: str, ai_system_id: Optional[str] = None) -> dict:

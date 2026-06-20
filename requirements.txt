@@ -11,6 +11,7 @@ python-multipart
 slowapi
 
 fpdf2
+google-cloud-storage
 
 pytest
 pytest-asyncio

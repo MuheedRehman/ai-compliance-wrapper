@@ -119,8 +119,9 @@ def download_evidence_artifact(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="evidence:read")
     artifact = EvidenceVaultService.get_artifact(db, auth["tenant_id"], item_id, artifact_id)
+    content = EvidenceVaultService.read_artifact_content(artifact)
     return Response(
-        content=artifact.content_bytes,
+        content=content,
         media_type=artifact.content_type,
         headers={
             "Content-Disposition": f'attachment; filename="{artifact.file_name}"',
@@ -139,8 +140,9 @@ def preview_evidence_artifact(
 ):
     auth = authenticate_api_key(db, x_api_key, required_scope="evidence:read")
     artifact = EvidenceVaultService.get_previewable_artifact(db, auth["tenant_id"], item_id, artifact_id)
+    content = EvidenceVaultService.read_artifact_content(artifact)
     return Response(
-        content=artifact.content_bytes,
+        content=content,
         media_type=artifact.content_type,
         headers={
             "Content-Disposition": f'inline; filename="{artifact.file_name}"',
@@ -150,3 +152,23 @@ def preview_evidence_artifact(
             "X-Evidence-Artifact-Signature": artifact.hmac_signature,
         },
     )
+
+
+@router.get("/items/{item_id}/artifacts/{artifact_id}/signed-url")
+def get_artifact_signed_url(
+    item_id: str,
+    artifact_id: str,
+    expiry: int = Query(default=3600, ge=60, le=86400),
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+):
+    auth = authenticate_api_key(db, x_api_key, required_scope="evidence:read")
+    url = EvidenceVaultService.get_artifact_signed_url(
+        db, auth["tenant_id"], item_id, artifact_id, expiry_seconds=expiry
+    )
+    if url is None:
+        raise HTTPException(
+            status_code=409,
+            detail="Signed URLs are only available for GCS-backed artifacts",
+        )
+    return {"signed_url": url, "expires_in": expiry}

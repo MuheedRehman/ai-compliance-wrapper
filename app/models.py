@@ -438,7 +438,7 @@ class EvidenceArtifact(Base):
     hmac_signature = Column(String, nullable=False)
     storage_backend = Column(String, nullable=False, default="database", index=True)
     storage_key = Column(String, nullable=False)
-    content_bytes = Column(LargeBinary, nullable=False)
+    content_bytes = Column(LargeBinary, nullable=True)
     metadata_json = Column(JSON, nullable=False, default=dict)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
