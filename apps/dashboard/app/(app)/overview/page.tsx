@@ -1,12 +1,8 @@
-'use client';
-
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { api } from '@/lib/api';
 import PageShell from '@/components/page-shell';
 import Card from '@/components/card';
 import StatusBadge from '@/components/status-badge';
-import Loading from '@/components/loading';
+import { backendServiceFetch } from '@/lib/backend-service';
 import {
   Cpu,
   Layers,
@@ -18,46 +14,26 @@ import {
   ListChecks,
 } from 'lucide-react';
 
-interface OverviewData {
-  systems: any[];
-  features: any[];
-  reviews: any[];
-  logs: any[];
-  scorecard: any | null;
+async function fetchOverviewData() {
+  const [systemsRes, featuresRes, reviewsRes, logsRes, scorecardRes] = await Promise.allSettled([
+    backendServiceFetch('/v1/ai-systems').then(r => r.ok ? r.json() as Promise<any[]> : []),
+    backendServiceFetch('/v1/features').then(r => r.ok ? r.json() as Promise<{ features: any[] }> : { features: [] }),
+    backendServiceFetch('/v1/review-tasks').then(r => r.ok ? r.json() as Promise<{ review_tasks: any[] }> : { review_tasks: [] }),
+    backendServiceFetch('/v1/logs').then(r => r.ok ? r.json() as Promise<{ logs: any[] }> : { logs: [] }),
+    backendServiceFetch('/v1/compliance/scorecard').then(r => r.ok ? r.json() : null),
+  ]);
+
+  return {
+    systems: (systemsRes.status === 'fulfilled' ? systemsRes.value : null) as any[] || [],
+    features: ((featuresRes.status === 'fulfilled' ? featuresRes.value : null) as any)?.features || [],
+    reviews: ((reviewsRes.status === 'fulfilled' ? reviewsRes.value : null) as any)?.review_tasks || [],
+    logs: ((logsRes.status === 'fulfilled' ? logsRes.value : null) as any)?.logs || [],
+    scorecard: scorecardRes.status === 'fulfilled' ? scorecardRes.value : null,
+  };
 }
 
-const EMPTY_DATA: OverviewData = { systems: [], features: [], reviews: [], logs: [], scorecard: null };
-
-export default function OverviewPage() {
-  const [data, setData] = useState<OverviewData>(EMPTY_DATA);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([
-      api.listSystems().catch(() => []),
-      api.listFeatures().catch(() => ({ features: [] })),
-      api.listReviews().catch(() => ({ review_tasks: [] })),
-      api.listLogs().catch(() => ({ logs: [] })),
-      api.getScorecard().catch(() => null),
-    ]).then(([systems, featData, revData, logData, scorecard]) => {
-      setData({
-        systems: systems || [],
-        features: featData.features || [],
-        reviews: revData.review_tasks || [],
-        logs: logData.logs || [],
-        scorecard,
-      });
-      setLoading(false);
-    });
-  }, []);
-
-  if (loading) {
-    return (
-      <PageShell title="Governance Overview" subtitle="Real-time operational summary of your EU AI Act compliance posture.">
-        <Loading />
-      </PageShell>
-    );
-  }
+export default async function OverviewPage() {
+  const data = await fetchOverviewData();
 
   const totalSystems = data.systems.length;
   const deployedSystems = data.systems.filter((s: any) => s.deployment_status?.toLowerCase() === 'deployed').length;

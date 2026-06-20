@@ -36,6 +36,7 @@ async function proxy(request: NextRequest, context: RouteContext) {
   }
 
   headers.set('x-api-key', apiKey);
+  headers.set('x-request-id', request.headers.get('x-request-id') || crypto.randomUUID());
   if (session.email) headers.set('x-dashboard-user-email', session.email);
   if (session.name) headers.set('x-dashboard-user-name', session.name);
   if (session.provider) headers.set('x-dashboard-user-provider', session.provider);

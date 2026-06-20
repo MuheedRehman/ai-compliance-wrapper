@@ -104,6 +104,90 @@ export type CurrentSession = {
   access_label?: string;
 };
 
+// ── Domain types for the top-5 API endpoints ───────────────
+
+export type AiSystem = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  description?: string | null;
+  owner_email?: string | null;
+  technical_owner_email?: string | null;
+  legal_owner_email?: string | null;
+  review_status?: string | null;
+  next_review_at?: string | null;
+  lifecycle_notes?: string | null;
+  risk_level?: string | null;
+  annex_iii_category?: string | null;
+  lifecycle_status?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ComplianceControl = {
+  id: string;
+  tenant_id: string;
+  ai_system_id?: string | null;
+  control_key: string;
+  title: string;
+  article: string;
+  category?: string | null;
+  status: string;
+  severity?: string | null;
+  owner_email?: string | null;
+  evidence_required?: boolean | null;
+  review_cadence_days?: number | null;
+  last_reviewed_at?: string | null;
+  details_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EvidenceItem = {
+  id: string;
+  tenant_id: string;
+  ai_system_id?: string | null;
+  control_domain?: string | null;
+  title: string;
+  status: string;
+  owner_email?: string | null;
+  collected_at?: string | null;
+  notes?: string | null;
+  artifact_count?: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type ReportRecord = {
+  id: string;
+  tenant_id: string;
+  report_type: string;
+  title: string;
+  status: string;
+  ai_system_id?: string | null;
+  feature_id?: string | null;
+  report_json: Record<string, any>;
+  source_refs_json: Record<string, any>[];
+  artifact_metadata: Record<string, string>;
+  legal_basis_json: Record<string, any>[];
+  generation_manifest_json: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FRIARecord = {
+  id: string;
+  tenant_id: string;
+  ai_system_id: string;
+  ai_system_name?: string | null;
+  status: 'draft' | 'in_review' | 'approved' | 'rejected';
+  completion_percent: number;
+  sections_json?: Record<string, any> | null;
+  approval_json?: Record<string, any> | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {},
@@ -137,8 +221,8 @@ export async function fetchApi<T = any>(
 
 export const api = {
   // AI Systems
-  listSystems: () => fetchApi<any[]>('/v1/ai-systems'),
-  getSystem: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}`),
+  listSystems: () => fetchApi<AiSystem[]>('/v1/ai-systems'),
+  getSystem: (id: string) => fetchApi<AiSystem>(`/v1/ai-systems/${id}`),
   getSystemWorkspace: (id: string) => fetchApi<any>(`/v1/ai-systems/${id}/workspace`),
   createSystem: (body: {
     name: string;
@@ -201,7 +285,7 @@ export const api = {
   },
   listEvidenceItems: (params?: Record<string, string>) => {
     const qs = params ? '?' + new URLSearchParams(params).toString() : '';
-    return fetchApi<any[]>(`/v1/evidence/items${qs}`);
+    return fetchApi<EvidenceItem[]>(`/v1/evidence/items${qs}`);
   },
   getEvidenceSummary: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
@@ -273,8 +357,8 @@ export const api = {
   explainIntakeObligations: (id: string) => fetchApi<any>(`/v1/obligations/explain/intake/${id}`),
 
   // FRIA
-  listFrias: () => fetchApi<any[]>('/v1/obligations/fria'),
-  getFria: (id: string) => fetchApi<any>(`/v1/obligations/fria/${id}`),
+  listFrias: () => fetchApi<FRIARecord[]>('/v1/obligations/fria'),
+  getFria: (id: string) => fetchApi<FRIARecord>(`/v1/obligations/fria/${id}`),
   createFria: (body: any) => fetchApi<any>('/v1/obligations/fria', { method: 'POST', body: JSON.stringify(body) }),
   updateFria: (id: string, body: any) => fetchApi<any>(`/v1/obligations/fria/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteFria: (id: string) => fetchApi<any>(`/v1/obligations/fria/${id}`, { method: 'DELETE' }),
@@ -297,8 +381,8 @@ export const api = {
   deleteIncident: (id: string) => fetchApi<any>(`/v1/obligations/incidents/${id}`, { method: 'DELETE' }),
 
   // Reports (Phase 4.5)
-  listReports: () => fetchApi<any[]>('/v1/reports'),
-  getReport: (id: string) => fetchApi<any>(`/v1/reports/${id}`),
+  listReports: () => fetchApi<ReportRecord[]>('/v1/reports'),
+  getReport: (id: string) => fetchApi<ReportRecord>(`/v1/reports/${id}`),
   createReport: (body: any) => fetchApi<any>('/v1/reports', { method: 'POST', body: JSON.stringify(body) }),
   getArtifactUrl: (id: string, artifact: string) => `${API_BASE_URL}/v1/reports/${id}/artifacts/${artifact}`,
   downloadArtifact: async (id: string, artifact: string) => {
@@ -334,7 +418,7 @@ export const api = {
   // Compliance Controls
   listControls: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
-    return fetchApi<any[]>(`/v1/compliance/controls${qs}`);
+    return fetchApi<ComplianceControl[]>(`/v1/compliance/controls${qs}`);
   },
   listControlTemplates: (aiSystemId?: string) => {
     const qs = aiSystemId ? `?${new URLSearchParams({ ai_system_id: aiSystemId }).toString()}` : '';
