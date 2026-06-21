@@ -23,22 +23,21 @@ depends_on: Optional[Sequence[str]] = None
 
 
 def upgrade() -> None:
-    op.alter_column(
-        "evidence_artifacts",
-        "content_bytes",
-        existing_type=sa.LargeBinary(),
-        nullable=True,
-    )
+    with op.batch_alter_table("evidence_artifacts") as batch_op:
+        batch_op.alter_column(
+            "content_bytes",
+            existing_type=sa.LargeBinary(),
+            nullable=True,
+        )
 
 
 def downgrade() -> None:
-    # Back-fill NULL bytes before flipping nullable=False to avoid integrity errors.
     op.execute(
         "UPDATE evidence_artifacts SET content_bytes = '' WHERE content_bytes IS NULL"
     )
-    op.alter_column(
-        "evidence_artifacts",
-        "content_bytes",
-        existing_type=sa.LargeBinary(),
-        nullable=False,
-    )
+    with op.batch_alter_table("evidence_artifacts") as batch_op:
+        batch_op.alter_column(
+            "content_bytes",
+            existing_type=sa.LargeBinary(),
+            nullable=False,
+        )

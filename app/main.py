@@ -18,6 +18,7 @@ from app.routes.reports import router as reports_router
 from app.routes.compliance import router as compliance_router
 from app.routes.website_scans import router as website_scans_router
 from app.routes.tenant_admin import router as tenant_admin_router
+from app.routes.runtime import router as runtime_router
 from app.config import FRONTEND_URL
 
 app = FastAPI(title="AI Compliance & Governance Wrapper", version="0.5.0")
@@ -58,6 +59,7 @@ app.include_router(reports_router)
 app.include_router(compliance_router)
 app.include_router(website_scans_router)
 app.include_router(tenant_admin_router)
+app.include_router(runtime_router)
 
 register_exception_handlers(app)
 

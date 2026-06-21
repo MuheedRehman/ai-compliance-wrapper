@@ -70,7 +70,7 @@ const navSections = [
     items: [
       { href: '/settings/users', label: 'Users & Access', icon: Users },
       { href: '/billing',  label: 'Subscription',  icon: CreditCard, requiredPermission: 'billing:manage' },
-      { href: '/runtime',  label: 'Playground',    icon: Terminal, requiredPermission: 'runtime:execute' },
+      { href: '/runtime',  label: 'Runtime SDK',   icon: Terminal, requiredPermission: 'runtime:execute' },
     ],
   },
 ] satisfies { label: string; items: NavItem[] }[];

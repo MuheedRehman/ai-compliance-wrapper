@@ -188,6 +188,49 @@ export type FRIARecord = {
   updated_at: string;
 };
 
+export type PolicyCheckResult = {
+  check_id: string;
+  decision: 'allow' | 'block' | 'review';
+  reason: string;
+  feature_id?: string | null;
+  feature_name?: string | null;
+  ai_system_id?: string | null;
+  risk_level?: string | null;
+  policy_refs: string[];
+  latency_ms: number;
+};
+
+export type DeveloperKey = {
+  key_id: string;
+  name: string;
+  description?: string | null;
+  role: string;
+  scopes: string[];
+  revoked: boolean;
+  created_at?: string | null;
+  last_used_at?: string | null;
+  raw_key?: string | null;
+};
+
+export type RuntimeUsageDayStat = {
+  date: string;
+  total: number;
+  allow: number;
+  block: number;
+  review: number;
+};
+
+export type RuntimeUsage = {
+  tenant_id: string;
+  period_days: number;
+  total_checks: number;
+  allow_count: number;
+  block_count: number;
+  review_count: number;
+  top_features: { feature_id: string; check_count: number }[];
+  daily: RuntimeUsageDayStat[];
+};
+
 export async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {},
@@ -509,4 +552,20 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify(body),
     }),
+
+  // Runtime Governance SDK
+  policyCheck: (body: { prompt: string; feature_id?: string; context?: Record<string, unknown> }) =>
+    fetchApi<PolicyCheckResult>('/v1/runtime/policy-check', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  getRuntimeUsage: (days = 7) => fetchApi<RuntimeUsage>(`/v1/runtime/usage?days=${days}`),
+  listDeveloperKeys: () => fetchApi<DeveloperKey[]>('/v1/runtime/developer-keys'),
+  createDeveloperKey: (body: { name: string; description?: string }) =>
+    fetchApi<DeveloperKey>('/v1/runtime/developer-keys', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+  revokeDeveloperKey: (keyId: string) =>
+    fetchApi<void>(`/v1/runtime/developer-keys/${keyId}`, { method: 'DELETE' }),
 };

@@ -814,3 +814,63 @@ class TenantAdminSummaryResponse(BaseModel):
     auth_policy: TenantAuthPolicyResponse
     login_events: List[TenantLoginAuditResponse] = Field(default_factory=list)
     action_events: List[TenantActionAuditResponse] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
+# Runtime Governance SDK
+# ---------------------------------------------------------------------------
+
+class PolicyCheckRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=32000)
+    feature_id: Optional[str] = None
+    context: Optional[Dict[str, Any]] = None
+
+
+class PolicyCheckResponse(BaseModel):
+    check_id: str
+    decision: Literal["allow", "block", "review"]
+    reason: str
+    feature_id: Optional[str] = None
+    feature_name: Optional[str] = None
+    ai_system_id: Optional[str] = None
+    risk_level: Optional[str] = None
+    policy_refs: List[str] = Field(default_factory=list)
+    latency_ms: int
+
+
+class DeveloperKeyCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    description: Optional[str] = Field(default=None, max_length=300)
+
+
+class DeveloperKeyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key_id: str
+    name: str
+    description: Optional[str] = None
+    role: str
+    scopes: List[str]
+    revoked: bool
+    created_at: Optional[datetime] = None
+    last_used_at: Optional[datetime] = None
+    raw_key: Optional[str] = None  # populated only on creation
+
+
+class RuntimeUsageDayStat(BaseModel):
+    date: str
+    total: int
+    allow: int
+    block: int
+    review: int
+
+
+class RuntimeUsageResponse(BaseModel):
+    tenant_id: str
+    period_days: int
+    total_checks: int
+    allow_count: int
+    block_count: int
+    review_count: int
+    top_features: List[Dict[str, Any]]
+    daily: List[RuntimeUsageDayStat]

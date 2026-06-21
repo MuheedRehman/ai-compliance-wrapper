@@ -30,6 +30,7 @@ class ApiKey(Base):
     key_id = Column(String, primary_key=True, index=True)
     tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
     name = Column(String, nullable=False)
+    description = Column(String, nullable=True)
     key_hash = Column(String, nullable=False, unique=True, index=True)
     role = Column(String, nullable=False, default="app")
     scopes = Column(JSON, nullable=False, default=list)
@@ -585,3 +586,21 @@ class WebsiteScan(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+
+class RuntimePolicyCheck(Base):
+    __tablename__ = "runtime_policy_checks"
+
+    id = Column(String, primary_key=True, index=True)
+    tenant_id = Column(String, ForeignKey("tenants.tenant_id"), nullable=False, index=True)
+    api_key_id = Column(String, nullable=True, index=True)
+    feature_id = Column(String, nullable=True, index=True)
+    ai_system_id = Column(String, nullable=True)
+    prompt_hash = Column(String, nullable=True)
+    prompt_length = Column(Integer, nullable=False, default=0)
+    decision = Column(String, nullable=False, index=True)
+    reason = Column(String, nullable=False)
+    policy_refs = Column(JSON, nullable=False, default=list)
+    latency_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
