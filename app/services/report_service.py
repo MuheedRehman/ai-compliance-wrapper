@@ -589,6 +589,12 @@ class ReportService:
     # ------------------------------------------------------------------
 
     @staticmethod
+    def _safe_text(text: str, max_len: int = 0) -> str:
+        """Coerce text to Latin-1 safe (fpdf2 core fonts are Latin-1 only)."""
+        sanitized = (text or "").encode("latin-1", errors="replace").decode("latin-1")
+        return sanitized[:max_len] if max_len else sanitized
+
+    @staticmethod
     def _generate_pdf(report: ReportRecord) -> bytes:
         data = report.report_json or {}
         findings = data.get("findings", [])
@@ -596,6 +602,7 @@ class ReportService:
         penalty_exposures = data.get("penalty_exposures", [])
         readiness = data.get("readiness_summary", {}).get("status", "unknown")
         factsheet = data.get("factsheet")
+        s = ReportService._safe_text
 
         pdf = FPDF()
         pdf.set_auto_page_break(auto=True, margin=15)
@@ -612,14 +619,14 @@ class ReportService:
         pdf.set_xy(20, 16)
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(160, 160, 180)
-        pdf.cell(0, 6, f"CONFIDENTIAL — {report.report_type.replace('_', ' ').upper()}", ln=True)
+        pdf.cell(0, 6, f"CONFIDENTIAL - {report.report_type.replace('_', ' ').upper()}", ln=True)
         pdf.set_text_color(30, 30, 40)
 
         # ---- Title block ----
         pdf.set_xy(20, 34)
         pdf.set_font("Helvetica", "B", 18)
         pdf.set_text_color(20, 20, 30)
-        pdf.multi_cell(170, 9, report.title)
+        pdf.multi_cell(170, 9, s(report.title))
         pdf.ln(2)
 
         # Readiness badge
@@ -637,7 +644,7 @@ class ReportService:
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(120, 120, 140)
         meta = data.get("metadata", {})
-        pdf.cell(0, 5, f"Report ID: {report.id}  |  Generated: {meta.get('generated_at', '')[:19].replace('T', ' ')}", ln=True)
+        pdf.cell(0, 5, f"Report ID: {report.id}  |  Generated: {meta.get('generated_at', '')[:19].replace('T', ' ')} UTC", ln=True)
         pdf.ln(4)
 
         pdf.set_draw_color(220, 220, 230)
@@ -682,7 +689,7 @@ class ReportService:
                 pdf.set_xy(x + 2, pdf.get_y() + 3)
                 pdf.set_font("Helvetica", "B", 8)
                 pdf.set_text_color(30, 30, 50)
-                pdf.cell(col_w - 7, 3, str(value)[:25], ln=True if i % 2 == 1 or i == len(cards) - 1 else False)
+                pdf.cell(col_w - 7, 3, s(str(value), 25), ln=True if i % 2 == 1 or i == len(cards) - 1 else False)
                 if i % 2 == 0:
                     pdf.set_xy(20 + col_w, y if i > 0 else pdf.get_y() - row_h)
             pdf.ln(6)
@@ -695,7 +702,7 @@ class ReportService:
         pdf.cell(0, 7, "Executive Summary", ln=True)
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(60, 60, 80)
-        pdf.multi_cell(170, 5, data.get("executive_summary", ""))
+        pdf.multi_cell(170, 5, s(data.get("executive_summary", "")))
         pdf.ln(4)
 
         # ---- Findings ----
@@ -713,11 +720,11 @@ class ReportService:
                 pdf.set_x(24)
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(30, 30, 50)
-                pdf.cell(150, 5, f.get("title", "")[:80], ln=True)
+                pdf.cell(150, 5, s(f.get("title", ""), 80), ln=True)
                 pdf.set_x(24)
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(80, 80, 100)
-                pdf.multi_cell(166, 4, f.get("description", "")[:200])
+                pdf.multi_cell(166, 4, s(f.get("description", ""), 200))
                 pdf.ln(2)
 
         # ---- Remediation Actions ----
@@ -733,11 +740,11 @@ class ReportService:
                 pdf.cell(8, 5, f"{i}.", ln=False)
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.set_text_color(30, 30, 50)
-                pdf.cell(0, 5, action.get("title", "")[:80], ln=True)
+                pdf.cell(0, 5, s(action.get("title", ""), 80), ln=True)
                 pdf.set_x(28)
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(80, 80, 100)
-                pdf.multi_cell(162, 4, action.get("description", "")[:200])
+                pdf.multi_cell(162, 4, s(action.get("description", ""), 200))
                 pdf.ln(2)
 
         # ---- Penalty Exposure ----
@@ -755,11 +762,11 @@ class ReportService:
                 pdf.set_xy(23, y + 1)
                 pdf.set_font("Helvetica", "B", 8)
                 pdf.set_text_color(180, 30, 30)
-                pdf.cell(170, 4, p.get("enforcement_article", ""), ln=True)
+                pdf.cell(170, 4, s(p.get("enforcement_article", "")), ln=True)
                 pdf.set_x(23)
                 pdf.set_font("Helvetica", "", 8)
                 pdf.set_text_color(80, 40, 40)
-                note = (p.get("maximum_text") or p.get("notes") or "")[:100]
+                note = s(p.get("maximum_text") or p.get("notes") or "", 100)
                 pdf.cell(167, 4, note, ln=True)
                 pdf.ln(2)
 
